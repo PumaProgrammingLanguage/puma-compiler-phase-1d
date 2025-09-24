@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <StartupObject>Puma.Program</StartupObject>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <AssemblyVersion>0.1</AssemblyVersion>
+    <FileVersion>0.0.0.0</FileVersion>
+    <PublishAot>True</PublishAot>
+    <Description>LLVM compiler for the puma programming language.</Description>
+    <Copyright>Copyright © 2024 by Darryl Anthony Burchfield</Copyright>
+    <PackageReleaseNotes>Initial release</PackageReleaseNotes>
+    <Title>Puma Programming Language</Title>
+    <Company>Puma Programming Language Project</Company>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>compiler, translator</PackageTags>
+    <Version>0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Puma.Tests\Puma.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
+    <PackageReference Include="MSTest" Version="3.1.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="3.1.1" />
+    <PackageReference Include="MSTest.TestFramework" Version="3.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

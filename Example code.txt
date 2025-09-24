@@ -1,0 +1,38 @@
+add code to the parser and code generator for the following input and output
+
+// input: puma code
+using
+
+module
+
+enums
+
+records
+
+initialize
+
+finalize
+
+functions
+
+end
+
+
+
+// output: C code
+// using
+
+// module
+
+// enums
+
+// records
+
+// initialize
+
+// finalize
+
+// functions
+
+// end
+
