@@ -33,7 +33,7 @@ namespace Puma
         [
             // use
             "using",
-            // type
+            // type (currently recognized but not enforced in the order below)
             "type",
             "trait",
             "module",
@@ -90,6 +90,33 @@ namespace Puma
             ["functions"] = Section.Functions,
             ["end"] = Section.end
         };
+
+        // Enforce order: sections are optional, but if present they must follow this sequence.
+        // start and initialize share the same position.
+        private static readonly Dictionary<Section, int> SectionRank = new()
+        {
+            [Section.Using] = 10,
+            [Section.Module] = 20,
+            [Section.Enums] = 30,
+            [Section.Records] = 40,
+            [Section.Start] = 50,
+            [Section.Initialize] = 50,
+            [Section.Finalize] = 60,
+            [Section.Functions] = 70,
+            [Section.end] = 80,
+
+            // Recognized but not part of the enforced flow
+            [Section.Type] = 0,
+            [Section.Trait] = 0,
+            [Section.Properties] = 0
+        };
+
+        private const string ExpectedOrderText =
+            "using, module, enums, records, start/initialize, finalize, functions, end";
+
+        private int _lastRank = int.MinValue;
+        private Section _lastSection = Section.None;
+        private readonly HashSet<Section> _seen = new();
 
         private Section CurrentSection = Section.None;
         private LexerTokens? token = new LexerTokens();
@@ -214,6 +241,31 @@ namespace Puma
                 var text = t.TokenText;
                 if (_sectionMap.TryGetValue(text, out var next))
                 {
+                    // Duplicate check
+                    if (_seen.Contains(next))
+                    {
+                        throw new InvalidOperationException(
+                            $"Duplicate section '{DisplayName(next)}'. Remove the extra '{DisplayName(next)}' section.");
+                    }
+
+                    // Order check
+                    if (!SectionRank.TryGetValue(next, out var rank) || rank == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Section '{DisplayName(next)}' is not allowed here. Sections must appear in this order (all optional): {ExpectedOrderText}.");
+                    }
+
+                    if (rank < _lastRank)
+                    {
+                        throw new InvalidOperationException(
+                            $"Section '{DisplayName(next)}' is out of order after '{DisplayName(_lastSection)}'. " +
+                            $"Fix: move '{DisplayName(next)}' to match this order (all optional): {ExpectedOrderText}.");
+                    }
+
+                    _seen.Add(next);
+                    _lastRank = rank;
+                    _lastSection = next;
+
                     CurrentSection = next;
                     ast.Add(new Node(next));
                     return true;
@@ -222,120 +274,52 @@ namespace Puma
             return false;
         }
 
+        private static string DisplayName(Section s) => s switch
+        {
+            Section.Start => "start",
+            Section.Initialize => "initialize",
+            Section.Finalize => "finalize",
+            Section.Functions => "functions",
+            Section.Using => "using",
+            Section.Module => "module",
+            Section.Enums => "enums",
+            Section.Records => "records",
+            Section.end => "end",
+            Section.Type => "type",
+            Section.Trait => "trait",
+            Section.Properties => "properties",
+            _ => s.ToString()
+        };
+
         /// <summary>
         /// Parse the file
         /// </summary>
-        /// <param name="token"></param>
         private void ParseFile(LexerTokens? token)
         {
             // Look for the first section header
             TrySwitchSection(token);
         }
 
-        /// <summary>
-        /// Parse the using section
-        /// </summary>
-        /// <param name="token"></param>
         private void ParseUsing(LexerTokens? token)
         {
             // Switch when the next section header appears
             TrySwitchSection(token);
         }
 
-        /// <summary>
-        /// Parse the module section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseModule(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the type section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseType(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the trait section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseTrait(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the enums section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseEnums(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the records section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseRecords(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the properties section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseProperties(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the start section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseStart(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the initialize section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseInitialize(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the finalize section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseFinalize(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
-
-        /// <summary>
-        /// Parse the functions section
-        /// </summary>
-        /// <param name="token"></param>
-        private void ParseFunctions(LexerTokens? token)
-        {
-            TrySwitchSection(token);
-        }
+        private void ParseModule(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseType(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseTrait(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseEnums(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseRecords(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseProperties(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseStart(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseInitialize(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseFinalize(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseFunctions(LexerTokens? token) => TrySwitchSection(token);
 
         /// <summary>
         /// Parse the end of the file
         /// </summary>
-        /// <param name="token"></param>
         private void ParseEnd(LexerTokens? token)
         {
             // After 'end' we ignore remaining tokens.
