@@ -28,23 +28,42 @@ namespace Puma
 
         internal string Generate(List<Node> ast)
         {
-            var names = new List<string>();
+            // Collect only recognized (non-empty) section names in order.
+            var sections = new List<Section>();
             foreach (var node in ast)
             {
-                var name = SectionToString(node.Section);
-                if (!string.IsNullOrEmpty(name))
+                if (!string.IsNullOrEmpty(SectionToString(node.Section)))
                 {
-                    names.Add(name);
+                    sections.Add(node.Section);
                 }
             }
 
             var sb = new StringBuilder();
-            for (int i = 0; i < names.Count; i++)
+
+            for (int i = 0; i < sections.Count; i++)
             {
-                sb.AppendLine($"// {names[i]}");
-                if (i < names.Count - 1)
+                var section = sections[i];
+                var name = SectionToString(section);
+
+                // Emit the section marker comment
+                sb.AppendLine($"// {name}");
+
+                // Special handling: inline main stub inside the 'start' section immediately
+                if (section == Section.Start)
                 {
-                    sb.AppendLine();
+                    // Emit the C entry point stub inside the start section
+                    sb.Append("void main(void)\n{\n");
+                    // put more code here later
+                    sb.AppendLine("    return;\n}\n");
+                }
+                else
+                {
+                    // Add a separating blank line after the section if not the last section.
+                    // Matches the original formatting where only the last section omits the trailing blank line.
+                    if (i < sections.Count - 1)
+                    {
+                        sb.AppendLine();
+                    }
                 }
             }
 
