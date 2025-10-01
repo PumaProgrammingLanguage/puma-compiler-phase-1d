@@ -95,24 +95,22 @@ namespace Puma
         // start and initialize share the same position.
         private static readonly Dictionary<Section, int> SectionRank = new()
         {
-            [Section.Using] = 10,
-            [Section.Module] = 20,
-            [Section.Enums] = 30,
-            [Section.Records] = 40,
-            [Section.Start] = 50,
-            [Section.Initialize] = 50,
-            [Section.Finalize] = 60,
-            [Section.Functions] = 70,
-            [Section.end] = 80,
-
-            // Recognized but not part of the enforced flow
-            [Section.Type] = 0,
-            [Section.Trait] = 0,
-            [Section.Properties] = 0
+            [Section.Using] = 1,
+            [Section.Module] = 2,
+            [Section.Type] = 2,
+            [Section.Trait] = 2,
+            [Section.Enums] = 3,
+            [Section.Records] = 4,
+            [Section.Properties] = 5,
+            [Section.Start] = 6,
+            [Section.Initialize] = 6,
+            [Section.Finalize] = 7,
+            [Section.Functions] = 8,
+            [Section.end] = 9,
         };
 
         private const string ExpectedOrderText =
-            "using, module, enums, records, start/initialize, finalize, functions, end";
+            "using, module|type|trait, enums, records, start|initialize, finalize, functions, end";
 
         private int _lastRank = int.MinValue;
         private Section _lastSection = Section.None;

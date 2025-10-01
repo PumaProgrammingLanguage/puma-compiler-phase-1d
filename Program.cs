@@ -99,6 +99,11 @@ namespace Puma
                     File.WriteAllText(cSourceFileName, cCode);
                     return;
                 }
+                else
+                {
+                    // Write the generated C code to a file with the same name as the source file, but with the .c extension.
+                    File.WriteAllText(cSourceFileName, cCode);
+                }
 
                 if (OutputFileName != "")
                 {

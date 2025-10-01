@@ -1,0 +1,20 @@
+// input: puma code
+using
+
+module
+
+enums
+
+records
+
+properties
+
+initialize
+
+finalize
+
+functions
+
+end
+
+
