@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Puma": {
+      "commandName": "Project",
+      "commandLineArgs": "-v -o Sections.o Sections.puma",
+      "workingDirectory": "ExampleCode/"
+    }
+  }
+}
