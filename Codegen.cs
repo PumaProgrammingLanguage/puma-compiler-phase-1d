@@ -22,60 +22,95 @@ namespace Puma
 {
     internal class Codegen
     {
-        public Codegen() { }
+        public Codegen()
+        {
+        }
 
         internal string Generate(List<Node> ast)
         {
-            // Collect only recognized (non-empty) section names in order.
-            var sections = new List<Parser.Section>();
-            foreach (var node in ast)
-            {
-                if (!string.IsNullOrEmpty(SectionToString(node.Section)))
-                {
-                    sections.Add(node.Section);
-                }
-            }
-
             var sb = new StringBuilder();
 
-            for (int i = 0; i < sections.Count; i++)
+            // Include stdio if any WriteLine is present
+            var hasWriteLine = ast.Any(n => n.Kind == NodeKind.WriteLine);
+            if (hasWriteLine)
             {
-                var section = sections[i];
-                var name = SectionToString(section);
+                sb.AppendLine("#include <stdio.h> // needed for puts()");
+                sb.AppendLine();
+            }
 
-                // Emit the section marker comment
-                sb.AppendLine($"// {name}");
-
-                // Emit a valid C++ main inside 'start'
-                if (section == Parser.Section.Start)
+            // Walk the AST and render sections and statements.
+            for (int i = 0; i < ast.Count; i++)
+            {
+                var node = ast[i];
+                if (node.Kind == NodeKind.Section)
                 {
-                    sb.AppendLine();
-                    sb.AppendLine("int main() { return 0; }");
+                    var name = SectionToString(node.Section);
+                    if (string.IsNullOrEmpty(name))
+                        continue;
+
+                    if (node.Section == Section.Start)
+                    {
+                        // // start
+                        sb.AppendLine("// start");
+                        // Emit main with statements belonging to start until next section
+                        sb.AppendLine("int main() { ");
+                        // Emit statements under start
+                        int j = i + 1;
+                        while (j < ast.Count && ast[j].Kind != NodeKind.Section)
+                        {
+                            var stmt = ast[j];
+                            if (stmt.Kind == NodeKind.WriteLine && !string.IsNullOrEmpty(stmt.StringValue))
+                            {
+                                sb.AppendLine($"    puts({stmt.StringValue});");
+                            }
+                            j++;
+                        }
+                        // Always return 0 for C++ main
+                        sb.AppendLine("    return 0; ");
+                        sb.AppendLine("}");
+                        // Add a blank line if there are more nodes after start block
+                        if (j < ast.Count)
+                        {
+                            sb.AppendLine();
+                        }
+                        // Skip the statements we just consumed
+                        i = j - 1;
+                    }
+                    else
+                    {
+                        // Other sections are emitted as comments only
+                        sb.AppendLine($"// {name}");
+                        // Add a blank line if not the last item and next meaningful output follows
+                        bool last = (i == ast.Count - 1);
+                        if (!last)
+                        {
+                            sb.AppendLine();
+                        }
+                    }
                 }
-
-                if (i < sections.Count - 1)
+                else
                 {
-                    sb.AppendLine();
+                    // Statements outside a section are ignored for now
                 }
             }
 
             return sb.ToString();
         }
 
-        private static string SectionToString(Parser.Section section) => section switch
+        private static string SectionToString(Section section) => section switch
         {
-            Parser.Section.Using => "using",
-            Parser.Section.Module => "module",
-            Parser.Section.Type => "type",
-            Parser.Section.Trait => "trait",
-            Parser.Section.Enums => "enums",
-            Parser.Section.Records => "records",
-            Parser.Section.Properties => "properties",
-            Parser.Section.Start => "start",
-            Parser.Section.Initialize => "initialize",
-            Parser.Section.Finalize => "finalize",
-            Parser.Section.Functions => "functions",
-            Parser.Section.end => "end",
+            Section.Using => "using",
+            Section.Module => "module",
+            Section.Type => "type",
+            Section.Trait => "trait",
+            Section.Enums => "enums",
+            Section.Records => "records",
+            Section.Properties => "properties",
+            Section.Start => "start",
+            Section.Initialize => "initialize",
+            Section.Finalize => "finalize",
+            Section.Functions => "functions",
+            Section.end => "end",
             _ => string.Empty
         };
     }

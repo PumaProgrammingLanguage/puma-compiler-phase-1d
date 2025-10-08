@@ -21,14 +21,8 @@ using static Puma.Lexer;
 
 namespace Puma
 {
-    /// <summary>
-    /// 
-    /// </summary>
     internal partial class Parser
     {
-        /// <summary>
-        /// Names of the sections of Puma files
-        /// </summary>
         readonly string[] Sections =
         [
             // use
@@ -54,9 +48,6 @@ namespace Puma
             "end",
         ];
 
-        /// <summary>
-        /// Sections of Puma files
-        /// </summary>
         public enum Section
         {
             None,
@@ -95,22 +86,24 @@ namespace Puma
         // start and initialize share the same position.
         private static readonly Dictionary<Section, int> SectionRank = new()
         {
-            [Section.Using] = 1,
-            [Section.Module] = 2,
-            [Section.Type] = 2,
-            [Section.Trait] = 2,
-            [Section.Enums] = 3,
-            [Section.Records] = 4,
-            [Section.Properties] = 5,
-            [Section.Start] = 6,
-            [Section.Initialize] = 6,
-            [Section.Finalize] = 7,
-            [Section.Functions] = 8,
-            [Section.end] = 9,
+            [Section.Using] = 10,
+            [Section.Module] = 20,
+            [Section.Enums] = 30,
+            [Section.Records] = 40,
+            [Section.Start] = 50,
+            [Section.Initialize] = 50,
+            [Section.Finalize] = 60,
+            [Section.Functions] = 70,
+            [Section.end] = 80,
+
+            // Recognized but not part of the enforced flow
+            [Section.Type] = 0,
+            [Section.Trait] = 0,
+            [Section.Properties] = 0
         };
 
         private const string ExpectedOrderText =
-            "using, module|type|trait, enums, records, start|initialize, finalize, functions, end";
+            "using, module, enums, records, start/initialize, finalize, functions, end";
 
         private int _lastRank = int.MinValue;
         private Section _lastSection = Section.None;
@@ -126,9 +119,9 @@ namespace Puma
         private int LineNumber = 0;
         private int ColumnNumber = 0;
 
-        /// <summary>
-        /// constructor of the parser
-        /// </summary>
+        // Keep a reference to tokens to allow sub-parsers to read ahead
+        private List<LexerTokens> _tokens = new();
+
         public Parser()
         {
             index = 0;
@@ -137,9 +130,6 @@ namespace Puma
             currentNode = rootNode;
         }
 
-        ///
-        /// method to get the next token from the tokens list
-        ///
         private LexerTokens? GetNextToken(List<LexerTokens> tokens)
         {
             if (index < tokens.Count)
@@ -152,16 +142,20 @@ namespace Puma
             }
         }
 
-        /// <summary>
-        /// Main parser method
-        /// </summary>
-        /// <param name="tokens"></param>
-        /// <returns></returns>
         public List<Node> Parse(List<LexerTokens> tokens)
         {
+            _tokens = tokens;
+            // reset parser state for each Parse call
+            index = 0;
+            _lastRank = int.MinValue;
+            _lastSection = Section.None;
+            _seen.Clear();
+            CurrentSection = Section.None;
+            ast = new List<Node>();
+
             while (true)
             {
-                token = GetNextToken(tokens);
+                token = GetNextToken(_tokens);
                 if (token == null)
                 {
                     break;
@@ -218,7 +212,6 @@ namespace Puma
                         break;
 
                     case Section.end:
-                        // end of the file
                         ParseEnd(token);
                         break;
 
@@ -228,7 +221,6 @@ namespace Puma
                 }
             }
 
-            // Return the ast list, which is guaranteed to be non-null and matches the return type.
             return ast;
         }
 
@@ -289,38 +281,73 @@ namespace Puma
             _ => s.ToString()
         };
 
-        /// <summary>
-        /// Parse the file
-        /// </summary>
         private void ParseFile(LexerTokens? token)
         {
             // Look for the first section header
             TrySwitchSection(token);
         }
 
-        private void ParseUsing(LexerTokens? token)
-        {
-            // Switch when the next section header appears
-            TrySwitchSection(token);
-        }
-
+        private void ParseUsing(LexerTokens? token) => TrySwitchSection(token);
         private void ParseModule(LexerTokens? token) => TrySwitchSection(token);
         private void ParseType(LexerTokens? token) => TrySwitchSection(token);
         private void ParseTrait(LexerTokens? token) => TrySwitchSection(token);
         private void ParseEnums(LexerTokens? token) => TrySwitchSection(token);
         private void ParseRecords(LexerTokens? token) => TrySwitchSection(token);
         private void ParseProperties(LexerTokens? token) => TrySwitchSection(token);
-        private void ParseStart(LexerTokens? token) => TrySwitchSection(token);
-        private void ParseInitialize(LexerTokens? token) => TrySwitchSection(token);
+
+        private void ParseStart(LexerTokens? token)
+        {
+            // First, check if the token starts a new section
+            if (TrySwitchSection(token))
+                return;
+
+            // Recognize built-in WriteLine in start section: WriteLine("...") [EOL]
+            if (token is LexerTokens t && t.Category == TokenCategory.Identifier && t.TokenText == "WriteLine")
+            {
+                ParseWriteLineCall();
+                return;
+            }
+
+            // otherwise ignore tokens inside start (for now)
+        }
+
+        private void ParseInitialize(LexerTokens? token)
+        {
+            // For now, just watch for next section
+            TrySwitchSection(token);
+        }
+
         private void ParseFinalize(LexerTokens? token) => TrySwitchSection(token);
         private void ParseFunctions(LexerTokens? token) => TrySwitchSection(token);
 
-        /// <summary>
-        /// Parse the end of the file
-        /// </summary>
         private void ParseEnd(LexerTokens? token)
         {
             // After 'end' we ignore remaining tokens.
+        }
+
+        private void ParseWriteLineCall()
+        {
+            // Expect '(' StringLiteral ')'
+            var open = GetNextToken(_tokens);
+            if (open == null || open.Value.Category != TokenCategory.Delimiter || open.Value.TokenText != "(")
+            {
+                throw new InvalidOperationException("Expected '(' after WriteLine.");
+            }
+
+            var textTok = GetNextToken(_tokens);
+            if (textTok == null || textTok.Value.Category != TokenCategory.StringLiteral)
+            {
+                throw new InvalidOperationException("Expected string literal in WriteLine(...)");
+            }
+            var literal = textTok.Value.TokenText; // keep quotes
+
+            var close = GetNextToken(_tokens);
+            if (close == null || close.Value.Category != TokenCategory.Delimiter || close.Value.TokenText != ")")
+            {
+                throw new InvalidOperationException("Expected ')' after WriteLine argument.");
+            }
+
+            ast.Add(Node.CreateWriteLine(literal));
         }
     }
 }

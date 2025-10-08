@@ -19,18 +19,37 @@ using static Puma.Parser;
 
 namespace Puma
 {
+    internal enum NodeKind
+    {
+        Section,
+        WriteLine
+    }
+
     internal class Node
     {
-        public Section Section { get; set; }
+        public NodeKind Kind { get; set; } = NodeKind.Section;
+        public Section Section { get; set; } = Section.None;
+
+        // For WriteLine nodes
+        public string? StringValue { get; set; }
 
         public Node()
         {
-            Section = Section.None;
         }
 
         public Node(Section section)
         {
+            Kind = NodeKind.Section;
             Section = section;
+        }
+
+        public static Node CreateWriteLine(string literal)
+        {
+            return new Node
+            {
+                Kind = NodeKind.WriteLine,
+                StringValue = literal
+            };
         }
     }
 }
