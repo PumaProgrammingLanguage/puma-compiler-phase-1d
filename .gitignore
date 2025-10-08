@@ -363,3 +363,4 @@ MigrationBackup/
 ExampleCode/*.c
 ExampleCode/*.o
 ExampleCode/*.exe
+ExampleCode/*.cpp
