@@ -22,14 +22,12 @@ namespace Puma
 {
     internal class Codegen
     {
-        public Codegen()
-        {
-        }
+        public Codegen() { }
 
         internal string Generate(List<Node> ast)
         {
             // Collect only recognized (non-empty) section names in order.
-            var sections = new List<Section>();
+            var sections = new List<Parser.Section>();
             foreach (var node in ast)
             {
                 if (!string.IsNullOrEmpty(SectionToString(node.Section)))
@@ -48,42 +46,36 @@ namespace Puma
                 // Emit the section marker comment
                 sb.AppendLine($"// {name}");
 
-                // Special handling: inline main stub inside the 'start' section immediately
-                if (section == Section.Start)
+                // Emit a valid C++ main inside 'start'
+                if (section == Parser.Section.Start)
                 {
-                    // Emit the C entry point stub inside the start section
-                    sb.Append("void main(void)\n{\n");
-                    // put more code here later
-                    sb.AppendLine("    return;\n}\n");
+                    sb.AppendLine();
+                    sb.AppendLine("int main() { return 0; }");
                 }
-                else
+
+                if (i < sections.Count - 1)
                 {
-                    // Add a separating blank line after the section if not the last section.
-                    // Matches the original formatting where only the last section omits the trailing blank line.
-                    if (i < sections.Count - 1)
-                    {
-                        sb.AppendLine();
-                    }
+                    sb.AppendLine();
                 }
             }
 
             return sb.ToString();
         }
 
-        private static string SectionToString(Section section) => section switch
+        private static string SectionToString(Parser.Section section) => section switch
         {
-            Section.Using => "using",
-            Section.Module => "module",
-            Section.Type => "type",
-            Section.Trait => "trait",
-            Section.Enums => "enums",
-            Section.Records => "records",
-            Section.Properties => "properties",
-            Section.Start => "start",
-            Section.Initialize => "initialize",
-            Section.Finalize => "finalize",
-            Section.Functions => "functions",
-            Section.end => "end",
+            Parser.Section.Using => "using",
+            Parser.Section.Module => "module",
+            Parser.Section.Type => "type",
+            Parser.Section.Trait => "trait",
+            Parser.Section.Enums => "enums",
+            Parser.Section.Records => "records",
+            Parser.Section.Properties => "properties",
+            Parser.Section.Start => "start",
+            Parser.Section.Initialize => "initialize",
+            Parser.Section.Finalize => "finalize",
+            Parser.Section.Functions => "functions",
+            Parser.Section.end => "end",
             _ => string.Empty
         };
     }
