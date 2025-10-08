@@ -362,3 +362,4 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 ExampleCode/*.c
 ExampleCode/*.o
+ExampleCode/*.exe
