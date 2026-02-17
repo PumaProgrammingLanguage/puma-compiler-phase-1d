@@ -48,4 +48,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include=".github\CODEOWNERS" />
+    <None Include=".github\DOCOWNERS" />
+    <None Include=".github\FUNDING.yml" />
+  </ItemGroup>
+
 </Project>
