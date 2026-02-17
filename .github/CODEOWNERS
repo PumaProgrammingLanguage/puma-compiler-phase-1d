@@ -9,8 +9,10 @@ beautification by scripts.  The fields are: name (N), email (E), web-address
 (S).
 
 N: Anthony Burchfield
-E: d.a.burchfield@att.net
-D: puma-compiler-phase-a repository
-D: LICENSE.txt
+E: a.burchfield@att.net
+W: https://github.com/PumaProgrammingLanguage
+D: puma-compiler-phase-d repository
+D: LICENSE
+D: doc/Puma Programming Language Specification.md
 D: All parts of the Puma code and documentation not covered by someone else.
 
