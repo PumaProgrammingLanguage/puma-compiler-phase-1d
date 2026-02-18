@@ -32,7 +32,14 @@ namespace Puma
         FunctionCall,
         IfStatement,
         MatchStatement,
-        WhenStatement
+        WhenStatement,
+        WhileStatement,
+        ForStatement,
+        ForAllStatement,
+        RepeatStatement
+        ,
+        HasStatement,
+        HasTraitStatement
     }
 
     internal class Node
@@ -84,6 +91,22 @@ namespace Puma
 
         // For WhenStatement nodes
         public string? WhenCondition { get; set; }
+
+        // For WhileStatement nodes
+        public string? WhileCondition { get; set; }
+
+        // For ForStatement nodes
+        public string? ForVariable { get; set; }
+        public string? ForContainer { get; set; }
+
+        // For RepeatStatement nodes
+        public string? RepeatExpression { get; set; }
+
+        // For HasStatement nodes
+        public string? HasCondition { get; set; }
+
+        // For HasTraitStatement nodes
+        public string? HasTraitCondition { get; set; }
 
         public Node()
         {
@@ -211,6 +234,62 @@ namespace Puma
             {
                 Kind = NodeKind.WhenStatement,
                 WhenCondition = condition
+            };
+        }
+
+        public static Node CreateWhileStatement(string condition)
+        {
+            return new Node
+            {
+                Kind = NodeKind.WhileStatement,
+                WhileCondition = condition
+            };
+        }
+
+        public static Node CreateForStatement(string variable, string container)
+        {
+            return new Node
+            {
+                Kind = NodeKind.ForStatement,
+                ForVariable = variable,
+                ForContainer = container
+            };
+        }
+
+        public static Node CreateForAllStatement(string variable, string container)
+        {
+            return new Node
+            {
+                Kind = NodeKind.ForAllStatement,
+                ForVariable = variable,
+                ForContainer = container
+            };
+        }
+
+        public static Node CreateRepeatStatement(string expression)
+        {
+            return new Node
+            {
+                Kind = NodeKind.RepeatStatement,
+                RepeatExpression = expression
+            };
+        }
+
+        public static Node CreateHasStatement(string condition)
+        {
+            return new Node
+            {
+                Kind = NodeKind.HasStatement,
+                HasCondition = condition
+            };
+        }
+
+        public static Node CreateHasTraitStatement(string condition)
+        {
+            return new Node
+            {
+                Kind = NodeKind.HasTraitStatement,
+                HasTraitCondition = condition
             };
         }
     }

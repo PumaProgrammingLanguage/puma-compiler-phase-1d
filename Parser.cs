@@ -946,6 +946,31 @@ namespace Puma
                 return;
             }
 
+            if (TryParseWhileStatement(tokens))
+            {
+                return;
+            }
+
+            if (TryParseForStatement(tokens))
+            {
+                return;
+            }
+
+            if (TryParseRepeatStatement(tokens))
+            {
+                return;
+            }
+
+            if (TryParseHasStatement(tokens))
+            {
+                return;
+            }
+
+            if (TryParseHasTraitStatement(tokens))
+            {
+                return;
+            }
+
             if (TryParseAssignmentStatement(tokens))
             {
                 return;
@@ -978,6 +1003,81 @@ namespace Puma
             }
 
             ast.Add(Node.CreateAssignmentStatement(left, right));
+            return true;
+        }
+
+        private bool TryParseRepeatStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "repeat")
+            {
+                return false;
+            }
+
+            var expressionTokens = tokens.Skip(1).ToList();
+            var expression = BuildQualifiedName(expressionTokens);
+
+            ast.Add(Node.CreateRepeatStatement(expression));
+            return true;
+        }
+
+        private bool TryParseHasStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "has")
+            {
+                return false;
+            }
+
+            if (tokens.Count > 1 && tokens[1].Category == TokenCategory.Keyword && tokens[1].TokenText == "trait")
+            {
+                return false;
+            }
+
+            var conditionTokens = tokens.Skip(1).ToList();
+            var condition = BuildQualifiedName(conditionTokens);
+            if (string.IsNullOrWhiteSpace(condition))
+            {
+                throw new InvalidOperationException("Has statements require a condition.");
+            }
+
+            ast.Add(Node.CreateHasStatement(condition));
+            return true;
+        }
+
+        private bool TryParseHasTraitStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count < 3)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "has")
+            {
+                return false;
+            }
+
+            if (tokens[1].Category != TokenCategory.Keyword || tokens[1].TokenText != "trait")
+            {
+                return false;
+            }
+
+            var conditionTokens = tokens.Skip(2).ToList();
+            var condition = BuildQualifiedName(conditionTokens);
+            if (string.IsNullOrWhiteSpace(condition))
+            {
+                throw new InvalidOperationException("Has trait statements require a condition.");
+            }
+
+            ast.Add(Node.CreateHasTraitStatement(condition));
             return true;
         }
 
@@ -1075,6 +1175,66 @@ namespace Puma
             }
 
             ast.Add(Node.CreateWhenStatement(condition));
+            return true;
+        }
+
+        private bool TryParseWhileStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "while")
+            {
+                return false;
+            }
+
+            var conditionTokens = tokens.Skip(1).ToList();
+            var condition = BuildQualifiedName(conditionTokens);
+            if (string.IsNullOrWhiteSpace(condition))
+            {
+                throw new InvalidOperationException("While statements require a condition.");
+            }
+
+            ast.Add(Node.CreateWhileStatement(condition));
+            return true;
+        }
+
+        private bool TryParseForStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count < 4)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || (tokens[0].TokenText != "for" && tokens[0].TokenText != "forall"))
+            {
+                return false;
+            }
+
+            var inIndex = tokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "in");
+            if (inIndex <= 1)
+            {
+                throw new InvalidOperationException("For statements require the 'in' keyword and a variable name.");
+            }
+
+            var variable = BuildQualifiedName(tokens.Skip(1).Take(inIndex - 1));
+            var container = BuildQualifiedName(tokens.Skip(inIndex + 1));
+            if (string.IsNullOrWhiteSpace(variable) || string.IsNullOrWhiteSpace(container))
+            {
+                throw new InvalidOperationException("For statements require a variable and container expression.");
+            }
+
+            if (tokens[0].TokenText == "for")
+            {
+                ast.Add(Node.CreateForStatement(variable, container));
+            }
+            else
+            {
+                ast.Add(Node.CreateForAllStatement(variable, container));
+            }
+
             return true;
         }
 

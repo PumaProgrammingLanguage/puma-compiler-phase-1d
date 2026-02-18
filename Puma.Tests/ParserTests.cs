@@ -271,5 +271,143 @@ end
             Assert.AreEqual("1", whenNodes[0].WhenCondition);
             Assert.AreEqual("2", whenNodes[1].WhenCondition);
         }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseWhileStatements()
+        {
+            const string src =
+@"module
+
+initialize
+    while isReady
+
+start
+    while running
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var whileNodes = ast.Where(n => n.Kind == NodeKind.WhileStatement).ToList();
+            Assert.AreEqual(2, whileNodes.Count);
+            Assert.AreEqual("isReady", whileNodes[0].WhileCondition);
+            Assert.AreEqual("running", whileNodes[1].WhileCondition);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseForStatements()
+        {
+            const string src =
+@"module
+
+initialize
+    for item in items
+
+start
+    forall entry in records
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var forNode = ast.Single(n => n.Kind == NodeKind.ForStatement);
+            Assert.AreEqual("item", forNode.ForVariable);
+            Assert.AreEqual("items", forNode.ForContainer);
+
+            var forAllNode = ast.Single(n => n.Kind == NodeKind.ForAllStatement);
+            Assert.AreEqual("entry", forAllNode.ForVariable);
+            Assert.AreEqual("records", forAllNode.ForContainer);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseRepeatStatements()
+        {
+            const string src =
+@"module
+
+initialize
+    repeat
+
+start
+    repeat
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var repeats = ast.Where(n => n.Kind == NodeKind.RepeatStatement).ToList();
+            Assert.AreEqual(2, repeats.Count);
+            Assert.AreEqual(string.Empty, repeats[0].RepeatExpression);
+            Assert.AreEqual(string.Empty, repeats[1].RepeatExpression);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseHasStatements()
+        {
+            const string src =
+@"module
+
+initialize
+    has optionalValue
+
+start
+    has item
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var hasStatements = ast.Where(n => n.Kind == NodeKind.HasStatement).ToList();
+            Assert.AreEqual(2, hasStatements.Count);
+            Assert.AreEqual("optionalValue", hasStatements[0].HasCondition);
+            Assert.AreEqual("item", hasStatements[1].HasCondition);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseHasTraitStatements()
+        {
+            const string src =
+@"module
+
+initialize
+    has trait item
+
+start
+    has trait record
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var hasTraits = ast.Where(n => n.Kind == NodeKind.HasTraitStatement).ToList();
+            Assert.AreEqual(2, hasTraits.Count);
+            Assert.AreEqual("item", hasTraits[0].HasTraitCondition);
+            Assert.AreEqual("record", hasTraits[1].HasTraitCondition);
+        }
     }
 }
