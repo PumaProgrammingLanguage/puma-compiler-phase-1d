@@ -59,6 +59,8 @@ namespace Puma
             Punctuation,
             Operator,
             EndOfLine,
+            Indent,
+            Dedent,
             Keyword
         }
 
@@ -99,6 +101,19 @@ namespace Puma
             }
         }
 
+        private readonly HashSet<string> _keywords = new(StringComparer.Ordinal)
+        {
+            "use", "using", "as", "type", "trait", "module", "is", "has", "value", "object", "base", "number",
+            "optional", "enums", "records", "pack", "properties", "functions", "start", "initialize", "finalize",
+            "return", "yield", "public", "private", "internal", "override", "delegate", "constant", "readonly",
+            "readwrite", "int128", "int64", "int32", "int16", "int8", "int", "uint128", "uint64", "uint32",
+            "uint16", "uint8", "uint", "flt128", "flt64", "flt32", "flt", "fix128", "fix64", "fix32", "fix",
+            "char", "str", "fstr", "vstr", "bool", "true", "false", "hex", "oct", "bin", "implicit", "explicit",
+            "operator", "get", "set", "with", "self", "if", "else", "and", "or", "not", "for", "in", "while",
+            "repeat", "forall", "break", "continue", "match", "when", "error", "catch", "multithread",
+            "multiprocess", "end"
+        };
+
         /// <summary>
         /// Tokenize the source code
         /// </summary>
@@ -109,6 +124,11 @@ namespace Puma
             List<LexerTokens> tokens = [];
             var currentTokenType = TokenCategory.Unknown;
             var currentToken = "";
+            var atLineStart = true;
+            var escapeString = false;
+            var escapeChar = false;
+            var indentStack = new Stack<int>();
+            indentStack.Push(0);
 
             // TODO: check if the last character is an end of line marker
             // if last character is not an end of line marker, add one
@@ -123,6 +143,51 @@ namespace Puma
             for (var i = 0; i < source.Length; i++)
             {
                 var currentChar = sourceArray[i];
+
+                if (atLineStart)
+                {
+                    var indentIndex = i;
+                    var indentCount = 0;
+
+                    while (indentIndex <= lastCharInString && _whitespaces.Contains(sourceArray[indentIndex]))
+                    {
+                        indentCount += sourceArray[indentIndex] == '\t' ? 4 : 1;
+                        indentIndex++;
+                    }
+
+                    if (indentIndex <= lastCharInString && _eolFirstChar.Contains(sourceArray[indentIndex].ToString()))
+                    {
+                        atLineStart = false;
+                        i = indentIndex - 1;
+                        continue;
+                    }
+
+                    var currentIndent = indentStack.Peek();
+                    if (indentCount > currentIndent)
+                    {
+                        indentStack.Push(indentCount);
+                        tokens.Add(new LexerTokens() { TokenText = indentCount.ToString(), Category = TokenCategory.Indent });
+                    }
+                    else if (indentCount < currentIndent)
+                    {
+                        while (indentStack.Count > 0 && indentCount < indentStack.Peek())
+                        {
+                            indentStack.Pop();
+                            tokens.Add(new LexerTokens() { TokenText = indentCount.ToString(), Category = TokenCategory.Dedent });
+                        }
+                    }
+
+                    atLineStart = false;
+                    i = indentIndex - 1;
+                    continue;
+                }
+
+                if ((currentTokenType == TokenCategory.Unknown || currentTokenType == TokenCategory.Whitespace)
+                    && currentChar == '\\' && TryGetEndOfLineLength(i + 1, sourceArray, out var eolLength))
+                {
+                    i += eolLength;
+                    continue;
+                }
 
                 switch (currentTokenType)
                 {
@@ -139,7 +204,7 @@ namespace Puma
                         break;
 
                     case TokenCategory.EndOfLine:
-                        TokenizeEndOfLIne(tokens, ref currentTokenType, ref currentToken, ref i, currentChar);
+                        TokenizeEndOfLIne(tokens, ref currentTokenType, ref currentToken, ref i, currentChar, ref atLineStart);
                         break;
 
                     case TokenCategory.Comment:
@@ -148,11 +213,11 @@ namespace Puma
 
 
                     case TokenCategory.StringLiteral:
-                        TokenizeStringLiteral(tokens, ref currentTokenType, ref currentToken, currentChar);
+                        TokenizeStringLiteral(tokens, ref currentTokenType, ref currentToken, currentChar, ref escapeString);
                         break;
 
                     case TokenCategory.CharLiteral:
-                        TokentizeCharLiteral(tokens, ref currentTokenType, ref currentToken, currentChar);
+                        TokentizeCharLiteral(tokens, ref currentTokenType, ref currentToken, currentChar, ref escapeChar);
                         break;
 
                     case TokenCategory.NumericLiteral:
@@ -174,8 +239,17 @@ namespace Puma
                 {
                     // reached the end of the file and the last token type was not added
                     // add the last token of the line
-                    tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
+                    var category = currentTokenType == TokenCategory.Identifier && _keywords.Contains(currentToken)
+                        ? TokenCategory.Keyword
+                        : currentTokenType;
+                    tokens.Add(new LexerTokens() { TokenText = currentToken, Category = category });
                 }
+            }
+
+            while (indentStack.Count > 1)
+            {
+                indentStack.Pop();
+                tokens.Add(new LexerTokens() { TokenText = "0", Category = TokenCategory.Dedent });
             }
 
             return tokens;
@@ -194,8 +268,11 @@ namespace Puma
 
         private static void TokenizeNumericLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, ref int i, char currentChar)
         {
+            var lastChar = currentToken.Length > 0 ? currentToken[^1] : '\0';
+            var isExponentSign = (currentChar == '-' || currentChar == '+') && (lastChar == 'e' || lastChar == 'E');
+
             if (char.IsDigit(currentChar) || char.IsAsciiHexDigit(currentChar) || currentChar == '.' ||
-                currentChar == 'e' || currentChar == 'E' || currentChar == '-' || currentChar == '+')
+                currentChar == 'e' || currentChar == 'E' || isExponentSign)
             {
                 // number continues
                 currentToken += currentChar;
@@ -211,8 +288,22 @@ namespace Puma
             }
         }
 
-        private static void TokentizeCharLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar)
+        private static void TokentizeCharLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar, ref bool escapeChar)
         {
+            if (escapeChar)
+            {
+                currentToken += currentChar;
+                escapeChar = false;
+                return;
+            }
+
+            if (currentChar == '\\')
+            {
+                currentToken += currentChar;
+                escapeChar = true;
+                return;
+            }
+
             if (currentChar == '\'')
             {
                 // found the end of the charactor
@@ -220,6 +311,7 @@ namespace Puma
                 tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
+                escapeChar = false;
             }
             else
             {
@@ -228,8 +320,22 @@ namespace Puma
             }
         }
 
-        private static void TokenizeStringLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar)
+        private static void TokenizeStringLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar, ref bool escapeString)
         {
+            if (escapeString)
+            {
+                currentToken += currentChar;
+                escapeString = false;
+                return;
+            }
+
+            if (currentChar == '\\')
+            {
+                currentToken += currentChar;
+                escapeString = true;
+                return;
+            }
+
             if (currentChar == '\"')
             {
                 // found end of the string
@@ -237,6 +343,7 @@ namespace Puma
                 tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
+                escapeString = false;
             }
             else
             {
@@ -247,6 +354,18 @@ namespace Puma
 
         private void TokenizeComment(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar)
         {
+            if (currentToken.StartsWith("/."))
+            {
+                currentToken += currentChar;
+                if (currentToken.EndsWith("./"))
+                {
+                    tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
+                    currentToken = string.Empty;
+                    currentTokenType = TokenCategory.Unknown;
+                }
+                return;
+            }
+
             // check for end of line marker
             string currentCharString = currentChar.ToString();
             if (_eolFirstChar.Contains(currentCharString))
@@ -266,7 +385,7 @@ namespace Puma
             }
         }
 
-        private void TokenizeEndOfLIne(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, ref int i, char currentChar)
+        private void TokenizeEndOfLIne(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, ref int i, char currentChar, ref bool atLineStart)
         {
             // check for two character end of line marker
             if (_eol.Contains(currentToken + currentChar.ToString()))
@@ -277,6 +396,7 @@ namespace Puma
                 tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
+                atLineStart = true;
             }
             else
             {
@@ -289,10 +409,11 @@ namespace Puma
                 currentTokenType = TokenCategory.Unknown;
                 // current charator is next token.  reset the index by one character
                 i--;
+                atLineStart = true;
             }
         }
 
-        private static void TokenizeIdentifier(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, ref int i, char currentChar)
+        private void TokenizeIdentifier(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, ref int i, char currentChar)
         {
             if (char.IsLetterOrDigit(currentChar) || currentChar == '_')
             {
@@ -302,7 +423,8 @@ namespace Puma
             else
             {
                 // found the end of the identifier
-                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
+                var category = _keywords.Contains(currentToken) ? TokenCategory.Keyword : currentTokenType;
+                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = category });
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
                 // current charator is next token.  reset the index by one character
@@ -351,6 +473,14 @@ namespace Puma
                     currentTokenType = TokenCategory.Comment;
                     return;
                 }
+                else if (currentTwoChar == "/.")
+                {
+                    // this is a two character multiline comment marker. increment the index by one more characters
+                    i += 1;
+                    currentToken = currentTwoChar;
+                    currentTokenType = TokenCategory.Comment;
+                    return;
+                }
                 else if (_operatorsTwoChar.Contains(currentTwoChar))
                 {
                     // this is a two character operator. increment the index by one more characters
@@ -385,7 +515,7 @@ namespace Puma
                 currentToken = currentChar.ToString();
                 currentTokenType = TokenCategory.CharLiteral;
             }
-            else if (char.IsLetter(currentChar))
+            else if (char.IsLetter(currentChar) || currentChar == '_')
             {
                 // found start of an identifier
                 currentToken = currentChar.ToString();
@@ -427,6 +557,35 @@ namespace Puma
                 currentTokenType = TokenCategory.Unknown;
             }
             return;
+        }
+
+        private bool TryGetEndOfLineLength(int startIndex, char[] sourceArray, out int length)
+        {
+            length = 0;
+
+            if (startIndex > sourceArray.Length - 1)
+            {
+                return false;
+            }
+
+            if (startIndex + 1 <= sourceArray.Length - 1)
+            {
+                var twoChar = string.Concat(sourceArray[startIndex], sourceArray[startIndex + 1]);
+                if (_eol.Contains(twoChar))
+                {
+                    length = 2;
+                    return true;
+                }
+            }
+
+            var oneChar = sourceArray[startIndex].ToString();
+            if (_eol.Contains(oneChar))
+            {
+                length = 1;
+                return true;
+            }
+
+            return false;
         }
     }
 }

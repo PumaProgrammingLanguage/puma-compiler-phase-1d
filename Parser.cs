@@ -226,7 +226,7 @@ namespace Puma
 
         private bool TrySwitchSection(LexerTokens? tok)
         {
-            if (tok is LexerTokens t && t.Category == TokenCategory.Identifier)
+            if (tok is LexerTokens t && (t.Category == TokenCategory.Identifier || t.Category == TokenCategory.Keyword))
             {
                 var text = t.TokenText;
                 if (_sectionMap.TryGetValue(text, out var next))

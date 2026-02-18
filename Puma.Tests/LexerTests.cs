@@ -32,7 +32,7 @@ end
             var tokens = lexer.Tokenize(Sample);
 
             var identifiers = tokens
-                .Where(t => t.Category == TokenCategory.Identifier)
+                .Where(t => t.Category == TokenCategory.Keyword)
                 .Select(t => t.TokenText)
                 .ToArray();
 
