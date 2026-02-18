@@ -135,7 +135,7 @@ end
             const string src =
 @"properties
     Status = Active
-    User UserRecord
+    User = UserRecord
 
 end
 ";
@@ -154,8 +154,8 @@ end
             Assert.IsNull(properties[0].PropertyType);
 
             Assert.AreEqual("User", properties[1].PropertyName);
-            Assert.AreEqual("UserRecord", properties[1].PropertyType);
-            Assert.IsNull(properties[1].PropertyValue);
+            Assert.AreEqual("UserRecord", properties[1].PropertyValue);
+            Assert.IsNull(properties[1].PropertyType);
         }
     }
 }

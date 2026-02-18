@@ -882,22 +882,10 @@ namespace Puma
 
                 return;
             }
-
-            if (tokens.Count >= 2)
-            {
-                var name = tokens[0].TokenText;
-                var type = BuildQualifiedName(tokens.Skip(1));
-                if (!string.IsNullOrWhiteSpace(name))
-                {
-                    ast.Add(Node.CreatePropertyDeclaration(name, null, type));
-                }
-                return;
-            }
-
             var fallbackName = BuildQualifiedName(tokens);
             if (!string.IsNullOrWhiteSpace(fallbackName))
             {
-                ast.Add(Node.CreatePropertyDeclaration(fallbackName, null, null));
+                throw new InvalidOperationException("Property declarations must use assignment (name = value).");
             }
         }
 
