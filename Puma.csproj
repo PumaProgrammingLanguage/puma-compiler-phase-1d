@@ -50,6 +50,7 @@
 
   <ItemGroup>
     <None Include=".github\CODEOWNERS" />
+    <None Include=".github\copilot-instructions.md" />
     <None Include=".github\DOCOWNERS" />
     <None Include=".github\FUNDING.yml" />
   </ItemGroup>

@@ -130,7 +130,7 @@ end
         }
 
         [TestMethod]
-        public void PropertiesSection_ParsesAssignmentsAndTypedDeclarations()
+        public void PropertiesSection_ParsesAssignments()
         {
             const string src =
 @"properties
@@ -156,6 +156,120 @@ end
             Assert.AreEqual("User", properties[1].PropertyName);
             Assert.AreEqual("UserRecord", properties[1].PropertyValue);
             Assert.IsNull(properties[1].PropertyType);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseAssignmentStatements()
+        {
+            const string src =
+@"module
+
+initialize
+    Counter = 1
+
+start
+    Counter = 2
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
+            Assert.AreEqual(2, assignments.Count);
+            Assert.AreEqual("Counter", assignments[0].AssignmentLeft);
+            Assert.AreEqual("1", assignments[0].AssignmentRight);
+            Assert.AreEqual("Counter", assignments[1].AssignmentLeft);
+            Assert.AreEqual("2", assignments[1].AssignmentRight);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseFunctionCalls()
+        {
+            const string src =
+@"module
+
+initialize
+    Configure(1, 2)
+
+start
+    Console.WriteLine(""Hi"")
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var calls = ast.Where(n => n.Kind == NodeKind.FunctionCall).ToList();
+            Assert.AreEqual(2, calls.Count);
+            Assert.AreEqual("Configure", calls[0].FunctionName);
+            Assert.AreEqual("1,2", calls[0].FunctionArguments);
+            Assert.AreEqual("Console.WriteLine", calls[1].FunctionName);
+            Assert.AreEqual("\"Hi\"", calls[1].FunctionArguments);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseIfStatements()
+        {
+            const string src =
+@"module
+
+initialize
+    if ready
+
+start
+    if status
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var ifStatements = ast.Where(n => n.Kind == NodeKind.IfStatement).ToList();
+            Assert.AreEqual(2, ifStatements.Count);
+            Assert.AreEqual("ready", ifStatements[0].IfCondition);
+            Assert.AreEqual("status", ifStatements[1].IfCondition);
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseMatchStatements()
+        {
+            const string src =
+@"module
+
+start
+    match value
+        when 1
+        when 2
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var matchNode = ast.Single(n => n.Kind == NodeKind.MatchStatement);
+            Assert.AreEqual("value", matchNode.MatchExpression);
+
+            var whenNodes = ast.Where(n => n.Kind == NodeKind.WhenStatement).ToList();
+            Assert.AreEqual(2, whenNodes.Count);
+            Assert.AreEqual("1", whenNodes[0].WhenCondition);
+            Assert.AreEqual("2", whenNodes[1].WhenCondition);
         }
     }
 }

@@ -141,6 +141,21 @@ end
         }
 
         [TestMethod]
+        public void Parse_InitializeWithoutTypeTraitOrModule_Throws()
+        {
+            const string src =
+@"initialize
+
+end
+";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            Assert.ThrowsException<System.InvalidOperationException>(() => parser.Parse(tokens));
+        }
+
+        [TestMethod]
         public void Parse_MissingEnd_IsAccepted()
         {
             const string src =

@@ -27,7 +27,12 @@ namespace Puma
         TypeDeclaration,
         EnumDeclaration,
         RecordDeclaration,
-        PropertyDeclaration
+        PropertyDeclaration,
+        AssignmentStatement,
+        FunctionCall,
+        IfStatement,
+        MatchStatement,
+        WhenStatement
     }
 
     internal class Node
@@ -62,6 +67,23 @@ namespace Puma
         public string? PropertyName { get; set; }
         public string? PropertyValue { get; set; }
         public string? PropertyType { get; set; }
+
+        // For AssignmentStatement nodes
+        public string? AssignmentLeft { get; set; }
+        public string? AssignmentRight { get; set; }
+
+        // For FunctionCall nodes
+        public string? FunctionName { get; set; }
+        public string? FunctionArguments { get; set; }
+
+        // For IfStatement nodes
+        public string? IfCondition { get; set; }
+
+        // For MatchStatement nodes
+        public string? MatchExpression { get; set; }
+
+        // For WhenStatement nodes
+        public string? WhenCondition { get; set; }
 
         public Node()
         {
@@ -142,6 +164,53 @@ namespace Puma
                 PropertyName = name,
                 PropertyValue = value,
                 PropertyType = type
+            };
+        }
+
+        public static Node CreateAssignmentStatement(string left, string right)
+        {
+            return new Node
+            {
+                Kind = NodeKind.AssignmentStatement,
+                AssignmentLeft = left,
+                AssignmentRight = right
+            };
+        }
+
+        public static Node CreateFunctionCall(string name, string arguments)
+        {
+            return new Node
+            {
+                Kind = NodeKind.FunctionCall,
+                FunctionName = name,
+                FunctionArguments = arguments
+            };
+        }
+
+        public static Node CreateIfStatement(string condition)
+        {
+            return new Node
+            {
+                Kind = NodeKind.IfStatement,
+                IfCondition = condition
+            };
+        }
+
+        public static Node CreateMatchStatement(string expression)
+        {
+            return new Node
+            {
+                Kind = NodeKind.MatchStatement,
+                MatchExpression = expression
+            };
+        }
+
+        public static Node CreateWhenStatement(string condition)
+        {
+            return new Node
+            {
+                Kind = NodeKind.WhenStatement,
+                WhenCondition = condition
             };
         }
     }

@@ -23,6 +23,14 @@ namespace Puma
 {
     internal partial class Parser
     {
+        private enum FileDeclarationKind
+        {
+            None,
+            Module,
+            Type,
+            Trait
+        }
+
         readonly string[] Sections =
         [
             // use
@@ -122,6 +130,7 @@ namespace Puma
         private int? _currentRecordPackSize;
         private List<string> _currentRecordMembers = new();
         private int? _propertiesSectionIndent;
+        private FileDeclarationKind _currentFileKind;
 
         private Section CurrentSection = Section.None;
         private LexerTokens? token = new LexerTokens();
@@ -176,6 +185,7 @@ namespace Puma
             _currentRecordPackSize = null;
             _currentRecordMembers = new List<string>();
             _propertiesSectionIndent = null;
+            _currentFileKind = FileDeclarationKind.None;
             CurrentSection = Section.None;
             ast = new List<Node>();
 
@@ -355,6 +365,7 @@ namespace Puma
 
             ParseTypeDeclaration(token.Value, "type");
             _typeHeaderParsed = true;
+            _currentFileKind = FileDeclarationKind.Type;
         }
 
         private void ParseTrait(LexerTokens? token)
@@ -376,6 +387,7 @@ namespace Puma
 
             ParseSimpleDeclaration(token.Value, "trait");
             _traitHeaderParsed = true;
+            _currentFileKind = FileDeclarationKind.Trait;
         }
 
         private void ParseModule(LexerTokens? token)
@@ -397,6 +409,7 @@ namespace Puma
 
             ParseSimpleDeclaration(token.Value, "module");
             _moduleHeaderParsed = true;
+            _currentFileKind = FileDeclarationKind.Module;
         }
         private void ParseEnums(LexerTokens? token)
         {
@@ -574,6 +587,11 @@ namespace Puma
 
         private void ParseStart(LexerTokens? token)
         {
+            if (_currentFileKind != FileDeclarationKind.Module)
+            {
+                throw new InvalidOperationException("The start section is only allowed in module files.");
+            }
+
             // First, check if the token starts a new section
             if (TrySwitchSection(token))
                 return;
@@ -585,13 +603,29 @@ namespace Puma
                 return;
             }
 
-            // otherwise ignore tokens inside start (for now)
+            if (token != null && !IsIgnorable(token.Value))
+            {
+                ParseStatement(token.Value);
+            }
         }
 
         private void ParseInitialize(LexerTokens? token)
         {
+            if (_currentFileKind == FileDeclarationKind.None)
+            {
+                throw new InvalidOperationException("The initialize section is only allowed in module, type, or trait files.");
+            }
+
             // For now, just watch for next section
-            TrySwitchSection(token);
+            if (TrySwitchSection(token))
+            {
+                return;
+            }
+
+            if (token != null && !IsIgnorable(token.Value))
+            {
+                ParseStatement(token.Value);
+            }
         }
 
         private void ParseFinalize(LexerTokens? token) => TrySwitchSection(token);
@@ -887,6 +921,161 @@ namespace Puma
             {
                 throw new InvalidOperationException("Property declarations must use assignment (name = value).");
             }
+        }
+
+        private void ParseStatement(LexerTokens firstToken)
+        {
+            var tokens = ReadTokensUntilEol(firstToken);
+            if (tokens.Count == 0)
+            {
+                return;
+            }
+
+            if (TryParseMatchStatement(tokens))
+            {
+                return;
+            }
+
+            if (TryParseWhenStatement(tokens))
+            {
+                return;
+            }
+
+            if (TryParseIfStatement(tokens))
+            {
+                return;
+            }
+
+            if (TryParseAssignmentStatement(tokens))
+            {
+                return;
+            }
+
+            TryParseFunctionCall(tokens);
+        }
+
+        private bool TryParseAssignmentStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            var equalsIndex = tokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
+            if (equalsIndex < 0)
+            {
+                return false;
+            }
+
+            var leftTokens = tokens.Take(equalsIndex).ToList();
+            var rightTokens = tokens.Skip(equalsIndex + 1).ToList();
+            var left = BuildQualifiedName(leftTokens);
+            var right = BuildQualifiedName(rightTokens);
+
+            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            {
+                throw new InvalidOperationException("Assignment statements require left and right expressions.");
+            }
+
+            ast.Add(Node.CreateAssignmentStatement(left, right));
+            return true;
+        }
+
+        private bool TryParseFunctionCall(List<LexerTokens> tokens)
+        {
+            var openIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == "(");
+            if (openIndex <= 0)
+            {
+                return false;
+            }
+
+            var closeIndex = tokens.FindLastIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == ")");
+            if (closeIndex < 0 || closeIndex < openIndex)
+            {
+                return false;
+            }
+
+            var nameTokens = tokens.Take(openIndex).ToList();
+            var argsTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();
+            var name = BuildQualifiedName(nameTokens);
+            var args = BuildQualifiedName(argsTokens);
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            ast.Add(Node.CreateFunctionCall(name, args));
+            return true;
+        }
+
+        private bool TryParseIfStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "if")
+            {
+                return false;
+            }
+
+            var conditionTokens = tokens.Skip(1).ToList();
+            var condition = BuildQualifiedName(conditionTokens);
+            if (string.IsNullOrWhiteSpace(condition))
+            {
+                throw new InvalidOperationException("If statements require a condition expression.");
+            }
+
+            ast.Add(Node.CreateIfStatement(condition));
+            return true;
+        }
+
+        private bool TryParseMatchStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "match")
+            {
+                return false;
+            }
+
+            var expressionTokens = tokens.Skip(1).ToList();
+            var expression = BuildQualifiedName(expressionTokens);
+            if (string.IsNullOrWhiteSpace(expression))
+            {
+                throw new InvalidOperationException("Match statements require an expression.");
+            }
+
+            ast.Add(Node.CreateMatchStatement(expression));
+            return true;
+        }
+
+        private bool TryParseWhenStatement(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "when")
+            {
+                return false;
+            }
+
+            var conditionTokens = tokens.Skip(1).ToList();
+            var condition = BuildQualifiedName(conditionTokens);
+            if (string.IsNullOrWhiteSpace(condition))
+            {
+                throw new InvalidOperationException("When statements require a condition.");
+            }
+
+            ast.Add(Node.CreateWhenStatement(condition));
+            return true;
         }
 
         private static bool LooksLikeFilePath(List<LexerTokens> tokens)
