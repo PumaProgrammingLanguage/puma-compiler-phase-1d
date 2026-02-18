@@ -24,7 +24,9 @@ namespace Puma
         Section,
         WriteLine,
         UseStatement,
-        TypeDeclaration
+        TypeDeclaration,
+        EnumDeclaration,
+        RecordDeclaration
     }
 
     internal class Node
@@ -45,6 +47,15 @@ namespace Puma
         public string? DeclarationName { get; set; }
         public string? BaseTypeName { get; set; }
         public List<string> TraitNames { get; } = new();
+
+        // For EnumDeclaration nodes
+        public string? EnumName { get; set; }
+        public List<string> EnumMembers { get; } = new();
+
+        // For RecordDeclaration nodes
+        public string? RecordName { get; set; }
+        public int? RecordPackSize { get; set; }
+        public List<string> RecordMembers { get; } = new();
 
         public Node()
         {
@@ -91,6 +102,29 @@ namespace Puma
                 node.TraitNames.AddRange(traits);
             }
 
+            return node;
+        }
+
+        public static Node CreateEnumDeclaration(string name, IEnumerable<string> members)
+        {
+            var node = new Node
+            {
+                Kind = NodeKind.EnumDeclaration,
+                EnumName = name
+            };
+            node.EnumMembers.AddRange(members);
+            return node;
+        }
+
+        public static Node CreateRecordDeclaration(string name, int? packSize, IEnumerable<string> members)
+        {
+            var node = new Node
+            {
+                Kind = NodeKind.RecordDeclaration,
+                RecordName = name,
+                RecordPackSize = packSize
+            };
+            node.RecordMembers.AddRange(members);
             return node;
         }
     }

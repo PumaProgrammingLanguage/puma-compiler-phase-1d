@@ -95,5 +95,38 @@ end
             Assert.AreEqual("object", typeNode.BaseTypeName);
             CollectionAssert.AreEqual(new[] { "Alpha", "Beta" }, typeNode.TraitNames);
         }
+
+        [TestMethod]
+        public void EnumsAndRecords_AreParsedWithMembers()
+        {
+            const string src =
+@"enums
+    StatusSetting
+        Active
+        Inactive
+
+records
+    UserRecord pack 4
+        Name str
+        Age int
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration);
+            Assert.AreEqual("StatusSetting", enumNode.EnumName);
+            CollectionAssert.AreEqual(new[] { "Active", "Inactive" }, enumNode.EnumMembers);
+
+            var recordNode = ast.Single(n => n.Kind == NodeKind.RecordDeclaration);
+            Assert.AreEqual("UserRecord", recordNode.RecordName);
+            Assert.AreEqual(4, recordNode.RecordPackSize);
+            CollectionAssert.AreEqual(new[] { "Name", "Age" }, recordNode.RecordMembers);
+        }
     }
 }

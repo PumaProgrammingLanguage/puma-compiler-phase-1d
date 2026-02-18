@@ -113,6 +113,14 @@ namespace Puma
         private bool _typeHeaderParsed;
         private bool _traitHeaderParsed;
         private bool _moduleHeaderParsed;
+        private int _currentIndentLevel;
+        private int? _enumSectionIndent;
+        private string? _currentEnumName;
+        private List<string> _currentEnumMembers = new();
+        private int? _recordSectionIndent;
+        private string? _currentRecordName;
+        private int? _currentRecordPackSize;
+        private List<string> _currentRecordMembers = new();
 
         private Section CurrentSection = Section.None;
         private LexerTokens? token = new LexerTokens();
@@ -158,6 +166,14 @@ namespace Puma
             _typeHeaderParsed = false;
             _traitHeaderParsed = false;
             _moduleHeaderParsed = false;
+            _currentIndentLevel = 0;
+            _enumSectionIndent = null;
+            _currentEnumName = null;
+            _currentEnumMembers = new List<string>();
+            _recordSectionIndent = null;
+            _currentRecordName = null;
+            _currentRecordPackSize = null;
+            _currentRecordMembers = new List<string>();
             CurrentSection = Section.None;
             ast = new List<Node>();
 
@@ -228,6 +244,9 @@ namespace Puma
                         break;
                 }
             }
+
+            FinalizeEnum();
+            FinalizeRecord();
 
             return ast;
         }
@@ -377,8 +396,146 @@ namespace Puma
             ParseSimpleDeclaration(token.Value, "module");
             _moduleHeaderParsed = true;
         }
-        private void ParseEnums(LexerTokens? token) => TrySwitchSection(token);
-        private void ParseRecords(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseEnums(LexerTokens? token)
+        {
+            if (TrySwitchSection(token))
+            {
+                FinalizeEnum();
+                _enumSectionIndent = null;
+                return;
+            }
+
+            if (token == null)
+            {
+                return;
+            }
+
+            if (UpdateIndentation(token.Value))
+            {
+                return;
+            }
+
+            if (IsIgnorable(token.Value))
+            {
+                return;
+            }
+
+            if (_enumSectionIndent == null)
+            {
+                _enumSectionIndent = _currentIndentLevel;
+            }
+
+            if (_currentIndentLevel == _enumSectionIndent)
+            {
+                FinalizeEnum();
+                var headerTokens = ReadTokensUntilEol(token.Value);
+                var name = BuildQualifiedName(headerTokens);
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    _currentEnumName = name;
+                    _currentEnumMembers = new List<string>();
+                }
+                return;
+            }
+
+            if (_currentIndentLevel > _enumSectionIndent)
+            {
+                if (_currentEnumName == null)
+                {
+                    throw new InvalidOperationException("Enum member declared without an enum name.");
+                }
+
+                var memberTokens = ReadTokensUntilEol(token.Value);
+                var memberNameTokens = memberTokens
+                    .TakeWhile(t => !(t.Category == TokenCategory.Operator && t.TokenText == "="))
+                    .ToList();
+                var memberName = BuildQualifiedName(memberNameTokens);
+                if (!string.IsNullOrWhiteSpace(memberName))
+                {
+                    _currentEnumMembers.Add(memberName);
+                }
+                return;
+            }
+
+            FinalizeEnum();
+        }
+
+        private void ParseRecords(LexerTokens? token)
+        {
+            if (TrySwitchSection(token))
+            {
+                FinalizeRecord();
+                _recordSectionIndent = null;
+                return;
+            }
+
+            if (token == null)
+            {
+                return;
+            }
+
+            if (UpdateIndentation(token.Value))
+            {
+                return;
+            }
+
+            if (IsIgnorable(token.Value))
+            {
+                return;
+            }
+
+            if (_recordSectionIndent == null)
+            {
+                _recordSectionIndent = _currentIndentLevel;
+            }
+
+            if (_currentIndentLevel == _recordSectionIndent)
+            {
+                FinalizeRecord();
+                var headerTokens = ReadTokensUntilEol(token.Value);
+                var packIndex = headerTokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "pack");
+                var nameTokens = packIndex >= 0 ? headerTokens.Take(packIndex).ToList() : headerTokens;
+                var name = BuildQualifiedName(nameTokens);
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    _currentRecordName = name;
+                    _currentRecordMembers = new List<string>();
+                    _currentRecordPackSize = null;
+
+                    if (packIndex >= 0 && packIndex + 1 < headerTokens.Count)
+                    {
+                        if (int.TryParse(headerTokens[packIndex + 1].TokenText, out var packSize))
+                        {
+                            _currentRecordPackSize = packSize;
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (_currentIndentLevel > _recordSectionIndent)
+            {
+                if (_currentRecordName == null)
+                {
+                    throw new InvalidOperationException("Record member declared without a record name.");
+                }
+
+                var memberTokens = ReadTokensUntilEol(token.Value);
+                if (memberTokens.Count == 0)
+                {
+                    return;
+                }
+
+                var memberName = memberTokens[0].TokenText;
+                if (!string.IsNullOrWhiteSpace(memberName))
+                {
+                    _currentRecordMembers.Add(memberName);
+                }
+                return;
+            }
+
+            FinalizeRecord();
+        }
         private void ParseProperties(LexerTokens? token) => TrySwitchSection(token);
 
         private void ParseStart(LexerTokens? token)
@@ -626,6 +783,46 @@ namespace Puma
             }
 
             ast.Add(Node.CreateUseStatement(target, alias, isFilePath));
+        }
+
+        private bool UpdateIndentation(LexerTokens token)
+        {
+            if (token.Category == TokenCategory.Indent || token.Category == TokenCategory.Dedent)
+            {
+                if (int.TryParse(token.TokenText, out var indent))
+                {
+                    _currentIndentLevel = indent;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private void FinalizeEnum()
+        {
+            if (_currentEnumName == null)
+            {
+                return;
+            }
+
+            ast.Add(Node.CreateEnumDeclaration(_currentEnumName, _currentEnumMembers));
+            _currentEnumName = null;
+            _currentEnumMembers = new List<string>();
+        }
+
+        private void FinalizeRecord()
+        {
+            if (_currentRecordName == null)
+            {
+                return;
+            }
+
+            ast.Add(Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers));
+            _currentRecordName = null;
+            _currentRecordPackSize = null;
+            _currentRecordMembers = new List<string>();
         }
 
         private static bool LooksLikeFilePath(List<LexerTokens> tokens)
