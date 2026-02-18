@@ -121,6 +121,7 @@ namespace Puma
         private string? _currentRecordName;
         private int? _currentRecordPackSize;
         private List<string> _currentRecordMembers = new();
+        private int? _propertiesSectionIndent;
 
         private Section CurrentSection = Section.None;
         private LexerTokens? token = new LexerTokens();
@@ -174,6 +175,7 @@ namespace Puma
             _currentRecordName = null;
             _currentRecordPackSize = null;
             _currentRecordMembers = new List<string>();
+            _propertiesSectionIndent = null;
             CurrentSection = Section.None;
             ast = new List<Node>();
 
@@ -536,7 +538,39 @@ namespace Puma
 
             FinalizeRecord();
         }
-        private void ParseProperties(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseProperties(LexerTokens? token)
+        {
+            if (TrySwitchSection(token))
+            {
+                _propertiesSectionIndent = null;
+                return;
+            }
+
+            if (token == null)
+            {
+                return;
+            }
+
+            if (UpdateIndentation(token.Value))
+            {
+                return;
+            }
+
+            if (IsIgnorable(token.Value))
+            {
+                return;
+            }
+
+            if (_propertiesSectionIndent == null)
+            {
+                _propertiesSectionIndent = _currentIndentLevel;
+            }
+
+            if (_currentIndentLevel >= _propertiesSectionIndent)
+            {
+                ParsePropertyDeclaration(token.Value);
+            }
+        }
 
         private void ParseStart(LexerTokens? token)
         {
@@ -823,6 +857,48 @@ namespace Puma
             _currentRecordName = null;
             _currentRecordPackSize = null;
             _currentRecordMembers = new List<string>();
+        }
+
+        private void ParsePropertyDeclaration(LexerTokens firstToken)
+        {
+            var tokens = ReadTokensUntilEol(firstToken);
+            if (tokens.Count == 0)
+            {
+                return;
+            }
+
+            var equalsIndex = tokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
+            if (equalsIndex >= 0)
+            {
+                var nameTokens = tokens.Take(equalsIndex).ToList();
+                var valueTokens = tokens.Skip(equalsIndex + 1).ToList();
+                var name = BuildQualifiedName(nameTokens);
+                var value = BuildQualifiedName(valueTokens);
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    ast.Add(Node.CreatePropertyDeclaration(name, value, null));
+                }
+
+                return;
+            }
+
+            if (tokens.Count >= 2)
+            {
+                var name = tokens[0].TokenText;
+                var type = BuildQualifiedName(tokens.Skip(1));
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    ast.Add(Node.CreatePropertyDeclaration(name, null, type));
+                }
+                return;
+            }
+
+            var fallbackName = BuildQualifiedName(tokens);
+            if (!string.IsNullOrWhiteSpace(fallbackName))
+            {
+                ast.Add(Node.CreatePropertyDeclaration(fallbackName, null, null));
+            }
         }
 
         private static bool LooksLikeFilePath(List<LexerTokens> tokens)

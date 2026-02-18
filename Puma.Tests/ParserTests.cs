@@ -128,5 +128,34 @@ end
             Assert.AreEqual(4, recordNode.RecordPackSize);
             CollectionAssert.AreEqual(new[] { "Name", "Age" }, recordNode.RecordMembers);
         }
+
+        [TestMethod]
+        public void PropertiesSection_ParsesAssignmentsAndTypedDeclarations()
+        {
+            const string src =
+@"properties
+    Status = Active
+    User UserRecord
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            Assert.AreEqual(2, properties.Count);
+
+            Assert.AreEqual("Status", properties[0].PropertyName);
+            Assert.AreEqual("Active", properties[0].PropertyValue);
+            Assert.IsNull(properties[0].PropertyType);
+
+            Assert.AreEqual("User", properties[1].PropertyName);
+            Assert.AreEqual("UserRecord", properties[1].PropertyType);
+            Assert.IsNull(properties[1].PropertyValue);
+        }
     }
 }

@@ -26,7 +26,8 @@ namespace Puma
         UseStatement,
         TypeDeclaration,
         EnumDeclaration,
-        RecordDeclaration
+        RecordDeclaration,
+        PropertyDeclaration
     }
 
     internal class Node
@@ -56,6 +57,11 @@ namespace Puma
         public string? RecordName { get; set; }
         public int? RecordPackSize { get; set; }
         public List<string> RecordMembers { get; } = new();
+
+        // For PropertyDeclaration nodes
+        public string? PropertyName { get; set; }
+        public string? PropertyValue { get; set; }
+        public string? PropertyType { get; set; }
 
         public Node()
         {
@@ -126,6 +132,17 @@ namespace Puma
             };
             node.RecordMembers.AddRange(members);
             return node;
+        }
+
+        public static Node CreatePropertyDeclaration(string name, string? value, string? type)
+        {
+            return new Node
+            {
+                Kind = NodeKind.PropertyDeclaration,
+                PropertyName = name,
+                PropertyValue = value,
+                PropertyType = type
+            };
         }
     }
 }
