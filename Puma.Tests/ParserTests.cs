@@ -50,5 +50,50 @@ end
 
             CollectionAssert.AreEqual(expected, sections);
         }
+
+        [TestMethod]
+        public void UseSection_ParsesNamespaceAndAlias()
+        {
+            const string src =
+@"use System.Console as Console
+
+module
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var useNode = ast.Single(n => n.Kind == NodeKind.UseStatement);
+            Assert.AreEqual("System.Console", useNode.UseTarget);
+            Assert.AreEqual("Console", useNode.UseAlias);
+            Assert.IsFalse(useNode.UseIsFilePath);
+        }
+
+        [TestMethod]
+        public void TypeSection_ParsesTypeWithBaseAndTraits()
+        {
+            const string src =
+@"type Sample.Type is object has Alpha, Beta
+
+end
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var typeNode = ast.Single(n => n.Kind == NodeKind.TypeDeclaration);
+            Assert.AreEqual("type", typeNode.DeclarationKind);
+            Assert.AreEqual("Sample.Type", typeNode.DeclarationName);
+            Assert.AreEqual("object", typeNode.BaseTypeName);
+            CollectionAssert.AreEqual(new[] { "Alpha", "Beta" }, typeNode.TraitNames);
+        }
     }
 }

@@ -22,7 +22,9 @@ namespace Puma
     internal enum NodeKind
     {
         Section,
-        WriteLine
+        WriteLine,
+        UseStatement,
+        TypeDeclaration
     }
 
     internal class Node
@@ -32,6 +34,17 @@ namespace Puma
 
         // For WriteLine nodes
         public string? StringValue { get; set; }
+
+        // For UseStatement nodes
+        public string? UseTarget { get; set; }
+        public string? UseAlias { get; set; }
+        public bool UseIsFilePath { get; set; }
+
+        // For TypeDeclaration nodes
+        public string? DeclarationKind { get; set; }
+        public string? DeclarationName { get; set; }
+        public string? BaseTypeName { get; set; }
+        public List<string> TraitNames { get; } = new();
 
         public Node()
         {
@@ -50,6 +63,35 @@ namespace Puma
                 Kind = NodeKind.WriteLine,
                 StringValue = literal
             };
+        }
+
+        public static Node CreateUseStatement(string target, string? alias, bool isFilePath)
+        {
+            return new Node
+            {
+                Kind = NodeKind.UseStatement,
+                UseTarget = target,
+                UseAlias = alias,
+                UseIsFilePath = isFilePath
+            };
+        }
+
+        public static Node CreateTypeDeclaration(string declarationKind, string name, string? baseType, IEnumerable<string>? traits = null)
+        {
+            var node = new Node
+            {
+                Kind = NodeKind.TypeDeclaration,
+                DeclarationKind = declarationKind,
+                DeclarationName = name,
+                BaseTypeName = baseType
+            };
+
+            if (traits != null)
+            {
+                node.TraitNames.AddRange(traits);
+            }
+
+            return node;
         }
     }
 }
