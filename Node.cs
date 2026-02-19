@@ -40,6 +40,8 @@ namespace Puma
         ,
         HasStatement,
         HasTraitStatement
+        ,
+        FunctionDeclaration
     }
 
     internal class Node
@@ -111,6 +113,12 @@ namespace Puma
 
         // For HasTraitStatement nodes
         public string? HasTraitCondition { get; set; }
+
+        // For FunctionDeclaration nodes
+        public string? FunctionDeclarationName { get; set; }
+        public string? FunctionDeclarationParameters { get; set; }
+        public string? FunctionDeclarationReturnType { get; set; }
+        public List<Node> FunctionBody { get; } = new();
 
         public Node()
         {
@@ -296,6 +304,20 @@ namespace Puma
                 Kind = NodeKind.HasTraitStatement,
                 HasTraitCondition = condition
             };
+        }
+
+        public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body)
+        {
+            var node = new Node
+            {
+                Kind = NodeKind.FunctionDeclaration,
+                FunctionDeclarationName = name,
+                FunctionDeclarationParameters = parameters,
+                FunctionDeclarationReturnType = returnType
+            };
+
+            node.FunctionBody.AddRange(body);
+            return node;
         }
     }
 }

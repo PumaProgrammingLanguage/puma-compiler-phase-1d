@@ -129,9 +129,16 @@ namespace Puma
         private int? _propertiesSectionIndent;
         private FileDeclarationKind _currentFileKind;
         private Node? _currentSectionNode;
+        private int? _functionsSectionIndent;
+        private Node? _currentFunctionNode;
+        private List<Node> _currentFunctionBody = new();
         private static readonly HashSet<string> AssignmentOperators = new(StringComparer.Ordinal)
         {
             "=", "/=", "*=", "%=", "+=", "-=", "<<=", ">>=", "&=", "^=", "|="
+        };
+        private static readonly HashSet<string> AccessModifiers = new(StringComparer.Ordinal)
+        {
+            "public", "private", "internal"
         };
 
         private Section CurrentSection = Section.None;
@@ -191,6 +198,9 @@ namespace Puma
             _propertiesSectionIndent = null;
             _currentFileKind = FileDeclarationKind.None;
             _currentSectionNode = null;
+            _functionsSectionIndent = null;
+            _currentFunctionNode = null;
+            _currentFunctionBody = new List<Node>();
             CurrentSection = Section.None;
             ast = new List<Node>();
 
@@ -260,6 +270,7 @@ namespace Puma
 
             FinalizeEnum();
             FinalizeRecord();
+            FinalizeFunction();
 
             return ast;
         }
@@ -303,6 +314,57 @@ namespace Puma
                 }
             }
             return false;
+        }
+
+        private void ParseFunctionDeclaration(LexerTokens firstToken)
+        {
+            var tokens = ReadTokensUntilEol(firstToken);
+            if (tokens.Count == 0)
+            {
+                return;
+            }
+
+            var tokenIndex = 0;
+            if (tokens.Count > 0 && tokens[0].Category == TokenCategory.Keyword && AccessModifiers.Contains(tokens[0].TokenText))
+            {
+                tokenIndex++;
+            }
+
+            var openIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == "(");
+            var closeIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == ")");
+            if (openIndex < 0 || closeIndex < openIndex)
+            {
+                throw new InvalidOperationException("Function declarations require a parameter list.");
+            }
+
+            var nameTokens = tokens.Skip(tokenIndex).Take(openIndex - tokenIndex).ToList();
+            var name = BuildQualifiedName(nameTokens);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new InvalidOperationException("Function declarations require a name.");
+            }
+
+            var parameterTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();
+            var parameters = BuildQualifiedName(parameterTokens);
+
+            var returnTokens = tokens.Skip(closeIndex + 1).ToList();
+            var returnType = returnTokens.Count > 0 ? BuildQualifiedName(returnTokens) : null;
+
+            _currentFunctionNode = Node.CreateFunctionDeclaration(name, parameters, returnType, Array.Empty<Node>());
+            _currentFunctionBody = new List<Node>();
+        }
+
+        private void FinalizeFunction()
+        {
+            if (_currentFunctionNode == null)
+            {
+                return;
+            }
+
+            _currentFunctionNode.FunctionBody.AddRange(_currentFunctionBody);
+            ast.Add(_currentFunctionNode);
+            _currentFunctionNode = null;
+            _currentFunctionBody = new List<Node>();
         }
 
         private static string DisplayName(Section s) => s switch
@@ -655,7 +717,51 @@ namespace Puma
                 ParseStatement(token.Value);
             }
         }
-        private void ParseFunctions(LexerTokens? token) => TrySwitchSection(token);
+        private void ParseFunctions(LexerTokens? token)
+        {
+            if (TrySwitchSection(token))
+            {
+                FinalizeFunction();
+                _functionsSectionIndent = null;
+                return;
+            }
+
+            if (token == null)
+            {
+                return;
+            }
+
+            if (UpdateIndentation(token.Value))
+            {
+                if (_functionsSectionIndent != null && _currentIndentLevel <= _functionsSectionIndent)
+                {
+                    FinalizeFunction();
+                }
+                return;
+            }
+
+            if (IsIgnorable(token.Value))
+            {
+                return;
+            }
+
+            if (_functionsSectionIndent == null)
+            {
+                _functionsSectionIndent = _currentIndentLevel;
+            }
+
+            if (_currentIndentLevel == _functionsSectionIndent)
+            {
+                FinalizeFunction();
+                ParseFunctionDeclaration(token.Value);
+                return;
+            }
+
+            if (_currentIndentLevel > _functionsSectionIndent && _currentFunctionNode != null)
+            {
+                ParseStatement(token.Value, _currentFunctionBody);
+            }
+        }
 
         private void ParseWriteLineCall()
         {
@@ -944,7 +1050,9 @@ namespace Puma
             }
         }
 
-        private void ParseStatement(LexerTokens firstToken)
+        private void ParseStatement(LexerTokens firstToken) => ParseStatement(firstToken, ast);
+
+        private void ParseStatement(LexerTokens firstToken, List<Node> target)
         {
             var tokens = ReadTokensUntilEol(firstToken);
             if (tokens.Count == 0)
@@ -952,55 +1060,55 @@ namespace Puma
                 return;
             }
 
-            if (TryParseMatchStatement(tokens))
+            if (TryParseMatchStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseWhenStatement(tokens))
+            if (TryParseWhenStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseIfStatement(tokens))
+            if (TryParseIfStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseWhileStatement(tokens))
+            if (TryParseWhileStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseForStatement(tokens))
+            if (TryParseForStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseRepeatStatement(tokens))
+            if (TryParseRepeatStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseHasStatement(tokens))
+            if (TryParseHasStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseHasTraitStatement(tokens))
+            if (TryParseHasTraitStatement(tokens, target))
             {
                 return;
             }
 
-            if (TryParseAssignmentStatement(tokens))
+            if (TryParseAssignmentStatement(tokens, target))
             {
                 return;
             }
 
-            TryParseFunctionCall(tokens);
+            TryParseFunctionCall(tokens, target);
         }
 
-        private bool TryParseAssignmentStatement(List<LexerTokens> tokens)
+        private bool TryParseAssignmentStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count == 0)
             {
@@ -1024,11 +1132,11 @@ namespace Puma
                 throw new InvalidOperationException("Assignment statements require left and right expressions.");
             }
 
-            ast.Add(Node.CreateAssignmentStatement(left, right, assignmentOperator));
+            target.Add(Node.CreateAssignmentStatement(left, right, assignmentOperator));
             return true;
         }
 
-        private bool TryParseRepeatStatement(List<LexerTokens> tokens)
+        private bool TryParseRepeatStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count == 0)
             {
@@ -1043,11 +1151,11 @@ namespace Puma
             var expressionTokens = tokens.Skip(1).ToList();
             var expression = BuildQualifiedName(expressionTokens);
 
-            ast.Add(Node.CreateRepeatStatement(expression));
+            target.Add(Node.CreateRepeatStatement(expression));
             return true;
         }
 
-        private bool TryParseHasStatement(List<LexerTokens> tokens)
+        private bool TryParseHasStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count == 0)
             {
@@ -1071,11 +1179,11 @@ namespace Puma
                 throw new InvalidOperationException("Has statements require a condition.");
             }
 
-            ast.Add(Node.CreateHasStatement(condition));
+            target.Add(Node.CreateHasStatement(condition));
             return true;
         }
 
-        private bool TryParseHasTraitStatement(List<LexerTokens> tokens)
+        private bool TryParseHasTraitStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count < 3)
             {
@@ -1099,11 +1207,11 @@ namespace Puma
                 throw new InvalidOperationException("Has trait statements require a condition.");
             }
 
-            ast.Add(Node.CreateHasTraitStatement(condition));
+            target.Add(Node.CreateHasTraitStatement(condition));
             return true;
         }
 
-        private bool TryParseFunctionCall(List<LexerTokens> tokens)
+        private bool TryParseFunctionCall(List<LexerTokens> tokens, List<Node> target)
         {
             var openIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == "(");
             if (openIndex <= 0)
@@ -1127,11 +1235,11 @@ namespace Puma
                 return false;
             }
 
-            ast.Add(Node.CreateFunctionCall(name, args));
+            target.Add(Node.CreateFunctionCall(name, args));
             return true;
         }
 
-        private bool TryParseIfStatement(List<LexerTokens> tokens)
+        private bool TryParseIfStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count == 0)
             {
@@ -1150,11 +1258,11 @@ namespace Puma
                 throw new InvalidOperationException("If statements require a condition expression.");
             }
 
-            ast.Add(Node.CreateIfStatement(condition));
+            target.Add(Node.CreateIfStatement(condition));
             return true;
         }
 
-        private bool TryParseMatchStatement(List<LexerTokens> tokens)
+        private bool TryParseMatchStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count == 0)
             {
@@ -1173,11 +1281,11 @@ namespace Puma
                 throw new InvalidOperationException("Match statements require an expression.");
             }
 
-            ast.Add(Node.CreateMatchStatement(expression));
+            target.Add(Node.CreateMatchStatement(expression));
             return true;
         }
 
-        private bool TryParseWhenStatement(List<LexerTokens> tokens)
+        private bool TryParseWhenStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count == 0)
             {
@@ -1196,11 +1304,11 @@ namespace Puma
                 throw new InvalidOperationException("When statements require a condition.");
             }
 
-            ast.Add(Node.CreateWhenStatement(condition));
+            target.Add(Node.CreateWhenStatement(condition));
             return true;
         }
 
-        private bool TryParseWhileStatement(List<LexerTokens> tokens)
+        private bool TryParseWhileStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count == 0)
             {
@@ -1219,11 +1327,11 @@ namespace Puma
                 throw new InvalidOperationException("While statements require a condition.");
             }
 
-            ast.Add(Node.CreateWhileStatement(condition));
+            target.Add(Node.CreateWhileStatement(condition));
             return true;
         }
 
-        private bool TryParseForStatement(List<LexerTokens> tokens)
+        private bool TryParseForStatement(List<LexerTokens> tokens, List<Node> target)
         {
             if (tokens.Count < 4)
             {
@@ -1250,11 +1358,11 @@ namespace Puma
 
             if (tokens[0].TokenText == "for")
             {
-                ast.Add(Node.CreateForStatement(variable, container));
+                target.Add(Node.CreateForStatement(variable, container));
             }
             else
             {
-                ast.Add(Node.CreateForAllStatement(variable, container));
+                target.Add(Node.CreateForAllStatement(variable, container));
             }
 
             return true;

@@ -416,5 +416,36 @@ finalize
             Assert.AreEqual("=", assignments[1].AssignmentOperator);
             Assert.AreEqual("-=", assignments[2].AssignmentOperator);
         }
+
+        [TestMethod]
+        public void FunctionsSection_ParsesFunctionDeclarationsAndBodies()
+        {
+            const string src =
+@"functions
+    Add(a int32, b int32) int32
+        Result = a
+        .Total += b
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var functionNode = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration);
+            Assert.AreEqual("Add", functionNode.FunctionDeclarationName);
+            Assert.AreEqual("aint32,bint32", functionNode.FunctionDeclarationParameters);
+            Assert.AreEqual("int32", functionNode.FunctionDeclarationReturnType);
+
+            var bodyAssignments = functionNode.FunctionBody
+                .Where(n => n.Kind == NodeKind.AssignmentStatement)
+                .ToList();
+            Assert.AreEqual(2, bodyAssignments.Count);
+            Assert.AreEqual("Result", bodyAssignments[0].AssignmentLeft);
+            Assert.AreEqual("a", bodyAssignments[0].AssignmentRight);
+            Assert.AreEqual(".Total", bodyAssignments[1].AssignmentLeft);
+            Assert.AreEqual("b", bodyAssignments[1].AssignmentRight);
+        }
     }
 }
