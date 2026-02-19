@@ -21,12 +21,10 @@ initialize
 finalize
 
 functions
-
-end
 ";
 
         [TestMethod]
-        public void SectionHeaders_AreTokenizedAsIdentifiersInOrder()
+        public void SectionHeaders_AreTokenizedAsKeywordsInOrder()
         {
             var lexer = new Puma.Lexer();
             var tokens = lexer.Tokenize(Sample);
@@ -38,7 +36,7 @@ end
 
             var expected = new[]
             {
-                "using","module","enums","records","initialize","finalize","functions","end"
+                "using","module","enums","records","initialize","finalize","functions"
             };
 
             CollectionAssert.AreEqual(expected, identifiers);

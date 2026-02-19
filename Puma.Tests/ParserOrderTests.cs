@@ -26,7 +26,7 @@ namespace Puma.Tests
     public class ParserOrderTests
     {
         private const string CorrectOrder =
-@"using
+@"use
 
 module
 
@@ -34,22 +34,27 @@ enums
 
 records
 
+properties
+    Count = 0
+
 initialize
 
 finalize
 
 functions
-
 ";
 
         private const string IncorrectOrder =
-@"module
-
-using
+@"use
 
 enums
 
+module
+
 records
+
+properties
+    Count = 0
 
 initialize
 
@@ -69,13 +74,14 @@ functions
             // Should not throw
             var ast = parser.Parse(tokens);
 
-            var sections = ast.Select(n => n.Section).ToArray();
+            var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
             var expected = new[]
             {
                 Section.Using,
                 Section.Module,
                 Section.Enums,
                 Section.Records,
+                Section.Properties,
                 Section.Initialize,
                 Section.Finalize,
                 Section.Functions

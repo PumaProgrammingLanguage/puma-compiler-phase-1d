@@ -40,9 +40,12 @@ namespace Puma.Tests
         public void Parse_StartWithoutInitialize_IsAccepted()
         {
             const string src =
-@"using
+@"use
 
 module
+
+properties
+    Counter = 0
 
 start
 
@@ -54,9 +57,9 @@ functions
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
 
-            var sections = ast.Select(n => n.Section).ToArray();
+            var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
             CollectionAssert.AreEqual(
-                new[] { Section.Using, Section.Module, Section.Start, Section.Functions },
+                new[] { Section.Using, Section.Module, Section.Properties, Section.Start, Section.Functions },
                 sections);
         }
 
@@ -64,9 +67,12 @@ functions
         public void Parse_InitializeWithoutStart_IsAccepted()
         {
             const string src =
-@"using
+@"use
 
 module
+
+properties
+    Counter = 0
 
 initialize
 
@@ -78,9 +84,9 @@ functions
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
 
-            var sections = ast.Select(n => n.Section).ToArray();
+            var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
             CollectionAssert.AreEqual(
-                new[] { Section.Using, Section.Module, Section.Initialize, Section.Functions },
+                new[] { Section.Using, Section.Module, Section.Properties, Section.Initialize, Section.Functions },
                 sections);
         }
 
@@ -88,7 +94,9 @@ functions
         public void Parse_InitializeWithoutTypeTraitOrModule_Throws()
         {
             const string src =
-@"initialize
+@"use
+
+initialize
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
@@ -101,9 +109,9 @@ functions
         public void Parse_DuplicateSection_ThrowsFriendlyError()
         {
             const string src =
-@"using
+@"use
 
-using
+use
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();

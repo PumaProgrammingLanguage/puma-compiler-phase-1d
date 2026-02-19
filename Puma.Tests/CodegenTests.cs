@@ -19,8 +19,6 @@ initialize
 finalize
 
 functions
-
-end
 ";
 
         private static string Normalize(string s) =>
@@ -43,8 +41,6 @@ end
 // finalize
 
 // functions
-
-// end
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();

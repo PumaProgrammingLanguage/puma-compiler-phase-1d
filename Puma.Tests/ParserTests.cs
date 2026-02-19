@@ -16,6 +16,8 @@ enums
 
 records
 
+properties
+
 initialize
 
 finalize
@@ -40,6 +42,7 @@ functions
                 Section.Module,
                 Section.Enums,
                 Section.Records,
+                Section.Properties,
                 Section.Initialize,
                 Section.Finalize,
                 Section.Functions
@@ -73,7 +76,9 @@ module
         public void TypeSection_ParsesTypeWithBaseAndTraits()
         {
             const string src =
-@"type Sample.Type is object has Alpha, Beta
+@"use
+
+type Sample.Type is object has Alpha, Beta
 ";
 
             var lexer = new Puma.Lexer();
@@ -93,7 +98,11 @@ module
         public void EnumsAndRecords_AreParsedWithMembers()
         {
             const string src =
-@"enums
+@"use
+
+module
+
+enums
     StatusSetting
         Active
         Inactive
@@ -124,7 +133,11 @@ records
         public void PropertiesSection_ParsesAssignments()
         {
             const string src =
-@"properties
+@"use
+
+module
+
+properties
     Status = Active
     User = UserRecord
 ";
@@ -151,7 +164,12 @@ records
         public void StartAndInitialize_ParseAssignmentStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    Counter = 0
 
 initialize
     Counter = 1
@@ -180,7 +198,12 @@ start
         public void StartAndInitialize_ParseFunctionCalls()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    Counter = 0
 
 initialize
     Configure(1, 2)
@@ -207,7 +230,12 @@ start
         public void StartAndInitialize_ParseIfStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    Flag = false
 
 initialize
     if ready
@@ -232,7 +260,12 @@ start
         public void StartAndInitialize_ParseMatchStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    value = 0
 
 start
     match value
@@ -259,7 +292,12 @@ start
         public void StartAndInitialize_ParseWhileStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    running = true
 
 initialize
     while isReady
@@ -284,7 +322,12 @@ start
         public void StartAndInitialize_ParseForStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    items = 0
 
 initialize
     for item in items
@@ -312,7 +355,12 @@ start
         public void StartAndInitialize_ParseRepeatStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    dummy = 0
 
 initialize
     repeat
@@ -337,7 +385,12 @@ start
         public void StartAndInitialize_ParseHasStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    optionalValue = 0
 
 initialize
     has optionalValue
@@ -362,7 +415,12 @@ start
         public void StartAndInitialize_ParseHasTraitStatements()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    item = 0
 
 initialize
     has trait item
@@ -387,7 +445,12 @@ start
         public void StartInitializeFinalize_ParseAssignmentsAndParameters()
         {
             const string src =
-@"module
+@"use
+
+module
+
+properties
+    Count = 0
 
 initialize(value int32)
     Count += value
@@ -421,7 +484,11 @@ finalize
         public void FunctionsSection_ParsesFunctionDeclarationsAndBodies()
         {
             const string src =
-@"functions
+@"use
+
+module
+
+functions
     Add(a int32, b int32) int32
         Result = a
         .Total += b

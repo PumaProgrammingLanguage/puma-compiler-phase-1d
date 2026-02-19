@@ -89,26 +89,24 @@ namespace Puma
         };
 
         // Enforce order: sections are optional, but if present they must follow this sequence.
-        // start and initialize share the same position.
+        // type/trait/module share the same position, and start/initialize share the same position.
         private static readonly Dictionary<Section, int> SectionRank = new()
         {
             [Section.Using] = 10,
+            [Section.Type] = 20,
+            [Section.Trait] = 20,
             [Section.Module] = 20,
             [Section.Enums] = 30,
             [Section.Records] = 40,
-            [Section.Start] = 50,
-            [Section.Initialize] = 50,
-            [Section.Finalize] = 60,
-            [Section.Functions] = 70,
-
-            // Recognized but not part of the enforced flow
-            [Section.Type] = 0,
-            [Section.Trait] = 0,
-            [Section.Properties] = 0
+            [Section.Properties] = 50,
+            [Section.Start] = 60,
+            [Section.Initialize] = 60,
+            [Section.Finalize] = 70,
+            [Section.Functions] = 80
         };
 
         private const string ExpectedOrderText =
-            "use, module, enums, records, start/initialize, finalize, functions";
+            "use, type/trait/module, enums, records, properties, start/initialize, finalize, functions";
 
         private int _lastRank = int.MinValue;
         private Section _lastSection = Section.None;
@@ -148,8 +146,6 @@ namespace Puma
         private Node? previousNode = new Node();
         private List<Node> ast = new List<Node>();
         private int index = 0;
-        private int LineNumber = 0;
-        private int ColumnNumber = 0;
 
         // Keep a reference to tokens to allow sub-parsers to read ahead
         private List<LexerTokens> _tokens = new();
@@ -157,8 +153,6 @@ namespace Puma
         public Parser()
         {
             index = 0;
-            LineNumber = 1;
-            ColumnNumber = 1;
             currentNode = rootNode;
         }
 
@@ -290,7 +284,7 @@ namespace Puma
                     }
 
                     // Order check
-                    if (!SectionRank.TryGetValue(next, out var rank) || rank == 0)
+                    if (!SectionRank.TryGetValue(next, out var rank))
                     {
                         throw new InvalidOperationException(
                             $"Section '{DisplayName(next)}' is not allowed here. Sections must appear in this order (all optional): {ExpectedOrderText}.");
@@ -303,11 +297,18 @@ namespace Puma
                             $"Fix: move '{DisplayName(next)}' to match this order (all optional): {ExpectedOrderText}.");
                     }
 
-                    _seen.Add(next);
                     _lastRank = rank;
                     _lastSection = next;
+                    _seen.Add(next);
 
                     CurrentSection = next;
+                    _currentFileKind = next switch
+                    {
+                        Section.Module => FileDeclarationKind.Module,
+                        Section.Type => FileDeclarationKind.Type,
+                        Section.Trait => FileDeclarationKind.Trait,
+                        _ => _currentFileKind
+                    };
                     _currentSectionNode = new Node(next);
                     ast.Add(_currentSectionNode);
                     return true;
