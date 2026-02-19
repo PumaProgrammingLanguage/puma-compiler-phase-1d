@@ -110,7 +110,6 @@ namespace Puma
             Section.Initialize => "initialize",
             Section.Finalize => "finalize",
             Section.Functions => "functions",
-            Section.end => "end",
             _ => string.Empty
         };
     }

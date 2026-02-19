@@ -40,7 +40,6 @@ finalize
 
 functions
 
-end
 ";
 
         private const string IncorrectOrder =
@@ -57,8 +56,6 @@ initialize
 finalize
 
 functions
-
-end
 ";
 
         [TestMethod]
@@ -81,8 +78,7 @@ end
                 Section.Records,
                 Section.Initialize,
                 Section.Finalize,
-                Section.Functions,
-                Section.end
+                Section.Functions
             };
 
             CollectionAssert.AreEqual(expected, sections);

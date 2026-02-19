@@ -78,6 +78,10 @@ namespace Puma
         // For AssignmentStatement nodes
         public string? AssignmentLeft { get; set; }
         public string? AssignmentRight { get; set; }
+        public string? AssignmentOperator { get; set; }
+
+        // For Section nodes
+        public string? SectionParameters { get; set; }
 
         // For FunctionCall nodes
         public string? FunctionName { get; set; }
@@ -190,13 +194,14 @@ namespace Puma
             };
         }
 
-        public static Node CreateAssignmentStatement(string left, string right)
+        public static Node CreateAssignmentStatement(string left, string right, string assignmentOperator)
         {
             return new Node
             {
                 Kind = NodeKind.AssignmentStatement,
                 AssignmentLeft = left,
-                AssignmentRight = right
+                AssignmentRight = right,
+                AssignmentOperator = assignmentOperator
             };
         }
 

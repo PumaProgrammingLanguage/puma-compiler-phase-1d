@@ -26,17 +26,13 @@ namespace Puma.Tests
             s.Replace("\r\n", "\n").Replace("\r", "\n");
 
         [TestMethod]
-        public void Generate_OnlyFunctionsAndEnd_EmitsExpected()
+        public void Generate_OnlyFunctions_EmitsExpected()
         {
             const string src =
 @"functions
-
-end
 ";
             var expected =
 @"// functions
-
-// end
 ";
 
             var lexer = new Puma.Lexer();

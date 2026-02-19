@@ -21,8 +21,6 @@ initialize
 finalize
 
 functions
-
-end
 ";
 
         [TestMethod]
@@ -44,8 +42,7 @@ end
                 Section.Records,
                 Section.Initialize,
                 Section.Finalize,
-                Section.Functions,
-                Section.end
+                Section.Functions
             };
 
             CollectionAssert.AreEqual(expected, sections);
@@ -58,8 +55,6 @@ end
 @"use System.Console as Console
 
 module
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -79,8 +74,6 @@ end
         {
             const string src =
 @"type Sample.Type is object has Alpha, Beta
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -109,8 +102,6 @@ records
     UserRecord pack 4
         Name str
         Age int
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -136,8 +127,6 @@ end
 @"properties
     Status = Active
     User = UserRecord
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -169,8 +158,6 @@ initialize
 
 start
     Counter = 2
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -183,8 +170,10 @@ end
             Assert.AreEqual(2, assignments.Count);
             Assert.AreEqual("Counter", assignments[0].AssignmentLeft);
             Assert.AreEqual("1", assignments[0].AssignmentRight);
+            Assert.AreEqual("=", assignments[0].AssignmentOperator);
             Assert.AreEqual("Counter", assignments[1].AssignmentLeft);
             Assert.AreEqual("2", assignments[1].AssignmentRight);
+            Assert.AreEqual("=", assignments[1].AssignmentOperator);
         }
 
         [TestMethod]
@@ -198,8 +187,6 @@ initialize
 
 start
     Console.WriteLine(""Hi"")
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -227,8 +214,6 @@ initialize
 
 start
     if status
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -253,8 +238,6 @@ start
     match value
         when 1
         when 2
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -283,8 +266,6 @@ initialize
 
 start
     while running
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -310,8 +291,6 @@ initialize
 
 start
     forall entry in records
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -340,8 +319,6 @@ initialize
 
 start
     repeat
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -367,8 +344,6 @@ initialize
 
 start
     has item
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -394,8 +369,6 @@ initialize
 
 start
     has trait record
-
-end
 ";
 
             var lexer = new Puma.Lexer();
@@ -408,6 +381,40 @@ end
             Assert.AreEqual(2, hasTraits.Count);
             Assert.AreEqual("item", hasTraits[0].HasTraitCondition);
             Assert.AreEqual("record", hasTraits[1].HasTraitCondition);
+        }
+
+        [TestMethod]
+        public void StartInitializeFinalize_ParseAssignmentsAndParameters()
+        {
+            const string src =
+@"module
+
+initialize(value int32)
+    Count += value
+
+start(args str)
+    Count = 0
+
+finalize
+    Count -= 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var startNode = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Section.Start);
+            var initializeNode = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Section.Initialize);
+            Assert.AreEqual("argsstr", startNode.SectionParameters);
+            Assert.AreEqual("valueint32", initializeNode.SectionParameters);
+
+            var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
+            Assert.AreEqual(3, assignments.Count);
+            Assert.AreEqual("+=", assignments[0].AssignmentOperator);
+            Assert.AreEqual("=", assignments[1].AssignmentOperator);
+            Assert.AreEqual("-=", assignments[2].AssignmentOperator);
         }
     }
 }

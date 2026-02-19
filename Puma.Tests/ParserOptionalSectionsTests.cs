@@ -37,58 +37,6 @@ namespace Puma.Tests
         }
 
         [TestMethod]
-        public void Parse_OnlyEnd_IsAccepted()
-        {
-            const string src = "end\n";
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-
-            var sections = ast.Select(n => n.Section).ToArray();
-            CollectionAssert.AreEqual(new[] { Section.end }, sections);
-        }
-
-        [TestMethod]
-        public void Parse_OnlyFunctionsAndEnd_IsAccepted()
-        {
-            const string src =
-@"functions
-
-end
-";
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-
-            var sections = ast.Select(n => n.Section).ToArray();
-            CollectionAssert.AreEqual(new[] { Section.Functions, Section.end }, sections);
-        }
-
-        [TestMethod]
-        public void Parse_UsingModuleEnd_SubsetInOrder_IsAccepted()
-        {
-            const string src =
-@"using
-
-module
-
-end
-";
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-
-            var sections = ast.Select(n => n.Section).ToArray();
-            CollectionAssert.AreEqual(new[] { Section.Using, Section.Module, Section.end }, sections);
-        }
-
-        [TestMethod]
         public void Parse_StartWithoutInitialize_IsAccepted()
         {
             const string src =
@@ -99,8 +47,6 @@ module
 start
 
 functions
-
-end
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
@@ -110,7 +56,7 @@ end
 
             var sections = ast.Select(n => n.Section).ToArray();
             CollectionAssert.AreEqual(
-                new[] { Section.Using, Section.Module, Section.Start, Section.Functions, Section.end },
+                new[] { Section.Using, Section.Module, Section.Start, Section.Functions },
                 sections);
         }
 
@@ -125,8 +71,6 @@ module
 initialize
 
 functions
-
-end
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
@@ -136,7 +80,7 @@ end
 
             var sections = ast.Select(n => n.Section).ToArray();
             CollectionAssert.AreEqual(
-                new[] { Section.Using, Section.Module, Section.Initialize, Section.Functions, Section.end },
+                new[] { Section.Using, Section.Module, Section.Initialize, Section.Functions },
                 sections);
         }
 
@@ -145,8 +89,6 @@ end
         {
             const string src =
 @"initialize
-
-end
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
@@ -156,36 +98,12 @@ end
         }
 
         [TestMethod]
-        public void Parse_MissingEnd_IsAccepted()
-        {
-            const string src =
-@"using
-
-module
-
-functions
-";
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-
-            var sections = ast.Select(n => n.Section).ToArray();
-            CollectionAssert.AreEqual(
-                new[] { Section.Using, Section.Module, Section.Functions },
-                sections);
-        }
-
-        [TestMethod]
         public void Parse_DuplicateSection_ThrowsFriendlyError()
         {
             const string src =
 @"using
 
 using
-
-end
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();

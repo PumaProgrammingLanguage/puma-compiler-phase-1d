@@ -111,7 +111,7 @@ namespace Puma
             "char", "str", "fstr", "vstr", "bool", "true", "false", "hex", "oct", "bin", "implicit", "explicit",
             "operator", "get", "set", "with", "self", "if", "else", "and", "or", "not", "for", "in", "while",
             "repeat", "forall", "break", "continue", "match", "when", "error", "catch", "multithread",
-            "multiprocess", "end"
+            "multiprocess"
         };
 
         /// <summary>

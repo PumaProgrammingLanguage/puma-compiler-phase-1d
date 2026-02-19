@@ -53,8 +53,6 @@ namespace Puma
             "finalize",
             // functions
             "functions",
-            // end
-            "end",
         ];
 
         public enum Section
@@ -71,7 +69,6 @@ namespace Puma
             Initialize,
             Finalize,
             Functions,
-            end, // end of last section
             Invalid,
         }
 
@@ -88,8 +85,7 @@ namespace Puma
             ["start"] = Section.Start,
             ["initialize"] = Section.Initialize,
             ["finalize"] = Section.Finalize,
-            ["functions"] = Section.Functions,
-            ["end"] = Section.end
+            ["functions"] = Section.Functions
         };
 
         // Enforce order: sections are optional, but if present they must follow this sequence.
@@ -104,7 +100,6 @@ namespace Puma
             [Section.Initialize] = 50,
             [Section.Finalize] = 60,
             [Section.Functions] = 70,
-            [Section.end] = 80,
 
             // Recognized but not part of the enforced flow
             [Section.Type] = 0,
@@ -113,7 +108,7 @@ namespace Puma
         };
 
         private const string ExpectedOrderText =
-            "use, module, enums, records, start/initialize, finalize, functions, end";
+            "use, module, enums, records, start/initialize, finalize, functions";
 
         private int _lastRank = int.MinValue;
         private Section _lastSection = Section.None;
@@ -121,6 +116,8 @@ namespace Puma
         private bool _typeHeaderParsed;
         private bool _traitHeaderParsed;
         private bool _moduleHeaderParsed;
+        private bool _startHeaderParsed;
+        private bool _initializeHeaderParsed;
         private int _currentIndentLevel;
         private int? _enumSectionIndent;
         private string? _currentEnumName;
@@ -131,6 +128,11 @@ namespace Puma
         private List<string> _currentRecordMembers = new();
         private int? _propertiesSectionIndent;
         private FileDeclarationKind _currentFileKind;
+        private Node? _currentSectionNode;
+        private static readonly HashSet<string> AssignmentOperators = new(StringComparer.Ordinal)
+        {
+            "=", "/=", "*=", "%=", "+=", "-=", "<<=", ">>=", "&=", "^=", "|="
+        };
 
         private Section CurrentSection = Section.None;
         private LexerTokens? token = new LexerTokens();
@@ -176,6 +178,8 @@ namespace Puma
             _typeHeaderParsed = false;
             _traitHeaderParsed = false;
             _moduleHeaderParsed = false;
+            _startHeaderParsed = false;
+            _initializeHeaderParsed = false;
             _currentIndentLevel = 0;
             _enumSectionIndent = null;
             _currentEnumName = null;
@@ -186,6 +190,7 @@ namespace Puma
             _currentRecordMembers = new List<string>();
             _propertiesSectionIndent = null;
             _currentFileKind = FileDeclarationKind.None;
+            _currentSectionNode = null;
             CurrentSection = Section.None;
             ast = new List<Node>();
 
@@ -247,10 +252,6 @@ namespace Puma
                         ParseFunctions(token);
                         break;
 
-                    case Section.end:
-                        ParseEnd(token);
-                        break;
-
                     case Section.Invalid:
                     default:
                         break;
@@ -296,7 +297,8 @@ namespace Puma
                     _lastSection = next;
 
                     CurrentSection = next;
-                    ast.Add(new Node(next));
+                    _currentSectionNode = new Node(next);
+                    ast.Add(_currentSectionNode);
                     return true;
                 }
             }
@@ -313,7 +315,6 @@ namespace Puma
             Section.Module => "module",
             Section.Enums => "enums",
             Section.Records => "records",
-            Section.end => "end",
             Section.Type => "type",
             Section.Trait => "trait",
             Section.Properties => "properties",
@@ -596,6 +597,13 @@ namespace Puma
             if (TrySwitchSection(token))
                 return;
 
+            if (!_startHeaderParsed && TryParseSectionParameters(token, out var parameters))
+            {
+                _currentSectionNode!.SectionParameters = parameters;
+                _startHeaderParsed = true;
+                return;
+            }
+
             // Recognize built-in WriteLine in start section: WriteLine("...") [EOL]
             if (token is LexerTokens t && t.Category == TokenCategory.Identifier && t.TokenText == "WriteLine")
             {
@@ -622,19 +630,32 @@ namespace Puma
                 return;
             }
 
+            if (!_initializeHeaderParsed && TryParseSectionParameters(token, out var parameters))
+            {
+                _currentSectionNode!.SectionParameters = parameters;
+                _initializeHeaderParsed = true;
+                return;
+            }
+
             if (token != null && !IsIgnorable(token.Value))
             {
                 ParseStatement(token.Value);
             }
         }
 
-        private void ParseFinalize(LexerTokens? token) => TrySwitchSection(token);
-        private void ParseFunctions(LexerTokens? token) => TrySwitchSection(token);
-
-        private void ParseEnd(LexerTokens? token)
+        private void ParseFinalize(LexerTokens? token)
         {
-            // After 'end' we ignore remaining tokens.
+            if (TrySwitchSection(token))
+            {
+                return;
+            }
+
+            if (token != null && !IsIgnorable(token.Value))
+            {
+                ParseStatement(token.Value);
+            }
         }
+        private void ParseFunctions(LexerTokens? token) => TrySwitchSection(token);
 
         private void ParseWriteLineCall()
         {
@@ -986,14 +1007,15 @@ namespace Puma
                 return false;
             }
 
-            var equalsIndex = tokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
-            if (equalsIndex < 0)
+            var assignmentIndex = tokens.FindIndex(t => t.Category == TokenCategory.Operator && AssignmentOperators.Contains(t.TokenText));
+            if (assignmentIndex < 0)
             {
                 return false;
             }
 
-            var leftTokens = tokens.Take(equalsIndex).ToList();
-            var rightTokens = tokens.Skip(equalsIndex + 1).ToList();
+            var leftTokens = tokens.Take(assignmentIndex).ToList();
+            var rightTokens = tokens.Skip(assignmentIndex + 1).ToList();
+            var assignmentOperator = tokens[assignmentIndex].TokenText;
             var left = BuildQualifiedName(leftTokens);
             var right = BuildQualifiedName(rightTokens);
 
@@ -1002,7 +1024,7 @@ namespace Puma
                 throw new InvalidOperationException("Assignment statements require left and right expressions.");
             }
 
-            ast.Add(Node.CreateAssignmentStatement(left, right));
+            ast.Add(Node.CreateAssignmentStatement(left, right, assignmentOperator));
             return true;
         }
 
@@ -1258,6 +1280,52 @@ namespace Puma
             }
 
             return false;
+        }
+
+        private bool TryParseSectionParameters(LexerTokens? token, out string parameters)
+        {
+            parameters = string.Empty;
+
+            if (token == null)
+            {
+                return false;
+            }
+
+            if (IsIgnorable(token.Value))
+            {
+                return false;
+            }
+
+            if (token.Value.Category != TokenCategory.Delimiter || token.Value.TokenText != "(")
+            {
+                return false;
+            }
+
+            var parameterTokens = new List<LexerTokens>();
+
+            while (true)
+            {
+                var next = GetNextToken(_tokens);
+                if (next == null)
+                {
+                    throw new InvalidOperationException("Unterminated parameter list in section header.");
+                }
+
+                if (next.Value.Category == TokenCategory.Delimiter && next.Value.TokenText == ")")
+                {
+                    break;
+                }
+
+                if (IsIgnorable(next.Value))
+                {
+                    continue;
+                }
+
+                parameterTokens.Add(next.Value);
+            }
+
+            parameters = BuildQualifiedName(parameterTokens);
+            return true;
         }
     }
 }
