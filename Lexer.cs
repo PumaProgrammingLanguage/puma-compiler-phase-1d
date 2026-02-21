@@ -15,10 +15,6 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-using Newtonsoft.Json.Linq;
-using System.Diagnostics;
-using System.Linq;
-
 namespace Puma
 {
     /// <summary>
@@ -28,13 +24,13 @@ namespace Puma
     {
         public readonly string[] Operators =
         [
-            "<<=", ">>=", 
+            "<<=", ">>=",
             "..",
-            "==", "!=", "<=", ">=", 
+            "==", "!=", "<=", ">=",
             "+=", "-=", "*=", "/=", "%=", "^=", "&=", "|=",
             "<<", ">>", "++", "--",
             "=", "<", ">", "~",
-            "+", "-", "*", "/", "%", "^", "&", "|" 
+            "+", "-", "*", "/", "%", "^", "&", "|"
 
         ];
         List<string> _operatorsOneChar = [];
@@ -127,6 +123,10 @@ namespace Puma
             var atLineStart = true;
             var escapeString = false;
             var escapeChar = false;
+            var invalidStringEscape = false;
+            var invalidCharEscape = false;
+            var stringHexRemaining = 0;
+            var charHexRemaining = 0;
             var indentStack = new Stack<int>();
             indentStack.Push(0);
 
@@ -213,11 +213,11 @@ namespace Puma
 
 
                     case TokenCategory.StringLiteral:
-                        TokenizeStringLiteral(tokens, ref currentTokenType, ref currentToken, currentChar, ref escapeString);
+                        TokenizeStringLiteral(tokens, ref currentTokenType, ref currentToken, currentChar, ref escapeString, ref invalidStringEscape, ref stringHexRemaining);
                         break;
 
                     case TokenCategory.CharLiteral:
-                        TokentizeCharLiteral(tokens, ref currentTokenType, ref currentToken, currentChar, ref escapeChar);
+                        TokentizeCharLiteral(tokens, ref currentTokenType, ref currentToken, currentChar, ref escapeChar, ref invalidCharEscape, ref charHexRemaining);
                         break;
 
                     case TokenCategory.NumericLiteral:
@@ -269,10 +269,27 @@ namespace Puma
         private static void TokenizeNumericLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, ref int i, char currentChar)
         {
             var lastChar = currentToken.Length > 0 ? currentToken[^1] : '\0';
-            var isExponentSign = (currentChar == '-' || currentChar == '+') && (lastChar == 'e' || lastChar == 'E');
+            var numberBase = GetNumberBase(currentToken);
+            var hasExponent = numberBase == 10 && (currentToken.Contains('e') || currentToken.Contains('E'));
+            var isExponentSign = numberBase == 10 && (currentChar == '-' || currentChar == '+') && (lastChar == 'e' || lastChar == 'E');
+            var isSuffixDigit = char.IsDigit(currentChar) && currentToken.Any(char.IsLetter);
+            var isBasePrefix = lastChar == '0' && currentToken.Length == 1 && (currentChar == 'x' || currentChar == 'X' || currentChar == 'b' || currentChar == 'B' || currentChar == 'o' || currentChar == 'O');
+            var isSuffixLetter = char.IsLetter(currentChar) && IsAllowedNumericSuffixChar(currentToken, currentChar, hasExponent);
+
+            if (numberBase != 10 && (char.IsLetterOrDigit(currentChar) || currentChar == '.'))
+            {
+                if (!IsValidDigitForBase(numberBase, currentChar) && !isSuffixLetter)
+                {
+                    tokens.Add(new LexerTokens() { TokenText = currentToken, Category = TokenCategory.Unknown });
+                    currentToken = string.Empty;
+                    currentTokenType = TokenCategory.Unknown;
+                    i--;
+                    return;
+                }
+            }
 
             if (char.IsDigit(currentChar) || char.IsAsciiHexDigit(currentChar) || currentChar == '.' ||
-                currentChar == 'e' || currentChar == 'E' || isExponentSign)
+                currentChar == 'e' || currentChar == 'E' || isExponentSign || isBasePrefix || isSuffixLetter || isSuffixDigit)
             {
                 // number continues
                 currentToken += currentChar;
@@ -280,7 +297,16 @@ namespace Puma
             else
             {
                 // found the end of the number
-                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
+                if (TrySplitNumericSuffix(currentToken, out var numberToken, out var suffixToken))
+                {
+                    tokens.Add(new LexerTokens() { TokenText = numberToken, Category = currentTokenType });
+                    var suffixCategory = IsKeyword(suffixToken) ? TokenCategory.Keyword : TokenCategory.Identifier;
+                    tokens.Add(new LexerTokens() { TokenText = suffixToken, Category = suffixCategory });
+                }
+                else
+                {
+                    tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
+                }
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
                 // current charator is next token.  reset the index by one character
@@ -288,11 +314,100 @@ namespace Puma
             }
         }
 
-        private static void TokentizeCharLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar, ref bool escapeChar)
+        private static bool IsAllowedNumericSuffixChar(string currentToken, char currentChar, bool hasExponent)
         {
+            if (hasExponent)
+            {
+                return false;
+            }
+
+            if (!currentToken.Any(char.IsDigit))
+            {
+                return false;
+            }
+
+            if (currentToken.Any(char.IsLetter))
+            {
+                return true;
+            }
+
+            return currentChar is 'i' or 'u' or 'f' or 'h' or 'o' or 'b' or 'x' or 'I' or 'U' or 'F' or 'H' or 'O' or 'B' or 'X';
+        }
+
+        private static int GetNumberBase(string currentToken)
+        {
+            if (currentToken.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                return 16;
+            }
+
+            if (currentToken.StartsWith("0b", StringComparison.OrdinalIgnoreCase))
+            {
+                return 2;
+            }
+
+            if (currentToken.StartsWith("0o", StringComparison.OrdinalIgnoreCase))
+            {
+                return 8;
+            }
+
+            return 10;
+        }
+
+        private static bool IsValidDigitForBase(int numberBase, char currentChar)
+        {
+            return numberBase switch
+            {
+                2 => currentChar is '0' or '1',
+                8 => currentChar is >= '0' and <= '7',
+                16 => char.IsDigit(currentChar) || (char.ToLowerInvariant(currentChar) is >= 'a' and <= 'f'),
+                _ => char.IsDigit(currentChar)
+            };
+        }
+
+        private static bool IsValidEscapeChar(char currentChar)
+        {
+            return currentChar is '\\' or '\'' or '"' or '0' or 'a' or 'b' or 'f' or 'n' or 'r' or 't' or 'v'
+                or 'x' or 'u' or 'U';
+        }
+
+        private static void TokentizeCharLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar, ref bool escapeChar, ref bool invalidCharEscape, ref int charHexRemaining)
+        {
+            if (charHexRemaining > 0)
+            {
+                currentToken += currentChar;
+                if (!char.IsAsciiHexDigit(currentChar))
+                {
+                    invalidCharEscape = true;
+                }
+                charHexRemaining--;
+                return;
+            }
+
+            if (charHexRemaining < 0)
+            {
+                if (char.IsAsciiHexDigit(currentChar))
+                {
+                    currentToken += currentChar;
+                    return;
+                }
+
+                charHexRemaining = 0;
+            }
+
             if (escapeChar)
             {
                 currentToken += currentChar;
+                if (currentChar is 'x' or 'u' or 'U')
+                {
+                    charHexRemaining = currentChar == 'x' ? -1 : currentChar == 'u' ? 4 : 8;
+                    escapeChar = false;
+                    return;
+                }
+                if (!IsValidEscapeChar(currentChar))
+                {
+                    invalidCharEscape = true;
+                }
                 escapeChar = false;
                 return;
             }
@@ -308,10 +423,12 @@ namespace Puma
             {
                 // found the end of the charactor
                 currentToken += currentChar;
-                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
+                var category = invalidCharEscape ? TokenCategory.Unknown : currentTokenType;
+                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = category });
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
                 escapeChar = false;
+                invalidCharEscape = false;
             }
             else
             {
@@ -320,11 +437,43 @@ namespace Puma
             }
         }
 
-        private static void TokenizeStringLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar, ref bool escapeString)
+        private static void TokenizeStringLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar, ref bool escapeString, ref bool invalidStringEscape, ref int stringHexRemaining)
         {
+            if (stringHexRemaining > 0)
+            {
+                currentToken += currentChar;
+                if (!char.IsAsciiHexDigit(currentChar))
+                {
+                    invalidStringEscape = true;
+                }
+                stringHexRemaining--;
+                return;
+            }
+
+            if (stringHexRemaining < 0)
+            {
+                if (char.IsAsciiHexDigit(currentChar))
+                {
+                    currentToken += currentChar;
+                    return;
+                }
+
+                stringHexRemaining = 0;
+            }
+
             if (escapeString)
             {
                 currentToken += currentChar;
+                if (currentChar is 'x' or 'u' or 'U')
+                {
+                    stringHexRemaining = currentChar == 'x' ? -1 : currentChar == 'u' ? 4 : 8;
+                    escapeString = false;
+                    return;
+                }
+                if (!IsValidEscapeChar(currentChar))
+                {
+                    invalidStringEscape = true;
+                }
                 escapeString = false;
                 return;
             }
@@ -340,10 +489,12 @@ namespace Puma
             {
                 // found end of the string
                 currentToken += currentChar;
-                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
+                var category = invalidStringEscape ? TokenCategory.Unknown : currentTokenType;
+                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = category });
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
                 escapeString = false;
+                invalidStringEscape = false;
             }
             else
             {
@@ -415,7 +566,7 @@ namespace Puma
 
         private void TokenizeIdentifier(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, ref int i, char currentChar)
         {
-            if (char.IsLetterOrDigit(currentChar) || currentChar == '_')
+            if (IsIdentifierPartChar(currentChar))
             {
                 // identifier continues
                 currentToken += currentChar;
@@ -515,7 +666,7 @@ namespace Puma
                 currentToken = currentChar.ToString();
                 currentTokenType = TokenCategory.CharLiteral;
             }
-            else if (char.IsLetter(currentChar) || currentChar == '_')
+            else if (IsIdentifierStartChar(currentChar))
             {
                 // found start of an identifier
                 currentToken = currentChar.ToString();
@@ -586,6 +737,83 @@ namespace Puma
             }
 
             return false;
+        }
+
+        private static bool IsIdentifierStartChar(char currentChar)
+        {
+            return currentChar == '_' || char.IsLetter(currentChar);
+        }
+
+        private static bool IsIdentifierPartChar(char currentChar)
+        {
+            return currentChar == '_' || char.IsLetterOrDigit(currentChar);
+        }
+
+        private static bool TrySplitNumericSuffix(string token, out string numberToken, out string suffixToken)
+        {
+            numberToken = token;
+            suffixToken = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            var numberBase = GetNumberBase(token);
+            var startIndex = token.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                || token.StartsWith("0b", StringComparison.OrdinalIgnoreCase)
+                || token.StartsWith("0o", StringComparison.OrdinalIgnoreCase)
+                ? 2
+                : 0;
+
+            var seenDigit = false;
+            for (var i = startIndex; i < token.Length; i++)
+            {
+                var ch = token[i];
+                if (numberBase == 10 && (ch == 'e' || ch == 'E'))
+                {
+                    seenDigit = true;
+                    if (i + 1 < token.Length && (token[i + 1] == '+' || token[i + 1] == '-'))
+                    {
+                        i++;
+                    }
+                    continue;
+                }
+
+                if (char.IsDigit(ch) || (numberBase == 16 && char.IsAsciiHexDigit(ch)) || (numberBase == 8 && ch is >= '0' and <= '7') || (numberBase == 2 && ch is '0' or '1') || (numberBase == 10 && ch == '.'))
+                {
+                    seenDigit = true;
+                    continue;
+                }
+
+                if (seenDigit && char.IsLetter(ch))
+                {
+                    numberToken = token[..i];
+                    suffixToken = token[i..];
+                    return true;
+                }
+
+                break;
+            }
+
+            return false;
+        }
+
+        private static bool IsKeyword(string token)
+        {
+            return token switch
+            {
+                "use" or "using" or "as" or "type" or "trait" or "module" or "is" or "has" or "value" or "object" or "base" or "number"
+                    or "optional" or "enums" or "records" or "pack" or "properties" or "functions" or "start" or "initialize" or "finalize"
+                    or "return" or "yield" or "public" or "private" or "internal" or "override" or "delegate" or "constant" or "readonly"
+                    or "readwrite" or "int128" or "int64" or "int32" or "int16" or "int8" or "int" or "uint128" or "uint64" or "uint32"
+                    or "uint16" or "uint8" or "uint" or "flt128" or "flt64" or "flt32" or "flt" or "fix128" or "fix64" or "fix32" or "fix"
+                    or "char" or "str" or "fstr" or "vstr" or "bool" or "true" or "false" or "hex" or "oct" or "bin" or "implicit" or "explicit"
+                    or "operator" or "get" or "set" or "with" or "self" or "if" or "else" or "and" or "or" or "not" or "for" or "in" or "while"
+                    or "repeat" or "forall" or "break" or "continue" or "match" or "when" or "error" or "catch" or "multithread"
+                    or "multiprocess" => true,
+                _ => false
+            };
         }
     }
 }
