@@ -41,11 +41,46 @@ namespace Puma
         HasStatement,
         HasTraitStatement
         ,
-        FunctionDeclaration
+        FunctionDeclaration,
+        ReturnStatement,
+        YieldStatement,
+        BreakStatement,
+        ContinueStatement,
+        ErrorStatement,
+        CatchStatement,
+        DelegateDeclaration,
+        ElseStatement
+    }
+
+    internal enum ExpressionKind
+    {
+        Identifier,
+        Literal,
+        Unary,
+        Binary,
+        MemberAccess,
+        Index,
+        Call
+    }
+
+    internal sealed class ExpressionNode
+    {
+        public ExpressionKind Kind { get; set; }
+        public string? Value { get; set; }
+        public ExpressionNode? Left { get; set; }
+        public ExpressionNode? Right { get; set; }
+        public List<ExpressionNode> Arguments { get; } = new();
     }
 
     internal class Node
     {
+        internal sealed class ParameterInfo
+        {
+            public string Name { get; set; } = string.Empty;
+            public string Type { get; set; } = string.Empty;
+            public string? DefaultValue { get; set; }
+            public List<string> Modifiers { get; } = new();
+        }
         public NodeKind Kind { get; set; } = NodeKind.Section;
         public Section Section { get; set; } = Section.None;
 
@@ -76,14 +111,18 @@ namespace Puma
         public string? PropertyName { get; set; }
         public string? PropertyValue { get; set; }
         public string? PropertyType { get; set; }
+        public List<string> PropertyModifiers { get; } = new();
 
         // For AssignmentStatement nodes
         public string? AssignmentLeft { get; set; }
         public string? AssignmentRight { get; set; }
         public string? AssignmentOperator { get; set; }
+        public ExpressionNode? AssignmentLeftExpression { get; set; }
+        public ExpressionNode? AssignmentRightExpression { get; set; }
 
         // For Section nodes
         public string? SectionParameters { get; set; }
+        public List<ParameterInfo> SectionParameterList { get; } = new();
 
         // For FunctionCall nodes
         public string? FunctionName { get; set; }
@@ -91,34 +130,53 @@ namespace Puma
 
         // For IfStatement nodes
         public string? IfCondition { get; set; }
+        public List<Node> ElseBody { get; } = new();
+        public ExpressionNode? ConditionExpression { get; set; }
 
         // For MatchStatement nodes
         public string? MatchExpression { get; set; }
+        public ExpressionNode? MatchExpressionNode { get; set; }
 
         // For WhenStatement nodes
         public string? WhenCondition { get; set; }
+        public ExpressionNode? WhenExpression { get; set; }
 
         // For WhileStatement nodes
         public string? WhileCondition { get; set; }
+        public ExpressionNode? WhileExpression { get; set; }
 
         // For ForStatement nodes
         public string? ForVariable { get; set; }
         public string? ForContainer { get; set; }
+        public ExpressionNode? ForContainerExpression { get; set; }
 
         // For RepeatStatement nodes
         public string? RepeatExpression { get; set; }
+        public ExpressionNode? RepeatExpressionNode { get; set; }
 
         // For HasStatement nodes
         public string? HasCondition { get; set; }
+        public ExpressionNode? HasExpression { get; set; }
 
         // For HasTraitStatement nodes
         public string? HasTraitCondition { get; set; }
+        public ExpressionNode? HasTraitExpression { get; set; }
 
         // For FunctionDeclaration nodes
         public string? FunctionDeclarationName { get; set; }
         public string? FunctionDeclarationParameters { get; set; }
         public string? FunctionDeclarationReturnType { get; set; }
         public List<Node> FunctionBody { get; } = new();
+        public List<ParameterInfo> FunctionParameterList { get; } = new();
+
+        // For DelegateDeclaration nodes
+        public string? DelegateName { get; set; }
+        public List<ParameterInfo> DelegateParameterList { get; } = new();
+
+        // For statement nodes
+        public string? StatementValue { get; set; }
+        public List<Node> StatementBody { get; } = new();
+        public ExpressionNode? StatementExpression { get; set; }
 
         public Node()
         {
@@ -191,15 +249,22 @@ namespace Puma
             return node;
         }
 
-        public static Node CreatePropertyDeclaration(string name, string? value, string? type)
+        public static Node CreatePropertyDeclaration(string name, string? value, string? type, IEnumerable<string>? modifiers = null)
         {
-            return new Node
+            var node = new Node
             {
                 Kind = NodeKind.PropertyDeclaration,
                 PropertyName = name,
                 PropertyValue = value,
                 PropertyType = type
             };
+
+            if (modifiers != null)
+            {
+                node.PropertyModifiers.AddRange(modifiers);
+            }
+
+            return node;
         }
 
         public static Node CreateAssignmentStatement(string left, string right, string assignmentOperator)
@@ -306,7 +371,7 @@ namespace Puma
             };
         }
 
-        public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body)
+        public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList)
         {
             var node = new Node
             {
@@ -316,7 +381,29 @@ namespace Puma
                 FunctionDeclarationReturnType = returnType
             };
 
+            node.FunctionParameterList.AddRange(parameterList);
             node.FunctionBody.AddRange(body);
+            return node;
+        }
+
+        public static Node CreateStatement(NodeKind kind, string? value = null)
+        {
+            return new Node
+            {
+                Kind = kind,
+                StatementValue = value
+            };
+        }
+
+        public static Node CreateDelegateDeclaration(string name, IEnumerable<ParameterInfo> parameterList)
+        {
+            var node = new Node
+            {
+                Kind = NodeKind.DelegateDeclaration,
+                DelegateName = name
+            };
+
+            node.DelegateParameterList.AddRange(parameterList);
             return node;
         }
     }

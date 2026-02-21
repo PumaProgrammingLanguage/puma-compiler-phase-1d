@@ -130,6 +130,9 @@ namespace Puma
         private int? _functionsSectionIndent;
         private Node? _currentFunctionNode;
         private List<Node> _currentFunctionBody = new();
+        private bool _currentFunctionIsDelegate;
+        private readonly Stack<List<Node>> _statementTargetStack = new();
+        private List<Node>? _pendingBlockTarget;
         private static readonly HashSet<string> AssignmentOperators = new(StringComparer.Ordinal)
         {
             "=", "/=", "*=", "%=", "+=", "-=", "<<=", ">>=", "&=", "^=", "|="
@@ -137,6 +140,14 @@ namespace Puma
         private static readonly HashSet<string> AccessModifiers = new(StringComparer.Ordinal)
         {
             "public", "private", "internal"
+        };
+        private static readonly HashSet<string> PropertyModifiers = new(StringComparer.Ordinal)
+        {
+            "public", "private", "internal", "readonly", "readwrite", "constant", "optional"
+        };
+        private static readonly HashSet<string> ParameterModifiers = new(StringComparer.Ordinal)
+        {
+            "readonly", "readwrite", "constant"
         };
 
         private Section CurrentSection = Section.None;
@@ -195,6 +206,9 @@ namespace Puma
             _functionsSectionIndent = null;
             _currentFunctionNode = null;
             _currentFunctionBody = new List<Node>();
+            _currentFunctionIsDelegate = false;
+            _statementTargetStack.Clear();
+            _pendingBlockTarget = null;
             CurrentSection = Section.None;
             ast = new List<Node>();
 
@@ -329,6 +343,93 @@ namespace Puma
             return false;
         }
 
+        private static (string Value, List<string> Modifiers) SplitTrailingModifiers(List<LexerTokens> tokens, HashSet<string> allowedModifiers)
+        {
+            var modifiers = new List<string>();
+            if (tokens.Count == 0)
+            {
+                return (string.Empty, modifiers);
+            }
+
+            var index = tokens.Count - 1;
+            while (index >= 0)
+            {
+                var token = tokens[index];
+                if ((token.Category == TokenCategory.Keyword || token.Category == TokenCategory.Identifier)
+                    && allowedModifiers.Contains(token.TokenText))
+                {
+                    modifiers.Insert(0, token.TokenText);
+                    index--;
+                    continue;
+                }
+
+                break;
+            }
+
+            var valueTokens = tokens.Take(index + 1).ToList();
+            var value = BuildQualifiedName(valueTokens);
+            return (value, modifiers);
+        }
+
+        private static List<Node.ParameterInfo> ParseParameterList(List<LexerTokens> tokens)
+        {
+            var parameters = new List<Node.ParameterInfo>();
+            if (tokens.Count == 0)
+            {
+                return parameters;
+            }
+
+            var current = new List<LexerTokens>();
+            foreach (var token in tokens)
+            {
+                if (token.Category == TokenCategory.Punctuation && token.TokenText == ",")
+                {
+                    AddParameterFromTokens(parameters, current);
+                    current.Clear();
+                    continue;
+                }
+
+                current.Add(token);
+            }
+
+            AddParameterFromTokens(parameters, current);
+            return parameters;
+        }
+
+        private static void AddParameterFromTokens(List<Node.ParameterInfo> parameters, List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return;
+            }
+
+            var equalsIndex = tokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
+            var nameAndTypeTokens = equalsIndex >= 0 ? tokens.Take(equalsIndex).ToList() : tokens.ToList();
+            var defaultTokens = equalsIndex >= 0 ? tokens.Skip(equalsIndex + 1).ToList() : new List<LexerTokens>();
+
+            if (nameAndTypeTokens.Count == 0)
+            {
+                return;
+            }
+
+            var name = nameAndTypeTokens[0].TokenText;
+            var typeTokens = nameAndTypeTokens.Skip(1).ToList();
+            var (type, modifiers) = SplitTrailingModifiers(typeTokens, ParameterModifiers);
+            var defaultValue = defaultTokens.Count > 0 ? BuildQualifiedName(defaultTokens) : null;
+
+            parameters.Add(new Node.ParameterInfo
+            {
+                Name = name,
+                Type = type,
+                DefaultValue = defaultValue
+            });
+
+            if (modifiers.Count > 0)
+            {
+                parameters[^1].Modifiers.AddRange(modifiers);
+            }
+        }
+
         private void ParseFunctionDeclaration(LexerTokens firstToken)
         {
             var tokens = ReadTokensUntilEol(firstToken);
@@ -359,12 +460,26 @@ namespace Puma
 
             var parameterTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();
             var parameters = BuildQualifiedName(parameterTokens);
+            var parameterList = ParseParameterList(parameterTokens);
 
             var returnTokens = tokens.Skip(closeIndex + 1).ToList();
             var returnType = returnTokens.Count > 0 ? BuildQualifiedName(returnTokens) : null;
 
-            _currentFunctionNode = Node.CreateFunctionDeclaration(name, parameters, returnType, Array.Empty<Node>());
+            var isDelegate = returnTokens.Any(t => t.Category == TokenCategory.Keyword && t.TokenText == "delegate")
+                || string.Equals(returnType, "delegate", StringComparison.OrdinalIgnoreCase);
+
+            if (isDelegate)
+            {
+                ast.Add(Node.CreateDelegateDeclaration(name, parameterList));
+                _currentFunctionNode = null;
+                _currentFunctionBody.Clear();
+                _currentFunctionIsDelegate = true;
+                return;
+            }
+
+            _currentFunctionNode = Node.CreateFunctionDeclaration(name, parameters, returnType, Array.Empty<Node>(), parameterList);
             _currentFunctionBody = new List<Node>();
+            _currentFunctionIsDelegate = false;
         }
 
         private void FinalizeFunction()
@@ -686,9 +801,14 @@ namespace Puma
                 return;
             }
 
+            if (token != null && UpdateIndentation(token.Value))
+            {
+                return;
+            }
+
             if (token != null && !IsIgnorable(token.Value))
             {
-                ParseStatement(token.Value);
+                ParseStatement(token.Value, GetStatementTarget(ast));
             }
         }
 
@@ -712,9 +832,14 @@ namespace Puma
                 return;
             }
 
+            if (token != null && UpdateIndentation(token.Value))
+            {
+                return;
+            }
+
             if (token != null && !IsIgnorable(token.Value))
             {
-                ParseStatement(token.Value);
+                ParseStatement(token.Value, GetStatementTarget(ast));
             }
         }
 
@@ -725,9 +850,14 @@ namespace Puma
                 return;
             }
 
+            if (token != null && UpdateIndentation(token.Value))
+            {
+                return;
+            }
+
             if (token != null && !IsIgnorable(token.Value))
             {
-                ParseStatement(token.Value);
+                ParseStatement(token.Value, GetStatementTarget(ast));
             }
         }
         private void ParseFunctions(LexerTokens? token)
@@ -767,12 +897,16 @@ namespace Puma
             {
                 FinalizeFunction();
                 ParseFunctionDeclaration(token.Value);
+                if (_currentFunctionIsDelegate)
+                {
+                    _currentFunctionIsDelegate = false;
+                }
                 return;
             }
 
             if (_currentIndentLevel > _functionsSectionIndent && _currentFunctionNode != null)
             {
-                ParseStatement(token.Value, _currentFunctionBody);
+                ParseStatement(token.Value, GetStatementTarget(_currentFunctionBody));
             }
         }
 
@@ -1002,10 +1136,292 @@ namespace Puma
                     _currentIndentLevel = indent;
                 }
 
+                if (token.Category == TokenCategory.Indent && _pendingBlockTarget != null)
+                {
+                    _statementTargetStack.Push(_pendingBlockTarget);
+                    _pendingBlockTarget = null;
+                }
+
+                if (token.Category == TokenCategory.Dedent && _statementTargetStack.Count > 0)
+                {
+                    _statementTargetStack.Pop();
+                }
+
                 return true;
             }
 
             return false;
+        }
+
+        private List<Node> GetStatementTarget(List<Node> fallback)
+        {
+            return _statementTargetStack.Count > 0 ? _statementTargetStack.Peek() : fallback;
+        }
+
+        private void SetPendingBlockTarget(List<Node> target, int startCount)
+        {
+            if (target.Count <= startCount)
+            {
+                return;
+            }
+
+            var node = target[startCount];
+            if (!SupportsStatementBlock(node.Kind))
+            {
+                return;
+            }
+
+            _pendingBlockTarget = node.StatementBody;
+        }
+
+        private static bool SupportsStatementBlock(NodeKind kind)
+        {
+            return kind is NodeKind.IfStatement or NodeKind.MatchStatement or NodeKind.WhenStatement
+                or NodeKind.WhileStatement or NodeKind.ForStatement or NodeKind.ForAllStatement
+                or NodeKind.RepeatStatement or NodeKind.HasStatement or NodeKind.HasTraitStatement
+                or NodeKind.ErrorStatement or NodeKind.CatchStatement or NodeKind.ElseStatement;
+        }
+
+        private static ExpressionNode? ParseExpression(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return null;
+            }
+
+            var parser = new ExpressionParser(tokens);
+            return parser.ParseExpression();
+        }
+
+        private sealed class ExpressionParser
+        {
+            private readonly List<LexerTokens> _tokens;
+            private int _index;
+
+            public ExpressionParser(List<LexerTokens> tokens)
+            {
+                _tokens = tokens;
+            }
+
+            public ExpressionNode? ParseExpression() => ParseOr();
+
+            private ExpressionNode? ParseOr()
+            {
+                var left = ParseAnd();
+                while (MatchKeyword("or"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseAnd();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseAnd()
+            {
+                var left = ParseEquality();
+                while (MatchKeyword("and"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseEquality();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseEquality()
+            {
+                var left = ParseComparison();
+                while (MatchOperator("==") || MatchOperator("!=") )
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseComparison();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseComparison()
+            {
+                var left = ParseTerm();
+                while (MatchOperator("<") || MatchOperator(">") || MatchOperator("<=") || MatchOperator(">="))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseTerm();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseTerm()
+            {
+                var left = ParseFactor();
+                while (MatchOperator("+") || MatchOperator("-"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseFactor();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseFactor()
+            {
+                var left = ParseUnary();
+                while (MatchOperator("*") || MatchOperator("/") || MatchOperator("%"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseUnary();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseUnary()
+            {
+                if (MatchOperator("-") || MatchOperator("+") || MatchKeyword("not"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var operand = ParseUnary();
+                    return new ExpressionNode { Kind = ExpressionKind.Unary, Value = op, Left = operand };
+                }
+
+                return ParsePostfix();
+            }
+
+            private ExpressionNode? ParsePostfix()
+            {
+                var expr = ParsePrimary();
+                while (true)
+                {
+                    if (MatchPunctuation("."))
+                    {
+                        if (MatchIdentifier(out var member))
+                        {
+                            expr = new ExpressionNode { Kind = ExpressionKind.MemberAccess, Value = member, Left = expr };
+                            continue;
+                        }
+                    }
+
+                    if (MatchDelimiter("["))
+                    {
+                        var indexExpr = ParseExpression();
+                        MatchDelimiter("]");
+                        expr = new ExpressionNode { Kind = ExpressionKind.Index, Left = expr, Right = indexExpr };
+                        continue;
+                    }
+
+                    if (MatchDelimiter("("))
+                    {
+                        var call = new ExpressionNode { Kind = ExpressionKind.Call, Left = expr };
+                        if (!MatchDelimiter(")"))
+                        {
+                            do
+                            {
+                                var arg = ParseExpression();
+                                if (arg != null)
+                                {
+                                    call.Arguments.Add(arg);
+                                }
+                            } while (MatchPunctuation(","));
+
+                            MatchDelimiter(")");
+                        }
+
+                        expr = call;
+                        continue;
+                    }
+
+                    break;
+                }
+
+                return expr;
+            }
+
+            private ExpressionNode? ParsePrimary()
+            {
+                if (MatchDelimiter("("))
+                {
+                    var expr = ParseExpression();
+                    MatchDelimiter(")");
+                    return expr;
+                }
+
+                if (_index >= _tokens.Count)
+                {
+                    return null;
+                }
+
+                var token = _tokens[_index++];
+                if (token.Category is TokenCategory.Identifier or TokenCategory.Keyword)
+                {
+                    return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = token.TokenText };
+                }
+
+                if (token.Category is TokenCategory.StringLiteral or TokenCategory.NumericLiteral or TokenCategory.CharLiteral)
+                {
+                    return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText };
+                }
+
+                return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText };
+            }
+
+            private bool MatchOperator(string op)
+            {
+                if (_index < _tokens.Count && _tokens[_index].Category == TokenCategory.Operator && _tokens[_index].TokenText == op)
+                {
+                    _index++;
+                    return true;
+                }
+
+                return false;
+            }
+
+            private bool MatchKeyword(string keyword)
+            {
+                if (_index < _tokens.Count && _tokens[_index].Category == TokenCategory.Keyword && _tokens[_index].TokenText == keyword)
+                {
+                    _index++;
+                    return true;
+                }
+
+                return false;
+            }
+
+            private bool MatchPunctuation(string punctuation)
+            {
+                if (_index < _tokens.Count && _tokens[_index].Category == TokenCategory.Punctuation && _tokens[_index].TokenText == punctuation)
+                {
+                    _index++;
+                    return true;
+                }
+
+                return false;
+            }
+
+            private bool MatchDelimiter(string delimiter)
+            {
+                if (_index < _tokens.Count && _tokens[_index].Category == TokenCategory.Delimiter && _tokens[_index].TokenText == delimiter)
+                {
+                    _index++;
+                    return true;
+                }
+
+                return false;
+            }
+
+            private bool MatchIdentifier(out string value)
+            {
+                if (_index < _tokens.Count && _tokens[_index].Category is TokenCategory.Identifier or TokenCategory.Keyword)
+                {
+                    value = _tokens[_index].TokenText;
+                    _index++;
+                    return true;
+                }
+
+                value = string.Empty;
+                return false;
+            }
         }
 
         private void FinalizeEnum()
@@ -1047,11 +1463,11 @@ namespace Puma
                 var nameTokens = tokens.Take(equalsIndex).ToList();
                 var valueTokens = tokens.Skip(equalsIndex + 1).ToList();
                 var name = BuildQualifiedName(nameTokens);
-                var value = BuildQualifiedName(valueTokens);
+                var (value, modifiers) = SplitTrailingModifiers(valueTokens, PropertyModifiers);
 
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    ast.Add(Node.CreatePropertyDeclaration(name, value, null));
+                    ast.Add(Node.CreatePropertyDeclaration(name, value, null, modifiers));
                 }
 
                 return;
@@ -1067,6 +1483,7 @@ namespace Puma
 
         private void ParseStatement(LexerTokens firstToken, List<Node> target)
         {
+            var startCount = target.Count;
             var tokens = ReadTokensUntilEol(firstToken);
             if (tokens.Count == 0)
             {
@@ -1075,46 +1492,82 @@ namespace Puma
 
             if (TryParseMatchStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
             if (TryParseWhenStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
             if (TryParseIfStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
+                return;
+            }
+
+            if (TryParseElseStatement(tokens, target))
+            {
+                SetPendingBlockTarget(target, startCount);
+                AttachElseBody(target, startCount);
                 return;
             }
 
             if (TryParseWhileStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
             if (TryParseForStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
             if (TryParseRepeatStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
             if (TryParseHasStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
             if (TryParseHasTraitStatement(tokens, target))
             {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
             if (TryParseAssignmentStatement(tokens, target))
             {
+                return;
+            }
+
+            if (TryParseReturnStatement(tokens, target))
+            {
+                return;
+            }
+
+            if (TryParseYieldStatement(tokens, target))
+            {
+                return;
+            }
+
+            if (TryParseBreakContinueStatement(tokens, target))
+            {
+                return;
+            }
+
+            if (TryParseErrorCatchStatement(tokens, target))
+            {
+                SetPendingBlockTarget(target, startCount);
                 return;
             }
 
@@ -1127,7 +1580,6 @@ namespace Puma
             {
                 return false;
             }
-
             var assignmentIndex = tokens.FindIndex(t => t.Category == TokenCategory.Operator && AssignmentOperators.Contains(t.TokenText));
             if (assignmentIndex < 0)
             {
@@ -1145,9 +1597,120 @@ namespace Puma
                 throw new InvalidOperationException("Assignment statements require left and right expressions.");
             }
 
-            target.Add(Node.CreateAssignmentStatement(left, right, assignmentOperator));
+            var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
+            node.AssignmentLeftExpression = ParseExpression(leftTokens);
+            node.AssignmentRightExpression = ParseExpression(rightTokens);
+            target.Add(node);
             return true;
         }
+
+        private void AttachBlockIfPresent(List<Node> target, int startCount)
+        {
+            if (target.Count <= startCount)
+            {
+                return;
+            }
+
+            var node = target[startCount];
+            if (!SupportsStatementBlock(node.Kind))
+            {
+                return;
+            }
+
+            if (!TryConsumeIndent(out _))
+            {
+                if (index > 0 && _tokens[index - 1].Category == TokenCategory.Indent)
+                {
+                    ParseIndentedBlock(node.StatementBody);
+                    return;
+                }
+
+                if (node.Kind == NodeKind.ElseStatement)
+                {
+                    var next = GetNextToken(_tokens);
+                    if (next != null && !IsIgnorable(next.Value))
+                    {
+                        ParseStatement(next.Value, node.StatementBody);
+                    }
+                }
+                return;
+            }
+
+            // ParseIndentedBlock(node.StatementBody);
+        }
+
+        private void ParseIndentedBlock(List<Node> target)
+        {
+            var depth = 1;
+            while (true)
+            {
+                var next = GetNextToken(_tokens);
+                if (next == null)
+                {
+                    break;
+                }
+
+                if (next.Value.Category == TokenCategory.Indent)
+                {
+                    depth++;
+                    continue;
+                }
+
+                if (next.Value.Category == TokenCategory.Dedent)
+                {
+                    depth--;
+                    if (depth <= 0)
+                    {
+                        break;
+                    }
+                    continue;
+                }
+
+                if (IsIgnorable(next.Value))
+                {
+                    continue;
+                }
+
+                ParseStatement(next.Value, target);
+            }
+        }
+
+        private bool TryConsumeIndent(out LexerTokens token)
+        {
+            token = default;
+            if (index >= _tokens.Count)
+            {
+                return false;
+            }
+
+            while (index < _tokens.Count)
+            {
+                var ignorable = _tokens[index];
+                if (ignorable.Category is TokenCategory.EndOfLine or TokenCategory.Whitespace or TokenCategory.Comment)
+                {
+                    index++;
+                    continue;
+                }
+
+                break;
+            }
+
+            if (index >= _tokens.Count)
+            {
+                return false;
+            }
+
+            var peek = _tokens[index];
+            if (peek.Category != TokenCategory.Indent)
+            {
+                return false;
+            }
+
+            token = peek;
+            index++;
+            return true;
+        }
+
 
         private bool TryParseRepeatStatement(List<LexerTokens> tokens, List<Node> target)
         {
@@ -1164,7 +1727,9 @@ namespace Puma
             var expressionTokens = tokens.Skip(1).ToList();
             var expression = BuildQualifiedName(expressionTokens);
 
-            target.Add(Node.CreateRepeatStatement(expression));
+            var node = Node.CreateRepeatStatement(expression);
+            node.RepeatExpressionNode = ParseExpression(expressionTokens);
+            target.Add(node);
             return true;
         }
 
@@ -1192,7 +1757,9 @@ namespace Puma
                 throw new InvalidOperationException("Has statements require a condition.");
             }
 
-            target.Add(Node.CreateHasStatement(condition));
+            var node = Node.CreateHasStatement(condition);
+            node.HasExpression = ParseExpression(conditionTokens);
+            target.Add(node);
             return true;
         }
 
@@ -1220,7 +1787,9 @@ namespace Puma
                 throw new InvalidOperationException("Has trait statements require a condition.");
             }
 
-            target.Add(Node.CreateHasTraitStatement(condition));
+            var node = Node.CreateHasTraitStatement(condition);
+            node.HasTraitExpression = ParseExpression(conditionTokens);
+            target.Add(node);
             return true;
         }
 
@@ -1271,8 +1840,50 @@ namespace Puma
                 throw new InvalidOperationException("If statements require a condition expression.");
             }
 
-            target.Add(Node.CreateIfStatement(condition));
+            var node = Node.CreateIfStatement(condition);
+            node.ConditionExpression = ParseExpression(conditionTokens);
+            target.Add(node);
             return true;
+        }
+
+        private bool TryParseElseStatement(List<LexerTokens> tokens, List<Node> target)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "else")
+            {
+                return false;
+            }
+
+            var valueTokens = tokens.Skip(1).ToList();
+            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
+            target.Add(Node.CreateStatement(NodeKind.ElseStatement, value));
+            return true;
+        }
+
+        private void AttachElseBody(List<Node> target, int startCount)
+        {
+            if (startCount == 0)
+            {
+                return;
+            }
+
+            var previous = target[startCount - 1];
+            var elseNode = target[startCount];
+            if (previous.Kind != NodeKind.IfStatement)
+            {
+                return;
+            }
+
+            previous.ElseBody.AddRange(elseNode.StatementBody);
+            target.RemoveAt(startCount);
+            if (_pendingBlockTarget == elseNode.StatementBody)
+            {
+                _pendingBlockTarget = previous.ElseBody;
+            }
         }
 
         private bool TryParseMatchStatement(List<LexerTokens> tokens, List<Node> target)
@@ -1294,7 +1905,9 @@ namespace Puma
                 throw new InvalidOperationException("Match statements require an expression.");
             }
 
-            target.Add(Node.CreateMatchStatement(expression));
+            var node = Node.CreateMatchStatement(expression);
+            node.MatchExpressionNode = ParseExpression(expressionTokens);
+            target.Add(node);
             return true;
         }
 
@@ -1317,7 +1930,9 @@ namespace Puma
                 throw new InvalidOperationException("When statements require a condition.");
             }
 
-            target.Add(Node.CreateWhenStatement(condition));
+            var node = Node.CreateWhenStatement(condition);
+            node.WhenExpression = ParseExpression(conditionTokens);
+            target.Add(node);
             return true;
         }
 
@@ -1340,7 +1955,9 @@ namespace Puma
                 throw new InvalidOperationException("While statements require a condition.");
             }
 
-            target.Add(Node.CreateWhileStatement(condition));
+            var node = Node.CreateWhileStatement(condition);
+            node.WhileExpression = ParseExpression(conditionTokens);
+            target.Add(node);
             return true;
         }
 
@@ -1371,11 +1988,15 @@ namespace Puma
 
             if (tokens[0].TokenText == "for")
             {
-                target.Add(Node.CreateForStatement(variable, container));
+                var node = Node.CreateForStatement(variable, container);
+                node.ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList());
+                target.Add(node);
             }
             else
             {
-                target.Add(Node.CreateForAllStatement(variable, container));
+                var node = Node.CreateForAllStatement(variable, container);
+                node.ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList());
+                target.Add(node);
             }
 
             return true;
@@ -1446,7 +2067,93 @@ namespace Puma
             }
 
             parameters = BuildQualifiedName(parameterTokens);
+            if (_currentSectionNode != null)
+            {
+                _currentSectionNode.SectionParameterList.Clear();
+                _currentSectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
+            }
             return true;
+        }
+
+        private bool TryParseReturnStatement(List<LexerTokens> tokens, List<Node> target)
+        {
+            if (tokens.Count == 0 || tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "return")
+            {
+                return false;
+            }
+
+            var valueTokens = tokens.Skip(1).ToList();
+            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
+            var node = Node.CreateStatement(NodeKind.ReturnStatement, value);
+            node.StatementExpression = ParseExpression(valueTokens);
+            target.Add(node);
+            return true;
+        }
+
+        private bool TryParseYieldStatement(List<LexerTokens> tokens, List<Node> target)
+        {
+            if (tokens.Count == 0 || tokens[0].Category != TokenCategory.Keyword || tokens[0].TokenText != "yield")
+            {
+                return false;
+            }
+
+            var valueTokens = tokens.Skip(1).ToList();
+            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
+            var node = Node.CreateStatement(NodeKind.YieldStatement, value);
+            node.StatementExpression = ParseExpression(valueTokens);
+            target.Add(node);
+            return true;
+        }
+
+        private bool TryParseBreakContinueStatement(List<LexerTokens> tokens, List<Node> target)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category == TokenCategory.Keyword && (tokens[0].TokenText == "break" || tokens[0].TokenText == "continue"))
+            {
+                var valueTokens = tokens.Skip(1).ToList();
+                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
+                var kind = tokens[0].TokenText == "break" ? NodeKind.BreakStatement : NodeKind.ContinueStatement;
+                var node = Node.CreateStatement(kind, value);
+                node.StatementExpression = ParseExpression(valueTokens);
+                target.Add(node);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryParseErrorCatchStatement(List<LexerTokens> tokens, List<Node> target)
+        {
+            if (tokens.Count == 0)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category == TokenCategory.Keyword && tokens[0].TokenText == "error")
+            {
+                var valueTokens = tokens.Skip(1).ToList();
+                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
+                var node = Node.CreateStatement(NodeKind.ErrorStatement, value);
+                node.StatementExpression = ParseExpression(valueTokens);
+                target.Add(node);
+                return true;
+            }
+
+            if (tokens[0].Category == TokenCategory.Keyword && tokens[0].TokenText == "catch")
+            {
+                var valueTokens = tokens.Skip(1).ToList();
+                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
+                var node = Node.CreateStatement(NodeKind.CatchStatement, value);
+                node.StatementExpression = ParseExpression(valueTokens);
+                target.Add(node);
+                return true;
+            }
+
+            return false;
         }
     }
 }
