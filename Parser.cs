@@ -276,6 +276,18 @@ namespace Puma
                 var text = t.TokenText;
                 if (_sectionMap.TryGetValue(text, out var next))
                 {
+                    if ((next == Section.Start && _seen.Contains(Section.Initialize))
+                        || (next == Section.Initialize && _seen.Contains(Section.Start)))
+                    {
+                        throw new InvalidOperationException("Only one of 'start' or 'initialize' sections may appear in a file.");
+                    }
+
+                    if ((next == Section.Module || next == Section.Type || next == Section.Trait)
+                        && (_seen.Contains(Section.Module) || _seen.Contains(Section.Type) || _seen.Contains(Section.Trait)))
+                    {
+                        throw new InvalidOperationException("Only one of 'module', 'type', or 'trait' sections may appear in a file.");
+                    }
+
                     // Duplicate check
                     if (_seen.Contains(next))
                     {

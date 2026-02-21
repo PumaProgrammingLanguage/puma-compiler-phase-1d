@@ -120,5 +120,44 @@ use
             var ex = Assert.ThrowsException<System.InvalidOperationException>(() => parser.Parse(tokens));
             StringAssert.Contains(ex.Message.ToLowerInvariant(), "duplicate");
         }
+
+        [TestMethod]
+        public void Parse_StartAndInitialize_Together_Throws()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+
+initialize
+
+start
+";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            Assert.ThrowsException<System.InvalidOperationException>(() => parser.Parse(tokens));
+        }
+
+        [TestMethod]
+        public void Parse_MultipleTypeSections_Throws()
+        {
+            const string src =
+@"use
+
+type
+
+trait
+";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            Assert.ThrowsException<System.InvalidOperationException>(() => parser.Parse(tokens));
+        }
     }
 }

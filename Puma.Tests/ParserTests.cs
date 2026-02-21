@@ -173,9 +173,6 @@ properties
 
 initialize
     Counter = 1
-
-start
-    Counter = 2
 ";
 
             var lexer = new Puma.Lexer();
@@ -185,13 +182,10 @@ start
             var ast = parser.Parse(tokens);
 
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
-            Assert.AreEqual(2, assignments.Count);
+            Assert.AreEqual(1, assignments.Count);
             Assert.AreEqual("Counter", assignments[0].AssignmentLeft);
             Assert.AreEqual("1", assignments[0].AssignmentRight);
             Assert.AreEqual("=", assignments[0].AssignmentOperator);
-            Assert.AreEqual("Counter", assignments[1].AssignmentLeft);
-            Assert.AreEqual("2", assignments[1].AssignmentRight);
-            Assert.AreEqual("=", assignments[1].AssignmentOperator);
         }
 
         [TestMethod]
@@ -205,9 +199,6 @@ module
 properties
     Counter = 0
 
-initialize
-    Configure(1, 2)
-
 start
     Console.WriteLine(""Hi"")
 ";
@@ -219,11 +210,9 @@ start
             var ast = parser.Parse(tokens);
 
             var calls = ast.Where(n => n.Kind == NodeKind.FunctionCall).ToList();
-            Assert.AreEqual(2, calls.Count);
-            Assert.AreEqual("Configure", calls[0].FunctionName);
-            Assert.AreEqual("1,2", calls[0].FunctionArguments);
-            Assert.AreEqual("Console.WriteLine", calls[1].FunctionName);
-            Assert.AreEqual("\"Hi\"", calls[1].FunctionArguments);
+            Assert.AreEqual(1, calls.Count);
+            Assert.AreEqual("Console.WriteLine", calls[0].FunctionName);
+            Assert.AreEqual("\"Hi\"", calls[0].FunctionArguments);
         }
 
         [TestMethod]
@@ -237,9 +226,6 @@ module
 properties
     Flag = false
 
-initialize
-    if ready
-
 start
     if status
 ";
@@ -251,9 +237,8 @@ start
             var ast = parser.Parse(tokens);
 
             var ifStatements = ast.Where(n => n.Kind == NodeKind.IfStatement).ToList();
-            Assert.AreEqual(2, ifStatements.Count);
-            Assert.AreEqual("ready", ifStatements[0].IfCondition);
-            Assert.AreEqual("status", ifStatements[1].IfCondition);
+            Assert.AreEqual(1, ifStatements.Count);
+            Assert.AreEqual("status", ifStatements[0].IfCondition);
         }
 
         [TestMethod]
@@ -301,9 +286,6 @@ properties
 
 initialize
     while isReady
-
-start
-    while running
 ";
 
             var lexer = new Puma.Lexer();
@@ -313,9 +295,8 @@ start
             var ast = parser.Parse(tokens);
 
             var whileNodes = ast.Where(n => n.Kind == NodeKind.WhileStatement).ToList();
-            Assert.AreEqual(2, whileNodes.Count);
+            Assert.AreEqual(1, whileNodes.Count);
             Assert.AreEqual("isReady", whileNodes[0].WhileCondition);
-            Assert.AreEqual("running", whileNodes[1].WhileCondition);
         }
 
         [TestMethod]
@@ -329,9 +310,6 @@ module
 properties
     items = 0
 
-initialize
-    for item in items
-
 start
     forall entry in records
 ";
@@ -341,10 +319,6 @@ start
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-
-            var forNode = ast.Single(n => n.Kind == NodeKind.ForStatement);
-            Assert.AreEqual("item", forNode.ForVariable);
-            Assert.AreEqual("items", forNode.ForContainer);
 
             var forAllNode = ast.Single(n => n.Kind == NodeKind.ForAllStatement);
             Assert.AreEqual("entry", forAllNode.ForVariable);
@@ -364,9 +338,6 @@ properties
 
 initialize
     repeat
-
-start
-    repeat
 ";
 
             var lexer = new Puma.Lexer();
@@ -376,9 +347,8 @@ start
             var ast = parser.Parse(tokens);
 
             var repeats = ast.Where(n => n.Kind == NodeKind.RepeatStatement).ToList();
-            Assert.AreEqual(2, repeats.Count);
+            Assert.AreEqual(1, repeats.Count);
             Assert.AreEqual(string.Empty, repeats[0].RepeatExpression);
-            Assert.AreEqual(string.Empty, repeats[1].RepeatExpression);
         }
 
         [TestMethod]
@@ -392,9 +362,6 @@ module
 properties
     optionalValue = 0
 
-initialize
-    has optionalValue
-
 start
     has item
 ";
@@ -406,9 +373,8 @@ start
             var ast = parser.Parse(tokens);
 
             var hasStatements = ast.Where(n => n.Kind == NodeKind.HasStatement).ToList();
-            Assert.AreEqual(2, hasStatements.Count);
-            Assert.AreEqual("optionalValue", hasStatements[0].HasCondition);
-            Assert.AreEqual("item", hasStatements[1].HasCondition);
+            Assert.AreEqual(1, hasStatements.Count);
+            Assert.AreEqual("item", hasStatements[0].HasCondition);
         }
 
         [TestMethod]
@@ -424,9 +390,6 @@ properties
 
 initialize
     has trait item
-
-start
-    has trait record
 ";
 
             var lexer = new Puma.Lexer();
@@ -436,9 +399,8 @@ start
             var ast = parser.Parse(tokens);
 
             var hasTraits = ast.Where(n => n.Kind == NodeKind.HasTraitStatement).ToList();
-            Assert.AreEqual(2, hasTraits.Count);
+            Assert.AreEqual(1, hasTraits.Count);
             Assert.AreEqual("item", hasTraits[0].HasTraitCondition);
-            Assert.AreEqual("record", hasTraits[1].HasTraitCondition);
         }
 
         [TestMethod]
@@ -455,9 +417,6 @@ properties
 initialize(value int32)
     Count += value
 
-start(args str)
-    Count = 0
-
 finalize
     Count -= 1
 ";
@@ -468,16 +427,35 @@ finalize
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
 
-            var startNode = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Section.Start);
             var initializeNode = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Section.Initialize);
-            Assert.AreEqual("argsstr", startNode.SectionParameters);
             Assert.AreEqual("valueint32", initializeNode.SectionParameters);
 
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
-            Assert.AreEqual(3, assignments.Count);
+            Assert.AreEqual(2, assignments.Count);
             Assert.AreEqual("+=", assignments[0].AssignmentOperator);
-            Assert.AreEqual("=", assignments[1].AssignmentOperator);
-            Assert.AreEqual("-=", assignments[2].AssignmentOperator);
+            Assert.AreEqual("-=", assignments[1].AssignmentOperator);
+        }
+
+        [TestMethod]
+        public void StartSection_ParsesParameters()
+        {
+            const string src =
+@"use
+
+module
+
+start(args str)
+    Count = 0
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var startNode = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Section.Start);
+            Assert.AreEqual("argsstr", startNode.SectionParameters);
         }
 
         [TestMethod]
