@@ -32,8 +32,7 @@ namespace Puma.Tests
 @"functions
 ";
             var expected =
-@"// functions
-";
+@"";
 
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();

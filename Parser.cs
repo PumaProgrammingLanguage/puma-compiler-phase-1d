@@ -133,6 +133,7 @@ namespace Puma
         private bool _currentFunctionIsDelegate;
         private readonly Stack<List<Node>> _statementTargetStack = new();
         private List<Node>? _pendingBlockTarget;
+        private Node? _typeOrTraitNode;
         private static readonly HashSet<string> AssignmentOperators = new(StringComparer.Ordinal)
         {
             "=", "/=", "*=", "%=", "+=", "-=", "<<=", ">>=", "&=", "^=", "|="
@@ -209,6 +210,7 @@ namespace Puma
             _currentFunctionIsDelegate = false;
             _statementTargetStack.Clear();
             _pendingBlockTarget = null;
+            _typeOrTraitNode = null;
             CurrentSection = Section.None;
             ast = new List<Node>();
 
@@ -279,6 +281,24 @@ namespace Puma
             FinalizeEnum();
             FinalizeRecord();
             FinalizeFunction();
+
+            if (_currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait)
+            {
+                var typeNode = ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
+                    (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
+                if (typeNode != null)
+                {
+                    if (typeNode.TypeProperties.Count == 0)
+                    {
+                        typeNode.TypeProperties.AddRange(ast.Where(n => n.Kind == NodeKind.PropertyDeclaration));
+                    }
+
+                    if (typeNode.TypeFunctions.Count == 0)
+                    {
+                        typeNode.TypeFunctions.AddRange(ast.Where(n => n.Kind == NodeKind.FunctionDeclaration));
+                    }
+                }
+            }
 
             return ast;
         }
@@ -524,6 +544,11 @@ namespace Puma
                 return;
             }
 
+            if (_currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait && _typeOrTraitNode == null)
+            {
+                _typeOrTraitNode = GetTypeOrTraitOwner();
+            }
+
             if (token == null)
             {
                 return;
@@ -557,6 +582,7 @@ namespace Puma
             ParseTypeDeclaration(token.Value, "type");
             _typeHeaderParsed = true;
             _currentFileKind = FileDeclarationKind.Type;
+            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.DeclarationKind == "type");
         }
 
         private void ParseTrait(LexerTokens? token)
@@ -579,6 +605,7 @@ namespace Puma
             ParseSimpleDeclaration(token.Value, "trait");
             _traitHeaderParsed = true;
             _currentFileKind = FileDeclarationKind.Trait;
+            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.DeclarationKind == "trait");
         }
 
         private void ParseModule(LexerTokens? token)
@@ -772,7 +799,13 @@ namespace Puma
 
             if (_currentIndentLevel >= _propertiesSectionIndent)
             {
-                ParsePropertyDeclaration(token.Value);
+                var propertyNode = ParsePropertyDeclaration(token.Value);
+                if (propertyNode != null && _currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait)
+                {
+                    var owner = _typeOrTraitNode ?? GetTypeOrTraitOwner();
+                    owner?.TypeProperties.Add(propertyNode);
+                    return;
+                }
             }
         }
 
@@ -872,6 +905,12 @@ namespace Puma
             if (token == null)
             {
                 return;
+            }
+
+            if (_currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait && _typeOrTraitNode == null)
+            {
+                _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
+                    (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
             }
 
             if (UpdateIndentation(token.Value))
@@ -1449,12 +1488,12 @@ namespace Puma
             _currentRecordMembers = new List<string>();
         }
 
-        private void ParsePropertyDeclaration(LexerTokens firstToken)
+        private Node? ParsePropertyDeclaration(LexerTokens firstToken)
         {
             var tokens = ReadTokensUntilEol(firstToken);
             if (tokens.Count == 0)
             {
-                return;
+                return null;
             }
 
             var equalsIndex = tokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
@@ -1467,16 +1506,26 @@ namespace Puma
 
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    ast.Add(Node.CreatePropertyDeclaration(name, value, null, modifiers));
+                    var node = Node.CreatePropertyDeclaration(name, value, null, modifiers);
+                ast.Add(node);
+                return node;
                 }
 
-                return;
+                return null;
             }
             var fallbackName = BuildQualifiedName(tokens);
             if (!string.IsNullOrWhiteSpace(fallbackName))
             {
                 throw new InvalidOperationException("Property declarations must use assignment (name = value).");
             }
+
+            return null;
+        }
+
+        private Node? GetTypeOrTraitOwner()
+        {
+            return ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
+                (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
         }
 
         private void ParseStatement(LexerTokens firstToken) => ParseStatement(firstToken, ast);

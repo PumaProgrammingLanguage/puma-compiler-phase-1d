@@ -97,6 +97,8 @@ namespace Puma
         public string? DeclarationName { get; set; }
         public string? BaseTypeName { get; set; }
         public List<string> TraitNames { get; } = new();
+        public List<Node> TypeProperties { get; } = new();
+        public List<Node> TypeFunctions { get; } = new();
 
         // For EnumDeclaration nodes
         public string? EnumName { get; set; }

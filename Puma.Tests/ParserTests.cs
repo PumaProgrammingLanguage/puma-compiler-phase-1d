@@ -646,5 +646,63 @@ functions
             Assert.AreEqual(".Total", bodyAssignments[1].AssignmentLeft);
             Assert.AreEqual("b", bodyAssignments[1].AssignmentRight);
         }
+
+        [TestMethod]
+        public void TypeSection_ParsesPropertyAndFunctionMembers()
+        {
+            const string src =
+@"use
+
+type Sample.Type is object has Alpha
+
+properties
+    Count = 1
+
+functions
+    Add(a int32) int32
+        return a
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var typeNode = ast.Single(n => n.Kind == NodeKind.TypeDeclaration);
+            Assert.AreEqual(1, typeNode.TypeProperties.Count);
+            Assert.AreEqual("Count", typeNode.TypeProperties[0].PropertyName);
+            Assert.AreEqual(1, typeNode.TypeFunctions.Count);
+            Assert.AreEqual("Add", typeNode.TypeFunctions[0].FunctionDeclarationName);
+        }
+
+        [TestMethod]
+        public void TraitSection_ParsesPropertyAndFunctionMembers()
+        {
+            const string src =
+@"use
+
+trait Alpha
+
+properties
+    Value = 0
+
+functions
+    Get() int32
+        return Value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var traitNode = ast.Single(n => n.Kind == NodeKind.TypeDeclaration);
+            Assert.AreEqual(1, traitNode.TypeProperties.Count);
+            Assert.AreEqual("Value", traitNode.TypeProperties[0].PropertyName);
+            Assert.AreEqual(1, traitNode.TypeFunctions.Count);
+            Assert.AreEqual("Get", traitNode.TypeFunctions[0].FunctionDeclarationName);
+        }
     }
 }

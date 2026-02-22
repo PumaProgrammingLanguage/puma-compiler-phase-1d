@@ -6,41 +6,31 @@ namespace Puma.Tests
     public class CodegenTests
     {
         private const string Sample =
-@"using
+@"use
 
 module
 
-enums
-
-records
-
-initialize
-
-finalize
+properties
+    Count = 1
 
 functions
+    Add(a int32, b int32) int32
+        Result = a
 ";
 
         private static string Normalize(string s) =>
             s.Replace("\r\n", "\n").Replace("\r", "\n");
 
         [TestMethod]
-        public void Generate_EmitsExpectedCCommentSkeleton()
+        public void Generate_EmitsExpectedCOutput()
         {
             var expected =
-@"// using
+@"int Count = 1;
 
-// module
-
-// enums
-
-// records
-
-// initialize
-
-// finalize
-
-// functions
+int Add(int a, int b)
+{
+    Result = a;
+}
 ";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
@@ -50,7 +40,313 @@ functions
             var ast = parser.Parse(tokens);
             var c = codegen.Generate(ast);
 
-            Assert.AreEqual(Normalize(expected), Normalize(c));
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsTypeMembers()
+        {
+            const string src =
+@"use
+
+type Sample.Type is object
+
+properties
+    Count = 1
+
+functions
+    Add(a int32) int32
+        return a
+";
+
+            var expected =
+@"class Sample::Type : public object
+{
+public:
+    int Count = 1;
+    int Add(int a)
+    {
+        return a;
+    }
+};
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsIncludesForUseAndBool()
+        {
+            const string src =
+@"use System.Console as Console
+
+module
+
+properties
+    Flag = true
+
+start
+    WriteLine(""Hi"")
+";
+
+            var expected =
+@"#include <System/Console>
+#include <stdbool.h>
+#include <stdio.h>
+
+bool Flag = true;
+
+int main()
+{
+    puts(""Hi"");
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsTraitMembers()
+        {
+            const string src =
+@"use
+
+trait Alpha
+
+properties
+    Value = 0
+
+functions
+    Get() int32
+        return Value
+";
+
+            var expected =
+@"class Alpha
+{
+public:
+    int Value = 0;
+    int Get()
+    {
+        return Value;
+    }
+};
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsEnumsAndRecords()
+        {
+            const string src =
+@"use
+
+module
+
+enums
+    Status
+        Active
+        Inactive
+
+records
+    UserRecord pack 4
+        Name str
+        Age int
+";
+
+            var expected =
+@"typedef enum Status {
+    Active,
+    Inactive
+} Status;
+
+typedef struct UserRecord {
+    int Name;
+    int Age;
+} UserRecord;
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsFinalizeCall()
+        {
+            const string src =
+@"use
+
+module
+
+start
+    Count = 3
+
+finalize
+    Count = 2
+";
+
+            var expected =
+@"void finalize()
+{
+    Count = 2;
+}
+
+int main()
+{
+    Count = 3;
+    finalize();
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsControlFlowStatements()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+
+start
+    if Count
+        Count = 1
+    else
+        Count = 2
+    while Count
+        Count = 3
+";
+
+            var expected =
+@"int Count = 0;
+
+int main()
+{
+    if (Count)
+    {
+        Count = 1;
+    }
+    else
+    {
+        Count = 2;
+    }
+    while (Count)
+    {
+        Count = 3;
+    }
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsTypeSkeleton()
+        {
+            const string src =
+@"use
+
+type Sample.Type is object has Alpha, Beta
+";
+
+            var expected =
+@"class Sample::Type : public object, public Alpha, public Beta
+{
+public:
+};
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsTraitSkeleton()
+        {
+            const string src =
+@"use
+
+trait Alpha
+";
+
+            var expected =
+@"class Alpha
+{
+public:
+};
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
     }
 }
