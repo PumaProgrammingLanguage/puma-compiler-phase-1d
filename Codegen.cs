@@ -82,7 +82,7 @@ namespace Puma
 
         private static string SectionToString(Section section) => section switch
         {
-            Section.Using => "using",
+            Section.Use => "use",
             Section.Module => "module",
             Section.Type => "type",
             Section.Trait => "trait",
@@ -341,14 +341,14 @@ namespace Puma
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.RepeatStatement:
-                    {
-                        var repeatCondition = GenerateExpression(node.RepeatExpressionNode, node.RepeatExpression) ?? "1";
-                        sb.AppendLine($"{indent}do");
-                        sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementBody, sb, indent + "    ");
-                        sb.AppendLine($"{indent}}} while ({repeatCondition});");
-                        break;
-                    }
+                        {
+                            var repeatCondition = GenerateExpression(node.RepeatExpressionNode, node.RepeatExpression) ?? "1";
+                            sb.AppendLine($"{indent}do");
+                            sb.AppendLine($"{indent}{{");
+                            EmitStatements(node.StatementBody, sb, indent + "    ");
+                            sb.AppendLine($"{indent}}} while ({repeatCondition});");
+                            break;
+                        }
                     case NodeKind.HasStatement:
                         sb.AppendLine($"{indent}if ({GenerateExpression(node.HasExpression, node.HasCondition)})");
                         sb.AppendLine($"{indent}{{");

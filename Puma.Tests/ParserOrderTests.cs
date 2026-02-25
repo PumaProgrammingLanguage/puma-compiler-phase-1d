@@ -15,8 +15,6 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-using System;
-using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static Puma.Parser;
 
@@ -35,7 +33,6 @@ enums
 records
 
 properties
-    Count = 0
 
 initialize
 
@@ -54,7 +51,44 @@ module
 records
 
 properties
-    Count = 0
+
+initialize
+
+finalize
+
+functions
+";
+
+
+        private const string IncorrectOrder2 =
+@"use
+
+module
+
+enums
+
+functions
+
+records
+
+properties
+
+initialize
+
+finalize
+";
+
+
+        private const string IncorrectOrder3 =
+@"enums
+
+module
+
+records
+
+use
+
+properties
 
 initialize
 
@@ -77,7 +111,7 @@ functions
             var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
             var expected = new[]
             {
-                Section.Using,
+                Section.Use,
                 Section.Module,
                 Section.Enums,
                 Section.Records,
@@ -97,6 +131,34 @@ functions
             var parser = new Puma.Parser();
 
             var tokens = lexer.Tokenize(IncorrectOrder);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+
+            // Optional: check the message gives guidance (parser should provide a friendly message)
+            StringAssert.Contains(ex.Message.ToLowerInvariant(), "order");
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsFriendlyError_WhenSectionsAreOutOfOrder2()
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(IncorrectOrder2);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+
+            // Optional: check the message gives guidance (parser should provide a friendly message)
+            StringAssert.Contains(ex.Message.ToLowerInvariant(), "order");
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsFriendlyError_WhenSectionsAreOutOfOrder3()
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(IncorrectOrder3);
 
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
 

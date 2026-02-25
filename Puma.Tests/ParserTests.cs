@@ -38,7 +38,7 @@ functions
 
             var expected = new[]
             {
-                Section.Using,
+                Section.Use,
                 Section.Module,
                 Section.Enums,
                 Section.Records,

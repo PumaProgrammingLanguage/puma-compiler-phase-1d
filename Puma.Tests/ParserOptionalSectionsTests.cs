@@ -59,7 +59,7 @@ functions
 
             var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
             CollectionAssert.AreEqual(
-                new[] { Section.Using, Section.Module, Section.Properties, Section.Start, Section.Functions },
+                new[] { Section.Use, Section.Module, Section.Properties, Section.Start, Section.Functions },
                 sections);
         }
 
@@ -86,7 +86,7 @@ functions
 
             var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
             CollectionAssert.AreEqual(
-                new[] { Section.Using, Section.Module, Section.Properties, Section.Initialize, Section.Functions },
+                new[] { Section.Use, Section.Module, Section.Properties, Section.Initialize, Section.Functions },
                 sections);
         }
 

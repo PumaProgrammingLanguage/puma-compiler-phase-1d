@@ -1,5 +1,5 @@
 // input: puma code
-using
+use
 
 module
 
@@ -14,7 +14,5 @@ start
 finalize
 
 functions
-
-end
 
 

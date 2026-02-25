@@ -15,8 +15,6 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-using System.Runtime.CompilerServices;
-using System.Xml.Linq;
 using static Puma.Lexer;
 
 namespace Puma
@@ -35,7 +33,6 @@ namespace Puma
         [
             // use
             "use",
-            "using",
             // type (currently recognized but not enforced in the order below)
             "type",
             "trait",
@@ -58,7 +55,7 @@ namespace Puma
         public enum Section
         {
             None,
-            Using,
+            Use,
             Module,
             Type,
             Trait,
@@ -74,8 +71,8 @@ namespace Puma
 
         private readonly Dictionary<string, Section> _sectionMap = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["use"] = Section.Using,
-            ["using"] = Section.Using,
+            ["use"] = Section.Use,
+            ["using"] = Section.Use,
             ["module"] = Section.Module,
             ["type"] = Section.Type,
             ["trait"] = Section.Trait,
@@ -92,7 +89,7 @@ namespace Puma
         // type/trait/module share the same position, and start/initialize share the same position.
         private static readonly Dictionary<Section, int> SectionRank = new()
         {
-            [Section.Using] = 10,
+            [Section.Use] = 10,
             [Section.Type] = 20,
             [Section.Trait] = 20,
             [Section.Module] = 20,
@@ -228,7 +225,7 @@ namespace Puma
                         ParseFile(token);
                         break;
 
-                    case Section.Using:
+                    case Section.Use:
                         ParseUsing(token);
                         break;
 
@@ -521,7 +518,7 @@ namespace Puma
             Section.Initialize => "initialize",
             Section.Finalize => "finalize",
             Section.Functions => "functions",
-            Section.Using => "use",
+            Section.Use => "use",
             Section.Module => "module",
             Section.Enums => "enums",
             Section.Records => "records",
@@ -1271,7 +1268,7 @@ namespace Puma
             private ExpressionNode? ParseEquality()
             {
                 var left = ParseComparison();
-                while (MatchOperator("==") || MatchOperator("!=") )
+                while (MatchOperator("==") || MatchOperator("!="))
                 {
                     var op = _tokens[_index - 1].TokenText;
                     var right = ParseComparison();
@@ -1515,8 +1512,8 @@ namespace Puma
                 if (!string.IsNullOrWhiteSpace(name))
                 {
                     var node = Node.CreatePropertyDeclaration(name, value, null, modifiers);
-                ast.Add(node);
-                return node;
+                    ast.Add(node);
+                    return node;
                 }
 
                 return null;

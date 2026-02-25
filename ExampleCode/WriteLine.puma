@@ -1,5 +1,3 @@
 // input: puma code
 start
 	WriteLine("Hello, World!")
-
-end
