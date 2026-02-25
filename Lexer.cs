@@ -99,7 +99,7 @@ namespace Puma
 
         private readonly HashSet<string> _keywords = new(StringComparer.Ordinal)
         {
-            "use", "using", "as", "type", "trait", "module", "is", "has", "value", "object", "base", "number",
+            "use", "as", "type", "trait", "module", "is", "has", "value", "object", "base", "number",
             "optional", "enums", "records", "pack", "properties", "functions", "start", "initialize", "finalize",
             "return", "yield", "public", "private", "internal", "override", "delegate", "constant", "readonly",
             "readwrite", "int128", "int64", "int32", "int16", "int8", "int", "uint128", "uint64", "uint32",
@@ -803,7 +803,7 @@ namespace Puma
         {
             return token switch
             {
-                "use" or "using" or "as" or "type" or "trait" or "module" or "is" or "has" or "value" or "object" or "base" or "number"
+                "use" or "as" or "type" or "trait" or "module" or "is" or "has" or "value" or "object" or "base" or "number"
                     or "optional" or "enums" or "records" or "pack" or "properties" or "functions" or "start" or "initialize" or "finalize"
                     or "return" or "yield" or "public" or "private" or "internal" or "override" or "delegate" or "constant" or "readonly"
                     or "readwrite" or "int128" or "int64" or "int32" or "int16" or "int8" or "int" or "uint128" or "uint64" or "uint32"

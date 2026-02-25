@@ -392,7 +392,7 @@ namespace Puma
 
             return node.Kind switch
             {
-                ExpressionKind.Identifier => node.Value ?? string.Empty,
+                ExpressionKind.Identifier => NormalizePropertyAccess(node.Value),
                 ExpressionKind.Literal => node.Value ?? string.Empty,
                 ExpressionKind.Unary => $"{node.Value}{GenerateExpression(node.Left, null)}",
                 ExpressionKind.Binary => $"({GenerateExpression(node.Left, null)} {node.Value} {GenerateExpression(node.Right, null)})",
@@ -401,6 +401,16 @@ namespace Puma
                 ExpressionKind.Call => $"{GenerateExpression(node.Left, null)}({string.Join(", ", node.Arguments.Select(a => GenerateExpression(a, null)))})",
                 _ => fallback ?? string.Empty
             };
+        }
+
+        private static string NormalizePropertyAccess(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            return value.StartsWith(".", StringComparison.Ordinal) ? value[1..] : value;
         }
 
         private static string FormatParameter(Node.ParameterInfo parameter)

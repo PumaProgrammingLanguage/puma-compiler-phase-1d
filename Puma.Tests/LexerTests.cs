@@ -8,7 +8,7 @@ namespace Puma.Tests
     public class LexerTests
     {
         private const string Sample =
-@"using
+@"use
 
 module
 
@@ -36,7 +36,7 @@ functions
 
             var expected = new[]
             {
-                "using","module","enums","records","initialize","finalize","functions"
+                "use","module","enums","records","initialize","finalize","functions"
             };
 
             CollectionAssert.AreEqual(expected, identifiers);
