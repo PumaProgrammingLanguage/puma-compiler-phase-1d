@@ -546,9 +546,12 @@ start(args str)
 
 module
 
+properties
+    Count = 0 int32
+
 functions
-    Configure(value int32 = 3)
-        return value
+    Configure(value int32 = 3) int32
+        return .Count
 ";
 
             var lexer = new Puma.Lexer();
@@ -573,7 +576,7 @@ functions
 module
 
 functions
-    Update(count int32 readonly)
+    Update(count int32 readonly) int32
         return count
 ";
 
@@ -620,6 +623,9 @@ functions
 @"use
 
 module
+
+properties
+    Total = 0
 
 functions
     Add(a int32, b int32) int32
