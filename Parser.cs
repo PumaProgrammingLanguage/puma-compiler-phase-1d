@@ -72,7 +72,6 @@ namespace Puma
         private readonly Dictionary<string, Section> _sectionMap = new(StringComparer.OrdinalIgnoreCase)
         {
             ["use"] = Section.Use,
-            ["using"] = Section.Use,
             ["module"] = Section.Module,
             ["type"] = Section.Type,
             ["trait"] = Section.Trait,
@@ -113,6 +112,8 @@ namespace Puma
         private bool _moduleHeaderParsed;
         private bool _startHeaderParsed;
         private bool _initializeHeaderParsed;
+        private bool _implicitStartSection;
+        private bool _hasExplicitSections;
         private int _currentIndentLevel;
         private int? _enumSectionIndent;
         private string? _currentEnumName;
@@ -190,6 +191,8 @@ namespace Puma
             _moduleHeaderParsed = false;
             _startHeaderParsed = false;
             _initializeHeaderParsed = false;
+            _implicitStartSection = false;
+            _hasExplicitSections = false;
             _currentIndentLevel = 0;
             _enumSectionIndent = null;
             _currentEnumName = null;
@@ -307,6 +310,11 @@ namespace Puma
                 var text = t.TokenText;
                 if (_sectionMap.TryGetValue(text, out var next))
                 {
+                    if (_implicitStartSection)
+                    {
+                        throw new InvalidOperationException("Sections are not allowed after implicit start statements.");
+                    }
+
                     if ((next == Section.Start && _seen.Contains(Section.Initialize))
                         || (next == Section.Initialize && _seen.Contains(Section.Start)))
                     {
@@ -343,15 +351,24 @@ namespace Puma
                     _lastRank = rank;
                     _lastSection = next;
                     _seen.Add(next);
+                    _hasExplicitSections = true;
 
                     CurrentSection = next;
-                    _currentFileKind = next switch
+                    if (_currentFileKind == FileDeclarationKind.None && next is Section.Enums or Section.Records or Section.Properties
+                        or Section.Start or Section.Initialize or Section.Finalize or Section.Functions)
                     {
-                        Section.Module => FileDeclarationKind.Module,
-                        Section.Type => FileDeclarationKind.Type,
-                        Section.Trait => FileDeclarationKind.Trait,
-                        _ => _currentFileKind
-                    };
+                        _currentFileKind = FileDeclarationKind.Module;
+                    }
+                    else
+                    {
+                        _currentFileKind = next switch
+                        {
+                            Section.Module => FileDeclarationKind.Module,
+                            Section.Type => FileDeclarationKind.Type,
+                            Section.Trait => FileDeclarationKind.Trait,
+                            _ => _currentFileKind
+                        };
+                    }
                     _currentSectionNode = new Node(next);
                     ast.Add(_currentSectionNode);
                     return true;
@@ -531,7 +548,27 @@ namespace Puma
         private void ParseFile(LexerTokens? token)
         {
             // Look for the first section header
-            TrySwitchSection(token);
+            if (TrySwitchSection(token))
+            {
+                return;
+            }
+
+            if (token == null || IsIgnorable(token.Value))
+            {
+                return;
+            }
+
+            if (_hasExplicitSections)
+            {
+                throw new InvalidOperationException("Code is not allowed outside of sections.");
+            }
+
+            _implicitStartSection = true;
+            CurrentSection = Section.Start;
+            _currentFileKind = FileDeclarationKind.Module;
+            _currentSectionNode = new Node(Section.Start);
+            ast.Add(_currentSectionNode);
+            ParseStart(token);
         }
 
         private void ParseUsing(LexerTokens? token)

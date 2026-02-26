@@ -7,7 +7,7 @@ namespace Puma.Tests
     public class ParserTests
     {
         private const string Sample =
-@"using
+@"use
 
 module
 
@@ -193,7 +193,7 @@ properties
     Counter = 0
 
 initialize
-    Counter = 1
+    .Counter = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -204,7 +204,7 @@ initialize
 
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(1, assignments.Count);
-            Assert.AreEqual("Counter", assignments[0].AssignmentLeft);
+            Assert.AreEqual(".Counter", assignments[0].AssignmentLeft);
             Assert.AreEqual("1", assignments[0].AssignmentRight);
             Assert.AreEqual("=", assignments[0].AssignmentOperator);
         }
@@ -248,7 +248,7 @@ properties
     Flag = false
 
 start
-    if status
+    if .Flag
 ";
 
             var lexer = new Puma.Lexer();
@@ -259,7 +259,7 @@ start
 
             var ifStatements = ast.Where(n => n.Kind == NodeKind.IfStatement).ToList();
             Assert.AreEqual(1, ifStatements.Count);
-            Assert.AreEqual("status", ifStatements[0].IfCondition);
+            Assert.AreEqual(".Flag", ifStatements[0].IfCondition);
         }
 
 
@@ -275,7 +275,7 @@ properties
     value = 0
 
 start
-    match value
+    match .value
         when 1
         when 2
 ";
@@ -287,7 +287,7 @@ start
             var ast = parser.Parse(tokens);
 
             var matchNode = ast.Single(n => n.Kind == NodeKind.MatchStatement);
-            Assert.AreEqual("value", matchNode.MatchExpression);
+            Assert.AreEqual(".value", matchNode.MatchExpression);
 
             var whenNodes = matchNode.StatementBody.Where(n => n.Kind == NodeKind.WhenStatement).ToList();
             Assert.AreEqual(2, whenNodes.Count);
@@ -303,10 +303,11 @@ module
 
 properties
     Count = 0
+    ready = false
 
 start
-    if ready
-        Count = 1
+    if .ready
+        .Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -330,12 +331,13 @@ module
 
 properties
     Count = 0
+    ready = false
 
 start
-    if ready
-        Count = 1
+    if .ready
+        .Count = 1
     else
-        Count = 2
+        .Count = 2
 ";
 
             var lexer = new Puma.Lexer();
@@ -360,7 +362,7 @@ properties
     running = true
 
 initialize
-    while isReady
+    while .running
 ";
 
             var lexer = new Puma.Lexer();
@@ -371,7 +373,7 @@ initialize
 
             var whileNodes = ast.Where(n => n.Kind == NodeKind.WhileStatement).ToList();
             Assert.AreEqual(1, whileNodes.Count);
-            Assert.AreEqual("isReady", whileNodes[0].WhileCondition);
+            Assert.AreEqual(".running", whileNodes[0].WhileCondition);
         }
 
         [TestMethod]
@@ -490,10 +492,10 @@ properties
     Count = 0
 
 initialize(value int32)
-    Count += value
+    .Count += value
 
 finalize
-    Count -= 1
+    .Count -= 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -688,7 +690,7 @@ properties
 
 functions
     Get() int32
-        return Value
+        return .Value
 ";
 
             var lexer = new Puma.Lexer();

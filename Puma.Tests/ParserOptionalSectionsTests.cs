@@ -91,7 +91,7 @@ functions
         }
 
         [TestMethod]
-        public void Parse_InitializeWithoutTypeTraitOrModule_Throws()
+        public void Parse_InitializeWithoutTypeTraitOrModule_DefaultsToModule()
         {
             const string src =
 @"use
@@ -102,7 +102,10 @@ initialize
             var parser = new Puma.Parser();
 
             var tokens = lexer.Tokenize(src);
-            Assert.ThrowsException<System.InvalidOperationException>(() => parser.Parse(tokens));
+            var ast = parser.Parse(tokens);
+
+            var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
+            CollectionAssert.AreEqual(new[] { Section.Use, Section.Initialize }, sections);
         }
 
         [TestMethod]
