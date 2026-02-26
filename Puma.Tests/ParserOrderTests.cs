@@ -23,7 +23,7 @@ namespace Puma.Tests
     [TestClass]
     public class ParserOrderTests
     {
-        private const string CorrectOrder =
+        private const string CorrectOrder1 =
 @"use
 
 module
@@ -41,7 +41,61 @@ finalize
 functions
 ";
 
-        private const string IncorrectOrder =
+        private const string CorrectOrder2 =
+@"use
+
+type
+
+enums
+
+records
+
+properties
+
+initialize
+
+finalize
+
+functions
+";
+
+        private const string CorrectOrder3 =
+@"use
+
+trait
+
+enums
+
+records
+
+properties
+
+initialize
+
+finalize
+
+functions
+";
+
+        private const string CorrectOrder4 =
+@"use
+
+module
+
+enums
+
+records
+
+properties
+
+start
+
+finalize
+
+functions
+";
+
+        private const string IncorrectOrder1 =
 @"use
 
 enums
@@ -98,12 +152,90 @@ functions
 ";
 
         [TestMethod]
-        public void Parse_DoesNotThrow_WhenSectionsAreInCorrectOrder()
+        public void Parse_DoesNotThrow_WhenSectionsAreInCorrectOrder1()
         {
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
 
-            var tokens = lexer.Tokenize(CorrectOrder);
+            var tokens = lexer.Tokenize(CorrectOrder1);
+
+            // Should not throw
+            var ast = parser.Parse(tokens);
+
+            var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
+            var expected = new[]
+            {
+                Section.Use,
+                Section.Module,
+                Section.Enums,
+                Section.Records,
+                Section.Properties,
+                Section.Initialize,
+                Section.Finalize,
+                Section.Functions
+            };
+
+            CollectionAssert.AreEqual(expected, sections);
+        }
+
+        public void Parse_DoesNotThrow_WhenSectionsAreInCorrectOrder2()
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(CorrectOrder2);
+
+            // Should not throw
+            var ast = parser.Parse(tokens);
+
+            var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
+            var expected = new[]
+            {
+                Section.Use,
+                Section.Module,
+                Section.Enums,
+                Section.Records,
+                Section.Properties,
+                Section.Initialize,
+                Section.Finalize,
+                Section.Functions
+            };
+
+            CollectionAssert.AreEqual(expected, sections);
+        }
+
+        public void Parse_DoesNotThrow_WhenSectionsAreInCorrectOrder3()
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(CorrectOrder3);
+
+            // Should not throw
+            var ast = parser.Parse(tokens);
+
+            var sections = ast.Where(n => n.Kind == NodeKind.Section).Select(n => n.Section).ToArray();
+            var expected = new[]
+            {
+                Section.Use,
+                Section.Module,
+                Section.Enums,
+                Section.Records,
+                Section.Properties,
+                Section.Initialize,
+                Section.Finalize,
+                Section.Functions
+            };
+
+            CollectionAssert.AreEqual(expected, sections);
+        }
+
+        public void Parse_DoesNotThrow_WhenSectionsAreInCorrectOrder4()
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(CorrectOrder4);
 
             // Should not throw
             var ast = parser.Parse(tokens);
@@ -125,12 +257,12 @@ functions
         }
 
         [TestMethod]
-        public void Parse_ThrowsFriendlyError_WhenSectionsAreOutOfOrder()
+        public void Parse_ThrowsFriendlyError_WhenSectionsAreOutOfOrder1()
         {
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
 
-            var tokens = lexer.Tokenize(IncorrectOrder);
+            var tokens = lexer.Tokenize(IncorrectOrder1);
 
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
 
