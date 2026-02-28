@@ -1426,14 +1426,6 @@ namespace Puma
                 }
 
                 var token = _tokens[_index++];
-                if (token.Category == TokenCategory.Punctuation && token.TokenText == ".")
-                {
-                    if (_index < _tokens.Count && _tokens[_index].Category is TokenCategory.Identifier or TokenCategory.Keyword)
-                    {
-                        var member = _tokens[_index++].TokenText;
-                        return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = $".{member}" };
-                    }
-                }
                 if (token.Category is TokenCategory.Identifier or TokenCategory.Keyword)
                 {
                     return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = token.TokenText };

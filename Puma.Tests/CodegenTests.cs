@@ -135,7 +135,7 @@ properties
 
 functions
     Get() int32
-        return .Value
+        return Value
 ";
 
             var expected =
@@ -215,10 +215,10 @@ properties
     Count = 0
 
 start
-    .Count = 3
+    Count = 3
 
 finalize
-    .Count = 2
+    Count = 2
 ";
 
             var expected =
@@ -260,12 +260,12 @@ properties
     Count = 0
 
 start
-    if .Count
-        .Count = 1
+    if Count
+        Count = 1
     else
-        .Count = 2
-    while .Count
-        .Count = 3
+        Count = 2
+    while Count
+        Count = 3
 ";
 
             var expected =

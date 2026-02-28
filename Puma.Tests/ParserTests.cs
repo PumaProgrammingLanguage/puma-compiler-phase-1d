@@ -193,7 +193,7 @@ properties
     Counter = 0
 
 initialize
-    .Counter = 1
+    Counter = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -204,7 +204,7 @@ initialize
 
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(1, assignments.Count);
-            Assert.AreEqual(".Counter", assignments[0].AssignmentLeft);
+            Assert.AreEqual("Counter", assignments[0].AssignmentLeft);
             Assert.AreEqual("1", assignments[0].AssignmentRight);
             Assert.AreEqual("=", assignments[0].AssignmentOperator);
         }
@@ -246,9 +246,11 @@ module
 
 properties
     Flag = false
+    Count = 0
 
 start
-    if .Flag
+    if Flag
+        Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -259,7 +261,7 @@ start
 
             var ifStatements = ast.Where(n => n.Kind == NodeKind.IfStatement).ToList();
             Assert.AreEqual(1, ifStatements.Count);
-            Assert.AreEqual(".Flag", ifStatements[0].IfCondition);
+            Assert.AreEqual("Flag", ifStatements[0].IfCondition);
         }
 
 
@@ -273,11 +275,14 @@ module
 
 properties
     value = 0
+    Count = 0
 
 start
-    match .value
+    match value
         when 1
+            Count = 1
         when 2
+            Count = 2
 ";
 
             var lexer = new Puma.Lexer();
@@ -287,7 +292,7 @@ start
             var ast = parser.Parse(tokens);
 
             var matchNode = ast.Single(n => n.Kind == NodeKind.MatchStatement);
-            Assert.AreEqual(".value", matchNode.MatchExpression);
+            Assert.AreEqual("value", matchNode.MatchExpression);
 
             var whenNodes = matchNode.StatementBody.Where(n => n.Kind == NodeKind.WhenStatement).ToList();
             Assert.AreEqual(2, whenNodes.Count);
@@ -306,8 +311,8 @@ properties
     ready = false
 
 start
-    if .ready
-        .Count = 1
+    if ready
+        Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -334,10 +339,10 @@ properties
     ready = false
 
 start
-    if .ready
-        .Count = 1
+    if ready
+        Count = 1
     else
-        .Count = 2
+        Count = 2
 ";
 
             var lexer = new Puma.Lexer();
@@ -350,6 +355,183 @@ start
             Assert.AreEqual(1, ifNode.ElseBody.Count);
             Assert.AreEqual(NodeKind.AssignmentStatement, ifNode.ElseBody[0].Kind);
         }
+
+        [TestMethod]
+        public void StartSection_ParsesIfStatementBodyAssignments()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+    Flag = false
+
+start
+    if Flag
+        Count = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var ifNode = ast.Single(n => n.Kind == NodeKind.IfStatement);
+            Assert.AreEqual(1, ifNode.StatementBody.Count);
+            var assignment = ifNode.StatementBody[0];
+            Assert.AreEqual(NodeKind.AssignmentStatement, assignment.Kind);
+            Assert.AreEqual("Count", assignment.AssignmentLeft);
+            Assert.AreEqual("1", assignment.AssignmentRight);
+        }
+
+        [TestMethod]
+        public void StartSection_ParsesIfElseStatementBodyAssignments()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+    Flag = false
+
+start
+    if Flag
+        Count = 1
+    else
+        Count = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var ifNode = ast.Single(n => n.Kind == NodeKind.IfStatement);
+            Assert.AreEqual(1, ifNode.StatementBody.Count);
+            Assert.AreEqual(1, ifNode.ElseBody.Count);
+            Assert.AreEqual(NodeKind.AssignmentStatement, ifNode.StatementBody[0].Kind);
+            Assert.AreEqual(NodeKind.AssignmentStatement, ifNode.ElseBody[0].Kind);
+        }
+
+        [TestMethod]
+        public void StartSection_ParsesHasStatementBodyAssignments()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+    item = 0
+
+start
+    has item
+        Count = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var hasNode = ast.Single(n => n.Kind == NodeKind.HasStatement);
+            Assert.AreEqual(1, hasNode.StatementBody.Count);
+            Assert.AreEqual(NodeKind.AssignmentStatement, hasNode.StatementBody[0].Kind);
+        }
+
+        [TestMethod]
+        public void StartSection_ParsesWhileStatementBodyAssignments()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+    running = true
+
+start
+    while running
+        Count = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var whileNode = ast.Single(n => n.Kind == NodeKind.WhileStatement);
+            Assert.AreEqual(1, whileNode.StatementBody.Count);
+            Assert.AreEqual(NodeKind.AssignmentStatement, whileNode.StatementBody[0].Kind);
+        }
+
+        [TestMethod]
+        public void StartSection_ParsesForStatementBodyAssignments()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+    items = 0
+
+start
+    for entry in items
+        Count = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var forNode = ast.Single(n => n.Kind == NodeKind.ForStatement);
+            Assert.AreEqual(1, forNode.StatementBody.Count);
+            Assert.AreEqual(NodeKind.AssignmentStatement, forNode.StatementBody[0].Kind);
+            Assert.AreEqual("entry", forNode.ForVariable);
+            Assert.AreEqual("items", forNode.ForContainer);
+        }
+
+        [TestMethod]
+        public void StartSection_ParsesRepeatStatementBodyAssignments()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+
+start
+    repeat Count
+        Count = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+
+            var repeatNode = ast.Single(n => n.Kind == NodeKind.RepeatStatement);
+            Assert.AreEqual(1, repeatNode.StatementBody.Count);
+            Assert.AreEqual(NodeKind.AssignmentStatement, repeatNode.StatementBody[0].Kind);
+            Assert.AreEqual("Count", repeatNode.RepeatExpression);
+        }
         [TestMethod]
         public void StartAndInitialize_ParseWhileStatements()
         {
@@ -360,9 +542,11 @@ module
 
 properties
     running = true
+    Count = 0
 
 initialize
-    while .running
+    while running
+        Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -373,7 +557,7 @@ initialize
 
             var whileNodes = ast.Where(n => n.Kind == NodeKind.WhileStatement).ToList();
             Assert.AreEqual(1, whileNodes.Count);
-            Assert.AreEqual(".running", whileNodes[0].WhileCondition);
+            Assert.AreEqual("running", whileNodes[0].WhileCondition);
         }
 
         [TestMethod]
@@ -386,9 +570,11 @@ module
 
 properties
     items = 0
+    Count = 0
 
 start
-    forall entry in records
+    forall entry in items
+        Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -399,7 +585,7 @@ start
 
             var forAllNode = ast.Single(n => n.Kind == NodeKind.ForAllStatement);
             Assert.AreEqual("entry", forAllNode.ForVariable);
-            Assert.AreEqual("records", forAllNode.ForContainer);
+            Assert.AreEqual("items", forAllNode.ForContainer);
         }
 
         [TestMethod]
@@ -412,9 +598,11 @@ module
 
 properties
     dummy = 0
+    Count = 0
 
 initialize
     repeat
+        Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -438,9 +626,12 @@ module
 
 properties
     optionalValue = 0
+    item = 0
+    Count = 0
 
 start
     has item
+        Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -464,9 +655,11 @@ module
 
 properties
     item = 0
+    Count = 0
 
 initialize
     has trait item
+        Count = 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -492,10 +685,10 @@ properties
     Count = 0
 
 initialize(value int32)
-    .Count += value
+    Count += value
 
 finalize
-    .Count -= 1
+    Count -= 1
 ";
 
             var lexer = new Puma.Lexer();
@@ -551,7 +744,7 @@ properties
 
 functions
     Configure(value int32 = 3) int32
-        return .Count
+        return Count
 ";
 
             var lexer = new Puma.Lexer();
@@ -630,7 +823,7 @@ properties
 functions
     Add(a int32, b int32) int32
         Result = a
-        .Total += b
+        Total += b
 ";
 
             var lexer = new Puma.Lexer();
@@ -650,7 +843,7 @@ functions
             Assert.AreEqual(2, bodyAssignments.Count);
             Assert.AreEqual("Result", bodyAssignments[0].AssignmentLeft);
             Assert.AreEqual("a", bodyAssignments[0].AssignmentRight);
-            Assert.AreEqual(".Total", bodyAssignments[1].AssignmentLeft);
+            Assert.AreEqual("Total", bodyAssignments[1].AssignmentLeft);
             Assert.AreEqual("b", bodyAssignments[1].AssignmentRight);
         }
 
@@ -696,7 +889,7 @@ properties
 
 functions
     Get() int32
-        return .Value
+        return Value
 ";
 
             var lexer = new Puma.Lexer();
