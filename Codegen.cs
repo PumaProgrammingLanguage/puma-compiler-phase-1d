@@ -344,7 +344,7 @@ namespace Puma
                             break;
                         }
                     case NodeKind.HasStatement:
-                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasExpression, node.HasCondition)})");
+                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasExpression, node.HasCondition)} != nullptr)");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
