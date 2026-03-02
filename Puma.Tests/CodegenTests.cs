@@ -25,9 +25,9 @@ functions
         public void Generate_EmitsExpectedCOutput()
         {
             var expected =
-@"int Count = 1;
+@"int64_t Count = 1;
 
-int Add(int a, int b)
+int32_t Add(int32_t a, int32_t b)
 {
     Result = a;
 }
@@ -63,8 +63,8 @@ functions
 @"class Sample::Type : public object
 {
 public:
-    int Count = 1;
-    int Add(int a)
+    int64_t Count = 1;
+    int32_t Add(int32_t a)
     {
         return a;
     }
@@ -99,10 +99,9 @@ start
 
             var expected =
 @"#include <System/Console>
-#include <stdbool.h>
 #include <stdio.h>
 
-bool Flag = true;
+bool_t Flag = true;
 
 int main()
 {
@@ -142,8 +141,8 @@ functions
 @"class Alpha
 {
 public:
-    int Value = 0;
-    int Get()
+    int64_t Value = 0;
+    int32_t Get()
     {
         return Value;
     }
@@ -222,7 +221,7 @@ finalize
 ";
 
             var expected =
-@"int Count = 0;
+@"int64_t Count = 0;
 
 void finalize()
 {
@@ -269,7 +268,7 @@ start
 ";
 
             var expected =
-@"int Count = 0;
+@"int64_t Count = 0;
 
 int main()
 {
@@ -341,6 +340,64 @@ trait Alpha
 {
 public:
 };
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_MapsFunctionTypes_ToConfiguredCppTypes()
+        {
+            const string src =
+@"use
+
+module
+
+functions
+    Convert(i int, u uint, f flt, b bool, c char, s str, x fix32) uint64
+        return 0
+";
+
+            var expected =
+@"uint64_t Convert(int64_t i, uint64_t u, double f, bool_t b, uint8[4] c, stdstr s, int32_t x)
+{
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_InfersStringProperty_AsStdStr()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Name = ""Puma""
+";
+
+            var expected =
+@"stdstr Name = ""Puma"";
 ";
 
             var lexer = new Puma.Lexer();

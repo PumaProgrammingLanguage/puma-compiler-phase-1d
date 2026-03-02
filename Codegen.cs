@@ -36,12 +36,6 @@ namespace Puma
                 includes.Add("<stdio.h>");
             }
 
-            var usesBool = ast.Any(n => UsesBool(n));
-            if (usesBool)
-            {
-                includes.Add("<stdbool.h>");
-            }
-
             foreach (var node in ast.Where(n => n.Kind == NodeKind.UseStatement))
             {
                 if (node.UseIsFilePath && !string.IsNullOrWhiteSpace(node.UseTarget))
@@ -405,7 +399,7 @@ namespace Puma
 
         private static string FormatParameter(Node.ParameterInfo parameter)
         {
-            var type = MapType(parameter.Type) ?? "int";
+            var type = MapType(parameter.Type) ?? "int64_t";
             return string.IsNullOrWhiteSpace(parameter.Name) ? type : $"{type} {parameter.Name}";
         }
 
@@ -426,11 +420,11 @@ namespace Puma
                 return parameter.DefaultValue;
             }
 
-            var type = MapType(parameter.Type) ?? "int";
+            var type = MapType(parameter.Type) ?? "int64_t";
             return type switch
             {
-                "const char*" => "\"\"",
-                "bool" => "false",
+                "stdstr" => "\"\"",
+                "bool_t" => "false",
                 _ => "0"
             };
         }
@@ -444,15 +438,21 @@ namespace Puma
 
             return type switch
             {
-                "int" or "int8" or "int16" or "int32" => "int",
-                "int64" or "int128" => "long long",
-                "uint" or "uint8" or "uint16" or "uint32" => "unsigned int",
-                "uint64" or "uint128" => "unsigned long long",
-                "flt" or "flt32" => "float",
-                "flt64" => "double",
-                "flt128" => "long double",
-                "bool" => "bool",
-                "str" or "fstr" or "vstr" => "const char*",
+                "int" or "int64" => "int64_t",
+                "int32" => "int32_t",
+                "int16" => "int16_t",
+                "int8" => "int8_t",
+                "uint" or "uint64" => "uint64_t",
+                "uint32" => "uint32_t",
+                "uint16" => "uint16_t",
+                "uint8" => "uint8_t",
+                "flt" or "flt64" => "double",
+                "flt32" => "float",
+                "fix" or "fix64" => "int64_t",
+                "fix32" => "int32_t",
+                "bool" => "bool_t",
+                "char" => "uint8[4]",
+                "str" => "stdstr",
                 _ => type
             };
         }
@@ -487,22 +487,22 @@ namespace Puma
         {
             if (string.IsNullOrWhiteSpace(value))
             {
-                return ("int", "0");
+                return ("int64_t", "0");
             }
 
             if (value.StartsWith("\"", StringComparison.Ordinal))
             {
-                return ("const char*", value);
+                return ("stdstr", value);
             }
 
             if (bool.TryParse(value, out _))
             {
-                return ("bool", value.ToLowerInvariant());
+                return ("bool_t", value.ToLowerInvariant());
             }
 
             if (int.TryParse(value, out _))
             {
-                return ("int", value);
+                return ("int64_t", value);
             }
 
             if (double.TryParse(value, out _))
@@ -510,7 +510,7 @@ namespace Puma
                 return ("double", value);
             }
 
-            return ("int", value);
+            return ("int64_t", value);
         }
 
         private static (int Index, Node? SectionNode) FindSection(List<Node> ast, Section section)

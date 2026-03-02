@@ -36,11 +36,9 @@ namespace Puma
         WhileStatement,
         ForStatement,
         ForAllStatement,
-        RepeatStatement
-        ,
+        RepeatStatement,
         HasStatement,
-        HasTraitStatement
-        ,
+        HasTraitStatement,
         FunctionDeclaration,
         ReturnStatement,
         YieldStatement,
