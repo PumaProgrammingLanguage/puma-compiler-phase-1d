@@ -728,6 +728,30 @@ start
         }
 
         [TestMethod]
+        public void AssignmentExpressions_Conditional_IsLeftAssociative()
+        {
+            const string src =
+@"use
+
+module
+
+start
+    A = 1 if true else 2 if false else 3
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var ast = parser.Parse(lexer.Tokenize(src));
+
+            var assignment = ast.Single(n => n.Kind == NodeKind.AssignmentStatement && n.AssignmentLeft == "A");
+            var conditional = assignment.AssignmentRightExpression!;
+
+            Assert.AreEqual(ExpressionKind.Conditional, conditional.Kind);
+            Assert.AreEqual(ExpressionKind.Conditional, conditional.Right!.Kind);
+            Assert.AreEqual(3L, EvaluateExpression(conditional));
+        }
+
+        [TestMethod]
         public void AssignmentExpressions_FunctionCallArguments_CommaStillSeparatesArguments()
         {
             const string src =
@@ -751,6 +775,64 @@ start
             Assert.AreEqual(ExpressionKind.Literal, call.Arguments[0].Kind);
             Assert.AreEqual("1", call.Arguments[0].Value);
             Assert.AreEqual(ExpressionKind.Conditional, call.Arguments[1].Kind);
+        }
+
+        [TestMethod]
+        public void AssignmentExpressions_FunctionCallArgument_AllowsParenthesizedCommaExpression()
+        {
+            const string src =
+@"use
+
+module
+
+start
+    A = func((1, 2), 3)
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var ast = parser.Parse(lexer.Tokenize(src));
+
+            var assignment = ast.Single(n => n.Kind == NodeKind.AssignmentStatement && n.AssignmentLeft == "A");
+            var call = assignment.AssignmentRightExpression!;
+
+            Assert.AreEqual(ExpressionKind.Call, call.Kind);
+            Assert.AreEqual(2, call.Arguments.Count);
+            Assert.AreEqual(ExpressionKind.Binary, call.Arguments[0].Kind);
+            Assert.AreEqual(",", call.Arguments[0].Value);
+            Assert.AreEqual(ExpressionKind.Literal, call.Arguments[1].Kind);
+            Assert.AreEqual("3", call.Arguments[1].Value);
+            Assert.AreEqual(2L, EvaluateExpression(call.Arguments[0]));
+        }
+
+        [TestMethod]
+        public void StartAndInitialize_ParseFunctionCallStatement_WithExpressionTree()
+        {
+            const string src =
+@"use
+
+module
+
+start
+    Print((1, 2), 3 if true else 4)
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var ast = parser.Parse(lexer.Tokenize(src));
+
+            var callNode = ast.Single(n => n.Kind == NodeKind.FunctionCall);
+            Assert.IsNotNull(callNode.StatementExpression);
+            Assert.AreEqual(ExpressionKind.Call, callNode.StatementExpression!.Kind);
+            Assert.AreEqual(2, callNode.StatementExpression.Arguments.Count);
+
+            var arg0 = callNode.StatementExpression.Arguments[0];
+            Assert.AreEqual(ExpressionKind.Binary, arg0.Kind);
+            Assert.AreEqual(",", arg0.Value);
+
+            var arg1 = callNode.StatementExpression.Arguments[1];
+            Assert.AreEqual(ExpressionKind.Conditional, arg1.Kind);
+            Assert.AreEqual(3L, EvaluateExpression(arg1));
         }
 
         [TestMethod]

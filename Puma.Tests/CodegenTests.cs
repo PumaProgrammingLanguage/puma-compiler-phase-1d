@@ -494,5 +494,283 @@ properties
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
+
+        [TestMethod]
+        public void Generate_EmitsConditionalExpressionInAssignment()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    A = 0
+
+start
+    A = 1 if true else 2
+";
+
+            var expected =
+@"int64_t A = 0;
+
+int main()
+{
+    A = (true ? 1 : 2);
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsCommaMultiExpressionInAssignment()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    A = 0
+
+start
+    A = 1 + 2, 3 * 4
+";
+
+            var expected =
+@"int64_t A = 0;
+
+int main()
+{
+    A = ((1 + 2) , (3 * 4));
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsNestedConditionalAndCommaExpression()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    A = 0
+
+start
+    A = (1 if true else 2), (3 if false else 4)
+";
+
+            var expected =
+@"int64_t A = 0;
+
+int main()
+{
+    A = ((true ? 1 : 2) , (false ? 3 : 4));
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsConditionalWithBitwiseAndAdditiveSubexpressions()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    A = 0
+
+start
+    A = 1 + 2 if 1 | 2 < 4 else 5 * 6
+";
+
+            var expected =
+@"int64_t A = 0;
+
+int main()
+{
+    A = (((1 | 2) < 4) ? (1 + 2) : (5 * 6));
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsConditionalExpressionInsideFunctionArguments()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    A = 0
+
+start
+    A = Print(1 if true else 2, 3)
+";
+
+            var expected =
+@"int64_t A = 0;
+
+int main()
+{
+    A = Print((true ? 1 : 2), 3);
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsLeftAssociativeConditionalChainShape()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    A = 0
+
+start
+    A = 1 if true else 2 if false else 3
+";
+
+            var expected =
+@"int64_t A = 0;
+
+int main()
+{
+    A = (false ? (true ? 1 : 2) : 3);
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsConditionalExpressionInsideStatementLevelFunctionArguments()
+        {
+            const string src =
+@"use
+
+module
+
+start
+    Print(1 if true else 2, 3)
+";
+
+            var expected =
+@"int main()
+{
+    Print((true ? 1 : 2), 3);
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsParenthesizedCommaExpressionAsSingleFunctionArgument()
+        {
+            const string src =
+@"use
+
+module
+
+start
+    Print((1, 2), 3)
+";
+
+            var expected =
+@"int main()
+{
+    Print((1 , 2), 3);
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
     }
 }

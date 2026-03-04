@@ -1298,32 +1298,32 @@ namespace Puma
 
             private ExpressionNode? ParseConditional()
             {
-                var whenTrue = ParseOr();
-                if (!MatchKeyword("if"))
+                var expression = ParseOr();
+                while (MatchKeyword("if"))
                 {
-                    return whenTrue;
+                    var condition = ParseOr();
+                    if (!MatchKeyword("else"))
+                    {
+                        throw new InvalidOperationException("Conditional expressions require an 'else' branch.");
+                    }
+
+                    var whenFalse = ParseOr();
+                    var conditional = new ExpressionNode
+                    {
+                        Kind = ExpressionKind.Conditional,
+                        Left = condition,
+                        Right = expression
+                    };
+
+                    if (whenFalse != null)
+                    {
+                        conditional.Arguments.Add(whenFalse);
+                    }
+
+                    expression = conditional;
                 }
 
-                var condition = ParseOr();
-                if (!MatchKeyword("else"))
-                {
-                    throw new InvalidOperationException("Conditional expressions require an 'else' branch.");
-                }
-
-                var whenFalse = ParseConditional();
-                var conditional = new ExpressionNode
-                {
-                    Kind = ExpressionKind.Conditional,
-                    Left = condition,
-                    Right = whenTrue
-                };
-
-                if (whenFalse != null)
-                {
-                    conditional.Arguments.Add(whenFalse);
-                }
-
-                return conditional;
+                return expression;
             }
 
             public bool HasRemainingTokens() => _index < _tokens.Count;
@@ -2101,7 +2101,9 @@ namespace Puma
                 return false;
             }
 
-            target.Add(Node.CreateFunctionCall(name, args));
+            var callNode = Node.CreateFunctionCall(name, args);
+            callNode.StatementExpression = ParseExpression(tokens);
+            target.Add(callNode);
             return true;
         }
 

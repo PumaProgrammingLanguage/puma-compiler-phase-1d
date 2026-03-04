@@ -286,7 +286,8 @@ namespace Puma
                     {
                         var leftExpression = GenerateExpression(node.AssignmentLeftExpression, node.AssignmentLeft);
                         var rightExpression = GenerateExpression(node.AssignmentRightExpression, node.AssignmentRight);
-                        if (!string.IsNullOrWhiteSpace(node.AssignmentRight)
+                        if (node.AssignmentRightExpression == null
+                            && !string.IsNullOrWhiteSpace(node.AssignmentRight)
                             && node.AssignmentRight.Contains('(')
                             && node.AssignmentRight.Contains(')'))
                         {
@@ -297,8 +298,18 @@ namespace Puma
                         break;
                     }
                     case NodeKind.FunctionCall:
-                        sb.AppendLine($"{indent}{node.FunctionName}({node.FunctionArguments});");
+                    {
+                        var callExpression = GenerateExpression(node.StatementExpression, null);
+                        if (!string.IsNullOrWhiteSpace(callExpression) && node.StatementExpression?.Kind == ExpressionKind.Call)
+                        {
+                            sb.AppendLine($"{indent}{callExpression};");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"{indent}{node.FunctionName}({node.FunctionArguments});");
+                        }
                         break;
+                    }
                     case NodeKind.WriteLine:
                         if (!string.IsNullOrWhiteSpace(node.StringValue))
                         {
@@ -405,6 +416,7 @@ namespace Puma
                 ExpressionKind.Literal => node.Value ?? string.Empty,
                 ExpressionKind.Unary => $"{node.Value}{GenerateExpression(node.Left, null)}",
                 ExpressionKind.Cast => $"({node.Value}){GenerateExpression(node.Left, null)}",
+                ExpressionKind.Conditional => $"({GenerateExpression(node.Left, null)} ? {GenerateExpression(node.Right, null)} : {GenerateExpression(node.Arguments.FirstOrDefault(), null)})",
                 ExpressionKind.Binary => $"({GenerateExpression(node.Left, null)} {node.Value} {GenerateExpression(node.Right, null)})",
                 ExpressionKind.MemberAccess => $"{GenerateExpression(node.Left, null)}.{node.Value}",
                 ExpressionKind.Index => $"{GenerateExpression(node.Left, null)}[{GenerateExpression(node.Right, null)}]",
