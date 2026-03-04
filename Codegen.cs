@@ -283,8 +283,19 @@ namespace Puma
                 switch (node.Kind)
                 {
                     case NodeKind.AssignmentStatement:
-                        sb.AppendLine($"{indent}{GenerateExpression(node.AssignmentLeftExpression, node.AssignmentLeft)} {node.AssignmentOperator} {GenerateExpression(node.AssignmentRightExpression, node.AssignmentRight)};");
+                    {
+                        var leftExpression = GenerateExpression(node.AssignmentLeftExpression, node.AssignmentLeft);
+                        var rightExpression = GenerateExpression(node.AssignmentRightExpression, node.AssignmentRight);
+                        if (!string.IsNullOrWhiteSpace(node.AssignmentRight)
+                            && node.AssignmentRight.Contains('(')
+                            && node.AssignmentRight.Contains(')'))
+                        {
+                            rightExpression = node.AssignmentRight;
+                        }
+
+                        sb.AppendLine($"{indent}{leftExpression} {node.AssignmentOperator} {rightExpression};");
                         break;
+                    }
                     case NodeKind.FunctionCall:
                         sb.AppendLine($"{indent}{node.FunctionName}({node.FunctionArguments});");
                         break;
@@ -350,11 +361,15 @@ namespace Puma
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.HasTraitStatement:
-                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasTraitExpression, node.HasTraitCondition)})");
+                    {
+                        var variable = node.HasTraitVariableName ?? GenerateExpression(node.HasTraitExpression, node.HasTraitCondition);
+                        var traitType = node.HasTraitTypeName ?? "Trait";
+                        sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == {traitType}Type)");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
+                    }
                     case NodeKind.ReturnStatement:
                         sb.AppendLine($"{indent}return {GenerateExpression(node.StatementExpression, node.StatementValue)};");
                         break;
@@ -389,6 +404,7 @@ namespace Puma
                 ExpressionKind.Identifier => node.Value ?? string.Empty,
                 ExpressionKind.Literal => node.Value ?? string.Empty,
                 ExpressionKind.Unary => $"{node.Value}{GenerateExpression(node.Left, null)}",
+                ExpressionKind.Cast => $"({node.Value}){GenerateExpression(node.Left, null)}",
                 ExpressionKind.Binary => $"({GenerateExpression(node.Left, null)} {node.Value} {GenerateExpression(node.Right, null)})",
                 ExpressionKind.MemberAccess => $"{GenerateExpression(node.Left, null)}.{node.Value}",
                 ExpressionKind.Index => $"{GenerateExpression(node.Left, null)}[{GenerateExpression(node.Right, null)}]",

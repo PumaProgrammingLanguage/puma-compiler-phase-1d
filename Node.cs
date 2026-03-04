@@ -55,6 +55,8 @@ namespace Puma
         Identifier,
         Literal,
         Unary,
+        Cast,
+        Conditional,
         Binary,
         MemberAccess,
         Index,
@@ -161,6 +163,8 @@ namespace Puma
         // For HasTraitStatement nodes
         public string? HasTraitCondition { get; set; }
         public ExpressionNode? HasTraitExpression { get; set; }
+        public string? HasTraitTypeName { get; set; }
+        public string? HasTraitVariableName { get; set; }
 
         // For FunctionDeclaration nodes
         public string? FunctionDeclarationName { get; set; }
@@ -362,12 +366,14 @@ namespace Puma
             };
         }
 
-        public static Node CreateHasTraitStatement(string condition)
+        public static Node CreateHasTraitStatement(string condition, string? traitTypeName = null, string? traitVariableName = null)
         {
             return new Node
             {
                 Kind = NodeKind.HasTraitStatement,
-                HasTraitCondition = condition
+                HasTraitCondition = condition,
+                HasTraitTypeName = traitTypeName,
+                HasTraitVariableName = traitVariableName
             };
         }
 

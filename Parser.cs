@@ -1263,7 +1263,13 @@ namespace Puma
             }
 
             var parser = new ExpressionParser(tokens);
-            return parser.ParseExpression();
+            var expression = parser.ParseExpression();
+            if (parser.HasRemainingTokens())
+            {
+                throw new InvalidOperationException("Unable to parse full expression.");
+            }
+
+            return expression;
         }
 
         private sealed class ExpressionParser
@@ -1276,7 +1282,51 @@ namespace Puma
                 _tokens = tokens;
             }
 
-            public ExpressionNode? ParseExpression() => ParseOr();
+            public ExpressionNode? ParseExpression() => ParseMultiExpression();
+
+            private ExpressionNode? ParseMultiExpression()
+            {
+                var left = ParseConditional();
+                while (MatchPunctuation(","))
+                {
+                    var right = ParseConditional();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = ",", Left = left, Right = right };
+                }
+
+                return left;
+            }
+
+            private ExpressionNode? ParseConditional()
+            {
+                var whenTrue = ParseOr();
+                if (!MatchKeyword("if"))
+                {
+                    return whenTrue;
+                }
+
+                var condition = ParseOr();
+                if (!MatchKeyword("else"))
+                {
+                    throw new InvalidOperationException("Conditional expressions require an 'else' branch.");
+                }
+
+                var whenFalse = ParseConditional();
+                var conditional = new ExpressionNode
+                {
+                    Kind = ExpressionKind.Conditional,
+                    Left = condition,
+                    Right = whenTrue
+                };
+
+                if (whenFalse != null)
+                {
+                    conditional.Arguments.Add(whenFalse);
+                }
+
+                return conditional;
+            }
+
+            public bool HasRemainingTokens() => _index < _tokens.Count;
 
             private ExpressionNode? ParseOr()
             {
@@ -1305,8 +1355,15 @@ namespace Puma
             private ExpressionNode? ParseEquality()
             {
                 var left = ParseComparison();
+                var matched = false;
                 while (MatchOperator("==") || MatchOperator("!="))
                 {
+                    if (matched)
+                    {
+                        throw new InvalidOperationException("Only one consecutive equality expression is allowed.");
+                    }
+
+                    matched = true;
                     var op = _tokens[_index - 1].TokenText;
                     var right = ParseComparison();
                     left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
@@ -1316,8 +1373,63 @@ namespace Puma
 
             private ExpressionNode? ParseComparison()
             {
-                var left = ParseTerm();
+                var left = ParseBitwiseOr();
+                var matched = false;
                 while (MatchOperator("<") || MatchOperator(">") || MatchOperator("<=") || MatchOperator(">="))
+                {
+                    if (matched)
+                    {
+                        throw new InvalidOperationException("Only one consecutive relational expression is allowed.");
+                    }
+
+                    matched = true;
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseBitwiseOr();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseBitwiseOr()
+            {
+                var left = ParseBitwiseXor();
+                while (MatchOperator("|"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseBitwiseXor();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseBitwiseXor()
+            {
+                var left = ParseBitwiseAnd();
+                while (MatchOperator("^"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseBitwiseAnd();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseBitwiseAnd()
+            {
+                var left = ParseShift();
+                while (MatchOperator("&"))
+                {
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseShift();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+                return left;
+            }
+
+            private ExpressionNode? ParseShift()
+            {
+                var left = ParseTerm();
+                while (MatchOperator("<<") || MatchOperator(">>"))
                 {
                     var op = _tokens[_index - 1].TokenText;
                     var right = ParseTerm();
@@ -1340,22 +1452,57 @@ namespace Puma
 
             private ExpressionNode? ParseFactor()
             {
-                var left = ParseUnary();
+                var left = ParsePairRange();
                 while (MatchOperator("*") || MatchOperator("/") || MatchOperator("%"))
                 {
                     var op = _tokens[_index - 1].TokenText;
-                    var right = ParseUnary();
+                    var right = ParsePairRange();
                     left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
                 }
                 return left;
             }
 
+            private ExpressionNode? ParsePairRange()
+            {
+                var left = ParseUnary();
+                var seenPairOrRange = false;
+                while (MatchPunctuation(":") || MatchOperator(".."))
+                {
+                    if (seenPairOrRange)
+                    {
+                        throw new InvalidOperationException("Only one consecutive pair or range expression is allowed.");
+                    }
+
+                    seenPairOrRange = true;
+                    var op = _tokens[_index - 1].TokenText;
+                    var right = ParseUnary();
+                    left = new ExpressionNode { Kind = ExpressionKind.Binary, Value = op, Left = left, Right = right };
+                }
+
+                return left;
+            }
+
             private ExpressionNode? ParseUnary()
             {
-                if (MatchOperator("-") || MatchOperator("+") || MatchKeyword("not"))
+                var castStart = _index;
+                if (MatchDelimiter("(") && MatchIdentifier(out var castType) && MatchDelimiter(")"))
+                {
+                    var castOperand = ParseUnary();
+                    if (castOperand != null)
+                    {
+                        return new ExpressionNode { Kind = ExpressionKind.Cast, Value = castType, Left = castOperand };
+                    }
+                }
+                _index = castStart;
+
+                if (MatchOperator("++") || MatchOperator("--") || MatchOperator("-") || MatchOperator("+") || MatchOperator("!") || MatchOperator("~") || MatchKeyword("not"))
                 {
                     var op = _tokens[_index - 1].TokenText;
                     var operand = ParseUnary();
+                    if (operand?.Kind == ExpressionKind.Unary)
+                    {
+                        throw new InvalidOperationException("Unary operators cannot be repeated consecutively.");
+                    }
                     return new ExpressionNode { Kind = ExpressionKind.Unary, Value = op, Left = operand };
                 }
 
@@ -1391,7 +1538,7 @@ namespace Puma
                         {
                             do
                             {
-                                var arg = ParseExpression();
+                                var arg = ParseConditional();
                                 if (arg != null)
                                 {
                                     call.Arguments.Add(arg);
@@ -1485,7 +1632,7 @@ namespace Puma
 
             private bool MatchIdentifier(out string value)
             {
-                if (_index < _tokens.Count && _tokens[_index].Category is TokenCategory.Identifier or TokenCategory.Keyword)
+                if (_index < _tokens.Count && (_tokens[_index].Category is TokenCategory.Identifier or TokenCategory.Keyword))
                 {
                     value = _tokens[_index].TokenText;
                     _index++;
@@ -1633,6 +1780,11 @@ namespace Puma
                 return;
             }
 
+            if (TryParseIncrementDecrementStatement(tokens, target))
+            {
+                return;
+            }
+
             if (TryParseReturnStatement(tokens, target))
             {
                 return;
@@ -1683,6 +1835,34 @@ namespace Puma
             var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
             node.AssignmentLeftExpression = ParseExpression(leftTokens);
             node.AssignmentRightExpression = ParseExpression(rightTokens);
+            target.Add(node);
+            return true;
+        }
+
+        private bool TryParseIncrementDecrementStatement(List<LexerTokens> tokens, List<Node> target)
+        {
+            if (tokens.Count < 2)
+            {
+                return false;
+            }
+
+            var last = tokens[^1];
+            if (last.Category != TokenCategory.Operator || (last.TokenText != "++" && last.TokenText != "--"))
+            {
+                return false;
+            }
+
+            var leftTokens = tokens.Take(tokens.Count - 1).ToList();
+            var left = BuildQualifiedName(leftTokens);
+            if (string.IsNullOrWhiteSpace(left))
+            {
+                return false;
+            }
+
+            var assignmentOperator = last.TokenText == "++" ? "+=" : "-=";
+            var node = Node.CreateAssignmentStatement(left, "1", assignmentOperator);
+            node.AssignmentLeftExpression = ParseExpression(leftTokens);
+            node.AssignmentRightExpression = new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" };
             target.Add(node);
             return true;
         }
@@ -1833,6 +2013,13 @@ namespace Puma
                 return false;
             }
 
+            if (tokens.Count >= 3
+                && tokens[1].Category is TokenCategory.Identifier or TokenCategory.Keyword
+                && tokens[2].Category is TokenCategory.Identifier or TokenCategory.Keyword)
+            {
+                return false;
+            }
+
             var conditionTokens = tokens.Skip(1).ToList();
             var condition = BuildQualifiedName(conditionTokens);
             if (string.IsNullOrWhiteSpace(condition))
@@ -1858,20 +2045,34 @@ namespace Puma
                 return false;
             }
 
-            if (tokens[1].Category != TokenCategory.Keyword || tokens[1].TokenText != "trait")
+            var offset = 1;
+            if (tokens[1].Category == TokenCategory.Keyword && tokens[1].TokenText == "trait")
+            {
+                offset = 2;
+                if (tokens.Count < 4)
+                {
+                    return false;
+                }
+            }
+
+            if (tokens.Count <= offset + 1)
             {
                 return false;
             }
 
-            var conditionTokens = tokens.Skip(2).ToList();
+            var traitTypeTokens = new List<LexerTokens> { tokens[offset] };
+            var variableTokens = tokens.Skip(offset + 1).ToList();
+            var traitType = BuildQualifiedName(traitTypeTokens);
+            var traitVariable = BuildQualifiedName(variableTokens);
+            var conditionTokens = tokens.Skip(offset).ToList();
             var condition = BuildQualifiedName(conditionTokens);
-            if (string.IsNullOrWhiteSpace(condition))
+            if (string.IsNullOrWhiteSpace(condition) || string.IsNullOrWhiteSpace(traitType) || string.IsNullOrWhiteSpace(traitVariable))
             {
                 throw new InvalidOperationException("Has trait statements require a condition.");
             }
 
-            var node = Node.CreateHasTraitStatement(condition);
-            node.HasTraitExpression = ParseExpression(conditionTokens);
+            var node = Node.CreateHasTraitStatement(condition, traitType, traitVariable);
+            node.HasTraitExpression = ParseExpression(variableTokens);
             target.Add(node);
             return true;
         }

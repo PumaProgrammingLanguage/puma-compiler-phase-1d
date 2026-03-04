@@ -44,6 +44,50 @@ int32_t Add(int32_t a, int32_t b)
         }
 
         [TestMethod]
+        public void Generate_EmitsHasTraitStatementAsTypeGuard()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    x = refValue
+
+start
+    has TraitName x
+        z = (TraitName)x
+        z.f()
+        z.y++
+";
+
+            var expected =
+@"int64_t x = refValue;
+
+int main()
+{
+    if (x != null && typeof(x) == TraitNameType)
+    {
+        z = (TraitName)x;
+        z.f();
+        z.y += 1;
+    }
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
         public void Generate_EmitsHasStatementAsNullCheckWithBody()
         {
             const string src =
