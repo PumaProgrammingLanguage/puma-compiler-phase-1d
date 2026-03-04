@@ -1138,6 +1138,13 @@ start
             Assert.AreEqual(1, calls.Count);
             Assert.AreEqual("Console.WriteLine", calls[0].FunctionName);
             Assert.AreEqual("\"Hi\"", calls[0].FunctionArguments);
+            var callExpression = calls[0].FunctionCallExpression;
+            Assert.IsNotNull(callExpression);
+            var nonNullCallExpression = callExpression!;
+            Assert.AreEqual(ExpressionKind.Call, nonNullCallExpression.Kind);
+            Assert.AreEqual(1, nonNullCallExpression.Arguments.Count);
+            Assert.AreEqual(ExpressionKind.Literal, nonNullCallExpression.Arguments[0].Kind);
+            Assert.AreEqual("\"Hi\"", nonNullCallExpression.Arguments[0].Value);
         }
 
         [TestMethod]

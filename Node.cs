@@ -283,13 +283,14 @@ namespace Puma
             };
         }
 
-        public static Node CreateFunctionCall(string name, string arguments)
+        public static Node CreateFunctionCall(string name, string arguments, ExpressionNode? expression = null)
         {
             return new Node
             {
                 Kind = NodeKind.FunctionCall,
                 FunctionName = name,
-                FunctionArguments = arguments
+                FunctionArguments = arguments,
+                FunctionCallExpression = expression
             };
         }
 
