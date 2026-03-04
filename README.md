@@ -3,8 +3,7 @@
 The goal of this project is to write an LLVM compiler front-end for the Puma programming language. Puma is a new programming language that is safe, organized and maintainable. It is also readable, reliable and efficient.
 
 ## Documents
-The specifications and other documents are found in the doc folder.  
-
+The specifications and other documents are found in the `doc` folder.
 
 ## Programming Language Development
 In 2023, the foundation was laid for an exciting new programming language with the creation of the Puma programming language — a language designed with safety, organization, and maintainability at its core without compromising on performance. However, Puma isn’t just another new language. It’s a practical tool for writing cleaner code and fostering greater consistency across software development teams.
