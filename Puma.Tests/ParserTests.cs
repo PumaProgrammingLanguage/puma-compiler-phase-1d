@@ -822,15 +822,16 @@ start
             var ast = parser.Parse(lexer.Tokenize(src));
 
             var callNode = ast.Single(n => n.Kind == NodeKind.FunctionCall);
+            Assert.IsNotNull(callNode.FunctionCallExpression);
             Assert.IsNotNull(callNode.StatementExpression);
-            Assert.AreEqual(ExpressionKind.Call, callNode.StatementExpression!.Kind);
-            Assert.AreEqual(2, callNode.StatementExpression.Arguments.Count);
+            Assert.AreEqual(ExpressionKind.Call, callNode.FunctionCallExpression!.Kind);
+            Assert.AreEqual(2, callNode.FunctionCallExpression.Arguments.Count);
 
-            var arg0 = callNode.StatementExpression.Arguments[0];
+            var arg0 = callNode.FunctionCallExpression.Arguments[0];
             Assert.AreEqual(ExpressionKind.Binary, arg0.Kind);
             Assert.AreEqual(",", arg0.Value);
 
-            var arg1 = callNode.StatementExpression.Arguments[1];
+            var arg1 = callNode.FunctionCallExpression.Arguments[1];
             Assert.AreEqual(ExpressionKind.Conditional, arg1.Kind);
             Assert.AreEqual(3L, EvaluateExpression(arg1));
         }

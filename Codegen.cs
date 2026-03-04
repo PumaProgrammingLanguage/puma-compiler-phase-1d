@@ -299,8 +299,9 @@ namespace Puma
                     }
                     case NodeKind.FunctionCall:
                     {
-                        var callExpression = GenerateExpression(node.StatementExpression, null);
-                        if (!string.IsNullOrWhiteSpace(callExpression) && node.StatementExpression?.Kind == ExpressionKind.Call)
+                        var callExpressionNode = node.FunctionCallExpression ?? node.StatementExpression;
+                        var callExpression = GenerateExpression(callExpressionNode, null);
+                        if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
                         {
                             sb.AppendLine($"{indent}{callExpression};");
                         }

@@ -2102,7 +2102,9 @@ namespace Puma
             }
 
             var callNode = Node.CreateFunctionCall(name, args);
-            callNode.StatementExpression = ParseExpression(tokens);
+            var callExpression = ParseExpression(tokens);
+            callNode.FunctionCallExpression = callExpression;
+            callNode.StatementExpression = callExpression;
             target.Add(callNode);
             return true;
         }

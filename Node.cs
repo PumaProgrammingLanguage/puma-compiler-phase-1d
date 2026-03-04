@@ -129,6 +129,7 @@ namespace Puma
         // For FunctionCall nodes
         public string? FunctionName { get; set; }
         public string? FunctionArguments { get; set; }
+        public ExpressionNode? FunctionCallExpression { get; set; }
 
         // For IfStatement nodes
         public string? IfCondition { get; set; }
