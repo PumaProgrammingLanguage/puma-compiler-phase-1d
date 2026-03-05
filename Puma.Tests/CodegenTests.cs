@@ -21,6 +21,17 @@ functions
         private static string Normalize(string s) =>
             s.Replace("\r\n", "\n").Replace("\r", "\n");
 
+        private static string GenerateCode(string src)
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            return codegen.Generate(ast);
+        }
+
         [TestMethod]
         public void Generate_EmitsExpectedCOutput()
         {
@@ -76,13 +87,7 @@ int main()
 }
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -116,13 +121,7 @@ int main()
 }
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -155,13 +154,7 @@ public:
 };
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -194,13 +187,7 @@ int main()
 }
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -233,13 +220,7 @@ public:
 };
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -275,13 +256,7 @@ typedef struct UserRecord {
 } UserRecord;
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -320,13 +295,7 @@ int main()
 }
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -372,13 +341,7 @@ int main()
 }
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
@@ -399,13 +362,7 @@ public:
 };
 ";
 
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var ast = parser.Parse(tokens);
-            var c = codegen.Generate(ast);
+            var c = GenerateCode(src);
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
