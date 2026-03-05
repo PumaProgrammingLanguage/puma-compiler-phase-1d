@@ -772,5 +772,228 @@ start
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
         }
+
+        [TestMethod]
+        public void Generate_EmitsMatchWhenAsSwitchCases()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    value = 0
+    Count = 0
+
+start
+    match value
+        when 1
+            Count = 1
+        when 2
+            Count = 2
+";
+
+            var expected =
+@"int64_t value = 0;
+int64_t Count = 0;
+
+int main()
+{
+    switch (value)
+    {
+        case 1:
+            Count = 1;
+            break;
+        case 2:
+            Count = 2;
+            break;
+    }
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsForAndRepeatStatements()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    items = 0
+    Count = 0
+
+start
+    for entry in items
+        Count = 1
+    repeat Count
+        Count -= 1
+";
+
+            var expected =
+@"int64_t items = 0;
+int64_t Count = 0;
+
+int main()
+{
+    for (auto entry : items)
+    {
+        Count = 1;
+    }
+    do
+    {
+        Count -= 1;
+    } while (Count);
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsInitializeSectionFunctionWithTypedParameters()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 0
+
+initialize(value int32)
+    Count += value
+";
+
+            var expected =
+@"int64_t Count = 0;
+
+void initialize(int32_t value)
+{
+    Count += value;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsBreakContinueYieldErrorCatchStatements()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    Count = 1
+
+start
+    while Count
+        continue
+        break
+    yield Count
+    error Count
+    catch Count
+";
+
+            var expected =
+@"int64_t Count = 1;
+
+int main()
+{
+    while (Count)
+    {
+        continue;
+        break;
+    }
+    /* yield Count */
+    /* error Count */
+    /* catch Count */
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
+
+        [TestMethod]
+        public void Generate_EmitsForAllStatements()
+        {
+            const string src =
+@"use
+
+module
+
+properties
+    items = 0
+    Count = 0
+
+start
+    forall entry in items
+        Count += 1
+";
+
+            var expected =
+@"int64_t items = 0;
+int64_t Count = 0;
+
+int main()
+{
+    for (auto entry : items)
+    {
+        Count += 1;
+    }
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var c = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(c).Trim());
+        }
     }
 }

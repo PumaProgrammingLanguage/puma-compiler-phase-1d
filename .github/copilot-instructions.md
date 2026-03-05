@@ -11,3 +11,6 @@
 - Break ongoing work into small subtasks and show progress incrementally each session.
 - Prioritize parser/lexer work first; do codegen unit tests last.
 - Do as many small tasks as possible each session, then report remaining tasks.
+
+## Specification Reference
+- The specification text file is located at `C:\Users\dabur\source\repos\Puma Programming Language Specification.txt`.
