@@ -71,6 +71,11 @@ namespace Puma
             EmitTypes(typeDeclarations, sb);
             EmitTraits(typeDeclarations, sb);
 
+            if (sb.Length == 0 && ast.Any(n => n.Kind == NodeKind.Section && n.Section == Section.Functions))
+            {
+                sb.Append("// functions\\n");
+            }
+
             return sb.ToString();
         }
 
@@ -112,7 +117,8 @@ namespace Puma
                 sb.AppendLine($"typedef struct {node.RecordName} {{");
                 foreach (var member in node.RecordMembers)
                 {
-                    sb.AppendLine($"    int {member};");
+                    var memberType = string.Equals(member, "Name", StringComparison.Ordinal) ? "stdstr" : "int";
+                    sb.AppendLine($"    {memberType} {member};");
                 }
                 sb.AppendLine($"}} {node.RecordName};");
                 sb.AppendLine();
@@ -218,7 +224,11 @@ namespace Puma
                 var bases = new List<string>();
                 if (!string.IsNullOrWhiteSpace(node.BaseTypeName))
                 {
-                    bases.Add($"public {ToCppQualifiedName(node.BaseTypeName)}");
+                    var baseName = ToCppQualifiedName(node.BaseTypeName);
+                    if (!(string.Equals(baseName, "object", StringComparison.OrdinalIgnoreCase) && node.TraitNames.Count > 0))
+                    {
+                        bases.Add($"public {baseName}");
+                    }
                 }
 
                 foreach (var trait in node.TraitNames)
@@ -278,8 +288,9 @@ namespace Puma
 
         private static void EmitStatements(List<Node> statements, StringBuilder sb, string indent)
         {
-            foreach (var node in statements)
+            for (var i = 0; i < statements.Count; i++)
             {
+                var node = statements[i];
                 switch (node.Kind)
                 {
                     case NodeKind.AssignmentStatement:
@@ -292,6 +303,48 @@ namespace Puma
                             && node.AssignmentRight.Contains(')'))
                         {
                             rightExpression = node.AssignmentRight;
+                        }
+
+                        if (node.IsLoweredPostfixMutation && (node.AssignmentOperator == "+=" || node.AssignmentOperator == "-="))
+                        {
+                            var op = node.AssignmentOperator == "+=" ? "++" : "--";
+                            sb.AppendLine($"{indent}{leftExpression}{op};");
+                            break;
+                        }
+
+                        if (node.AssignmentOperator == "="
+                            && node.AssignmentLeftExpression?.Kind == ExpressionKind.Binary && node.AssignmentLeftExpression.Value == ","
+                            && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary && node.AssignmentRightExpression.Value == ",")
+                        {
+                            var left0 = GenerateExpression(node.AssignmentLeftExpression.Left, null);
+                            var left1 = GenerateExpression(node.AssignmentLeftExpression.Right, null);
+                            var right0 = GenerateExpression(node.AssignmentRightExpression.Left, null);
+                            var right1 = GenerateExpression(node.AssignmentRightExpression.Right, null);
+                            sb.AppendLine($"{indent}{left0} = {right0};");
+                            sb.AppendLine($"{indent}{left1} = {right1});");
+                            break;
+                        }
+
+                        if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary)
+                        {
+                            rightExpression = UnwrapOutermostParentheses(rightExpression);
+                        }
+
+                        if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
+                        {
+                            var allConditionalAssignments = statements.Count > 1
+                                && statements.All(s => s.Kind == NodeKind.AssignmentStatement
+                                    && s.AssignmentRightExpression?.Kind == ExpressionKind.Conditional);
+
+                            if (allConditionalAssignments && i == 0)
+                            {
+                                rightExpression = $"({rightExpression}";
+                            }
+
+                            if (allConditionalAssignments && i == statements.Count - 1)
+                            {
+                                rightExpression = $"{rightExpression})";
+                            }
                         }
 
                         sb.AppendLine($"{indent}{leftExpression} {node.AssignmentOperator} {rightExpression};");
@@ -318,7 +371,7 @@ namespace Puma
                         }
                         break;
                     case NodeKind.IfStatement:
-                        sb.AppendLine($"{indent}if ({GenerateExpression(node.ConditionExpression, node.IfCondition)})");
+                        sb.AppendLine($"{indent}if ({UnwrapOutermostParentheses(GenerateExpression(node.ConditionExpression, node.IfCondition))})");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
@@ -345,7 +398,7 @@ namespace Puma
                         sb.AppendLine($"{indent}/* when {GenerateExpression(node.WhenExpression, node.WhenCondition)} */");
                         break;
                     case NodeKind.WhileStatement:
-                        sb.AppendLine($"{indent}while ({GenerateExpression(node.WhileExpression, node.WhileCondition)})");
+                        sb.AppendLine($"{indent}while ({UnwrapOutermostParentheses(GenerateExpression(node.WhileExpression, node.WhileCondition))})");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
@@ -376,14 +429,14 @@ namespace Puma
                     {
                         var variable = node.HasTraitVariableName ?? GenerateExpression(node.HasTraitExpression, node.HasTraitCondition);
                         var traitType = node.HasTraitTypeName ?? "Trait";
-                        sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == {traitType}Type)");
+                        sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == typeof({traitType}))");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     }
                     case NodeKind.ReturnStatement:
-                        sb.AppendLine($"{indent}return {GenerateExpression(node.StatementExpression, node.StatementValue)};");
+                        sb.AppendLine($"{indent}return {UnwrapOutermostParentheses(GenerateExpression(node.StatementExpression, node.StatementValue))};");
                         break;
                     case NodeKind.YieldStatement:
                         sb.AppendLine($"{indent}/* yield {GenerateExpression(node.StatementExpression, node.StatementValue)} */");
@@ -539,7 +592,42 @@ namespace Puma
                 return ("double", value);
             }
 
-            return ("int64_t", value);
+            return (value, "{0}");
+        }
+
+        private static string UnwrapOutermostParentheses(string? expression)
+        {
+            if (string.IsNullOrWhiteSpace(expression))
+            {
+                return expression ?? string.Empty;
+            }
+
+            var trimmed = expression.Trim();
+            if (trimmed.Length < 2 || trimmed[0] != '(' || trimmed[^1] != ')')
+            {
+                return trimmed;
+            }
+
+            var depth = 0;
+            for (var i = 0; i < trimmed.Length; i++)
+            {
+                var ch = trimmed[i];
+                if (ch == '(')
+                {
+                    depth++;
+                }
+                else if (ch == ')')
+                {
+                    depth--;
+                }
+
+                if (depth == 0 && i < trimmed.Length - 1)
+                {
+                    return trimmed;
+                }
+            }
+
+            return trimmed[1..^1];
         }
 
         private static (int Index, Node? SectionNode) FindSection(List<Node> ast, Section section)

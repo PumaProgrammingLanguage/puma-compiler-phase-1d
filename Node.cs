@@ -121,6 +121,7 @@ namespace Puma
         public string? AssignmentOperator { get; set; }
         public ExpressionNode? AssignmentLeftExpression { get; set; }
         public ExpressionNode? AssignmentRightExpression { get; set; }
+        public bool IsLoweredPostfixMutation { get; set; }
 
         // For Section nodes
         public string? SectionParameters { get; set; }

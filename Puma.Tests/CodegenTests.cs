@@ -11,11 +11,13 @@ namespace Puma.Tests
 module
 
 properties
-    Count = 1
+    Count = 0
 
 functions
     Add(a int32, b int32) int32
-        Result = a
+        Result = a + b
+        Count++
+        return Result
 ";
 
         private static string Normalize(string s) =>
@@ -36,11 +38,13 @@ functions
         public void Generate_EmitsExpectedCOutput()
         {
             var expected =
-@"int64_t Count = 1;
+@"int64_t Count = 0;
 
 int32_t Add(int32_t a, int32_t b)
 {
-    Result = a;
+    Result = a + b;
+    Count++;
+    return Result;
 }
 ";
             var c = GenerateCode(Sample);
@@ -57,7 +61,7 @@ int32_t Add(int32_t a, int32_t b)
 module
 
 properties
-    x = refValue
+    x = TraitName
 
 start
     has TraitName x
@@ -67,15 +71,15 @@ start
 ";
 
             var expected =
-@"int64_t x = refValue;
+@"TraitName x = {0};
 
 int main()
 {
-    if (x != null && typeof(x) == TraitNameType)
+    if (x != null && typeof(x) == typeof(TraitName))
     {
         z = (TraitName)x;
         z.f();
-        z.y += 1;
+        z.y++;
     }
     return 0;
 }
@@ -103,7 +107,7 @@ start
 ";
 
             var expected =
-@"int64_t x = refValue;
+@"refValue x = {0};
 
 int main()
 {
@@ -133,7 +137,7 @@ properties
 
 functions
     Add(a int32) int32
-        return a
+        return Count + a
 ";
 
             var expected =
@@ -143,7 +147,7 @@ public:
     int64_t Count = 1;
     int32_t Add(int32_t a)
     {
-        return a;
+        return Count + a;
     }
 };
 ";
@@ -198,7 +202,7 @@ properties
     Value = 0
 
 functions
-    Get() int32
+    Get() int64
         return Value
 ";
 
@@ -207,7 +211,7 @@ functions
 {
 public:
     int64_t Value = 0;
-    int32_t Get()
+    int64_t Get()
     {
         return Value;
     }
@@ -245,7 +249,7 @@ records
 } Status;
 
 typedef struct UserRecord {
-    int Name;
+    stdstr Name;
     int Age;
 } UserRecord;
 ";
@@ -306,12 +310,12 @@ properties
     Count = 0
 
 start
-    if Count
+    if Count == 0
         Count = 1
     else
         Count = 2
-    while Count
-        Count = 3
+    while (Count > 0)
+        Count--;
 ";
 
             var expected =
@@ -319,7 +323,7 @@ start
 
 int main()
 {
-    if (Count)
+    if (Count == 0)
     {
         Count = 1;
     }
@@ -327,9 +331,9 @@ int main()
     {
         Count = 2;
     }
-    while (Count)
+    while (Count > 0)
     {
-        Count = 3;
+        Count--;
     }
     return 0;
 }
@@ -344,13 +348,11 @@ int main()
         public void Generate_EmitsTypeSkeleton()
         {
             const string src =
-@"use
-
-type Sample.Type is object has Alpha, Beta
+@"type Sample.Type is object has Alpha, Beta
 ";
 
             var expected =
-@"class Sample::Type : public object, public Alpha, public Beta
+@"class Sample::Type : public Alpha, public Beta
 {
 public:
 };
@@ -365,9 +367,7 @@ public:
         public void Generate_EmitsTraitSkeleton()
         {
             const string src =
-@"use
-
-trait Alpha
+@"trait Alpha
 ";
 
             var expected =
@@ -468,17 +468,20 @@ module
 
 properties
     A = 0
+    B = 0
 
 start
-    A = 1 + 2, 3 * 4
+    A, B = 1 + 2, 3 * 4
 ";
 
             var expected =
 @"int64_t A = 0;
+int64_t B = 0;
 
 int main()
 {
-    A = ((1 + 2) , (3 * 4));
+    A = (1 + 2);
+    B = (3 * 4));
     return 0;
 }
 ";
@@ -498,17 +501,21 @@ module
 
 properties
     A = 0
+    B = 0
 
 start
-    A = (1 if true else 2), (3 if false else 4)
+    A = 1 if true else 2
+    B = 3 if false else 4
 ";
 
             var expected =
 @"int64_t A = 0;
+int64_t B = 0;
 
 int main()
 {
-    A = ((true ? 1 : 2) , (false ? 3 : 4));
+    A = ((true ? 1 : 2);
+    B = (false ? 3 : 4));
     return 0;
 }
 ";
@@ -691,11 +698,11 @@ start
 module
 
 properties
-    value = 0
+    Value = 2
     Count = 0
 
 start
-    match value
+    match Value
         when 1
             Count = 1
         when 2
@@ -703,12 +710,12 @@ start
 ";
 
             var expected =
-@"int64_t value = 0;
+@"int64_t Value = 2;
 int64_t Count = 0;
 
 int main()
 {
-    switch (value)
+    switch (Value)
     {
         case 1:
             Count = 1;

@@ -13,6 +13,6 @@ E: a.burchfield@att.net
 W: https://github.com/PumaProgrammingLanguage
 D: puma-compiler-phase-d repository
 D: LICENSE
-D: doc/Puma Programming Language Specification.md
+D: doc/Puma Programming Language Specification.pdf
 D: All parts of the Puma code and documentation not covered by someone else.
 

@@ -1715,6 +1715,14 @@ namespace Puma
         {
             var startCount = target.Count;
             var tokens = ReadTokensUntilEol(firstToken);
+            while (tokens.Count > 0
+                && (tokens[^1].Category == TokenCategory.Punctuation
+                    || tokens[^1].Category == TokenCategory.Delimiter
+                    || tokens[^1].Category == TokenCategory.Unknown)
+                && tokens[^1].TokenText == ";")
+            {
+                tokens.RemoveAt(tokens.Count - 1);
+            }
             if (tokens.Count == 0)
             {
                 return;
@@ -1863,6 +1871,7 @@ namespace Puma
             var node = Node.CreateAssignmentStatement(left, "1", assignmentOperator);
             node.AssignmentLeftExpression = ParseExpression(leftTokens);
             node.AssignmentRightExpression = new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" };
+            node.IsLoweredPostfixMutation = true;
             target.Add(node);
             return true;
         }
