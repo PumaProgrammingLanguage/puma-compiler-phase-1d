@@ -2,7 +2,7 @@
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //   
-// Copyright © 2024-2025 by Darryl Anthony Burchfield
+// Copyright © 2024-2026 by Darryl Anthony Burchfield
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -52,6 +52,30 @@ namespace Puma
                     && (string.Equals(n.AssignmentRight, "str", StringComparison.OrdinalIgnoreCase)
                         || n.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))));
             if (needsString)
+            {
+                includes.Add("<string>");
+            }
+
+            var needsStdBoolForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
+                .SelectMany(n => n.RecordMembers)
+                .Any(m =>
+                {
+                    var value = GetRecordMemberValue(m);
+                    return IsBooleanPropertyValue(value);
+                });
+            if (needsStdBoolForRecords)
+            {
+                includes.Add("<stdbool.h>");
+            }
+
+            var needsStringForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
+                .SelectMany(n => n.RecordMembers)
+                .Any(m =>
+                {
+                    var value = GetRecordMemberValue(m);
+                    return IsStringPropertyValue(value);
+                });
+            if (needsStringForRecords)
             {
                 includes.Add("<string>");
             }
@@ -150,6 +174,25 @@ namespace Puma
         {
             foreach (var node in ast.Where(n => n.Kind == NodeKind.RecordDeclaration))
             {
+                var hasAssignedMembers = node.RecordMembers.Any(m => m.Contains('=', StringComparison.Ordinal));
+                if (hasAssignedMembers)
+                {
+                    sb.AppendLine("// records");
+                    sb.AppendLine($"struct {node.RecordName}");
+                    sb.AppendLine("{");
+                    foreach (var member in node.RecordMembers)
+                    {
+                        var memberName = member.Contains('=', StringComparison.Ordinal)
+                            ? member[..member.IndexOf('=')]
+                            : member;
+                        node.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
+                        sb.AppendLine($"    {FormatRecordMemberDeclaration(member, declaredType)}");
+                    }
+                    sb.AppendLine("};");
+                    sb.AppendLine();
+                    continue;
+                }
+
                 sb.AppendLine($"typedef struct {node.RecordName} {{");
                 foreach (var member in node.RecordMembers)
                 {
@@ -159,6 +202,90 @@ namespace Puma
                 sb.AppendLine($"}} {node.RecordName};");
                 sb.AppendLine();
             }
+        }
+
+        private static string? GetRecordMemberValue(string member)
+        {
+            var equalsIndex = member.IndexOf('=');
+            if (equalsIndex < 0 || equalsIndex + 1 >= member.Length)
+            {
+                return null;
+            }
+
+            return member[(equalsIndex + 1)..];
+        }
+
+        private static string FormatRecordMemberDeclaration(string member, string? declaredType)
+        {
+            var equalsIndex = member.IndexOf('=');
+            if (equalsIndex <= 0)
+            {
+                return $"int {member};";
+            }
+
+            var name = member[..equalsIndex];
+            var value = member[(equalsIndex + 1)..];
+
+            if (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "false", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"bool {name} = {value.ToLowerInvariant()};";
+            }
+
+            if (string.Equals(value, "bool", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"bool {name} = false;";
+            }
+
+            if (string.Equals(value, "str", StringComparison.OrdinalIgnoreCase) || value.StartsWith("\"", StringComparison.Ordinal))
+            {
+                var literal = string.Equals(value, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : value;
+                return $"str:string {name} = {literal}s;";
+            }
+
+            var index = 0;
+            var dotSeen = false;
+            while (index < value.Length)
+            {
+                var ch = value[index];
+                if (char.IsDigit(ch))
+                {
+                    index++;
+                    continue;
+                }
+
+                if (ch == '.' && !dotSeen)
+                {
+                    dotSeen = true;
+                    index++;
+                    continue;
+                }
+
+                break;
+            }
+
+            if (index == 0)
+            {
+                return $"int {name} = {value};";
+            }
+
+            var numeric = value[..index];
+            var suffix = value[index..];
+            var effectiveType = !string.IsNullOrWhiteSpace(declaredType) ? declaredType : suffix;
+            var typeName = effectiveType switch
+            {
+                "" or "int" or "int64" => "int64_t",
+                "int32" => "int32_t",
+                "int16" => "int16_t",
+                "int8" => "int8_t",
+                "uint" or "uint64" => "uint64_t",
+                "uint32" => "uint32_t",
+                "uint16" => "uint16_t",
+                "uint8" => "uint8_t",
+                _ => "int64_t"
+            };
+
+            return $"{typeName} {name} = {numeric};";
         }
 
         private static void EmitGlobals(List<Node> ast, StringBuilder sb, HashSet<Node> typeProperties)
@@ -171,7 +298,7 @@ namespace Puma
                 sb.AppendLine("// properties");
                 foreach (var node in globalProperties)
                 {
-                    var initializer = FormatAutoPropertyInitializer(node.PropertyValue);
+                    var initializer = FormatAutoPropertyInitializer(node.PropertyValue, node.PropertyType);
                     sb.AppendLine($"auto {node.PropertyName} = {initializer};");
                 }
 
@@ -215,7 +342,7 @@ namespace Puma
                 || value.StartsWith("\"", StringComparison.Ordinal);
         }
 
-        private static string FormatAutoPropertyInitializer(string? value)
+        private static string FormatAutoPropertyInitializer(string? value, string? declaredType)
         {
             var text = value?.Trim() ?? string.Empty;
             if (string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
@@ -263,7 +390,8 @@ namespace Puma
 
             var numeric = text[..index];
             var suffix = text[index..];
-            var castType = suffix switch
+            var effectiveType = !string.IsNullOrWhiteSpace(declaredType) ? declaredType : suffix;
+            var castType = effectiveType switch
             {
                 "" => "int64_t",
                 "int" or "int64" => "int64_t",
@@ -461,76 +589,76 @@ namespace Puma
                 switch (node.Kind)
                 {
                     case NodeKind.AssignmentStatement:
-                    {
-                        var leftExpression = GenerateExpression(node.AssignmentLeftExpression, node.AssignmentLeft);
-                        var rightExpression = GenerateExpression(node.AssignmentRightExpression, node.AssignmentRight);
-                        if (node.AssignmentRightExpression == null
-                            && !string.IsNullOrWhiteSpace(node.AssignmentRight)
-                            && node.AssignmentRight.Contains('(')
-                            && node.AssignmentRight.Contains(')'))
                         {
-                            rightExpression = node.AssignmentRight;
-                        }
-
-                        if (node.IsLoweredPostfixMutation && (node.AssignmentOperator == "+=" || node.AssignmentOperator == "-="))
-                        {
-                            var op = node.AssignmentOperator == "+=" ? "++" : "--";
-                            sb.AppendLine($"{indent}{leftExpression}{op};");
-                            break;
-                        }
-
-                        if (node.AssignmentOperator == "="
-                            && node.AssignmentLeftExpression?.Kind == ExpressionKind.Binary && node.AssignmentLeftExpression.Value == ","
-                            && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary && node.AssignmentRightExpression.Value == ",")
-                        {
-                            var left0 = GenerateExpression(node.AssignmentLeftExpression.Left, null);
-                            var left1 = GenerateExpression(node.AssignmentLeftExpression.Right, null);
-                            var right0 = GenerateExpression(node.AssignmentRightExpression.Left, null);
-                            var right1 = GenerateExpression(node.AssignmentRightExpression.Right, null);
-                            sb.AppendLine($"{indent}{left0} = {right0};");
-                            sb.AppendLine($"{indent}{left1} = {right1});");
-                            break;
-                        }
-
-                        if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary)
-                        {
-                            rightExpression = UnwrapOutermostParentheses(rightExpression);
-                        }
-
-                        if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
-                        {
-                            var allConditionalAssignments = statements.Count > 1
-                                && statements.All(s => s.Kind == NodeKind.AssignmentStatement
-                                    && s.AssignmentRightExpression?.Kind == ExpressionKind.Conditional);
-
-                            if (allConditionalAssignments && i == 0)
+                            var leftExpression = GenerateExpression(node.AssignmentLeftExpression, node.AssignmentLeft);
+                            var rightExpression = GenerateExpression(node.AssignmentRightExpression, node.AssignmentRight);
+                            if (node.AssignmentRightExpression == null
+                                && !string.IsNullOrWhiteSpace(node.AssignmentRight)
+                                && node.AssignmentRight.Contains('(')
+                                && node.AssignmentRight.Contains(')'))
                             {
-                                rightExpression = $"({rightExpression}";
+                                rightExpression = node.AssignmentRight;
                             }
 
-                            if (allConditionalAssignments && i == statements.Count - 1)
+                            if (node.IsLoweredPostfixMutation && (node.AssignmentOperator == "+=" || node.AssignmentOperator == "-="))
                             {
-                                rightExpression = $"{rightExpression})";
+                                var op = node.AssignmentOperator == "+=" ? "++" : "--";
+                                sb.AppendLine($"{indent}{leftExpression}{op};");
+                                break;
                             }
-                        }
 
-                        sb.AppendLine($"{indent}{leftExpression} {node.AssignmentOperator} {rightExpression};");
-                        break;
-                    }
+                            if (node.AssignmentOperator == "="
+                                && node.AssignmentLeftExpression?.Kind == ExpressionKind.Binary && node.AssignmentLeftExpression.Value == ","
+                                && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary && node.AssignmentRightExpression.Value == ",")
+                            {
+                                var left0 = GenerateExpression(node.AssignmentLeftExpression.Left, null);
+                                var left1 = GenerateExpression(node.AssignmentLeftExpression.Right, null);
+                                var right0 = GenerateExpression(node.AssignmentRightExpression.Left, null);
+                                var right1 = GenerateExpression(node.AssignmentRightExpression.Right, null);
+                                sb.AppendLine($"{indent}{left0} = {right0};");
+                                sb.AppendLine($"{indent}{left1} = {right1});");
+                                break;
+                            }
+
+                            if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary)
+                            {
+                                rightExpression = UnwrapOutermostParentheses(rightExpression);
+                            }
+
+                            if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
+                            {
+                                var allConditionalAssignments = statements.Count > 1
+                                    && statements.All(s => s.Kind == NodeKind.AssignmentStatement
+                                        && s.AssignmentRightExpression?.Kind == ExpressionKind.Conditional);
+
+                                if (allConditionalAssignments && i == 0)
+                                {
+                                    rightExpression = $"({rightExpression}";
+                                }
+
+                                if (allConditionalAssignments && i == statements.Count - 1)
+                                {
+                                    rightExpression = $"{rightExpression})";
+                                }
+                            }
+
+                            sb.AppendLine($"{indent}{leftExpression} {node.AssignmentOperator} {rightExpression};");
+                            break;
+                        }
                     case NodeKind.FunctionCall:
-                    {
-                        var callExpressionNode = node.FunctionCallExpression ?? node.StatementExpression;
-                        var callExpression = GenerateExpression(callExpressionNode, null);
-                        if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
                         {
-                            sb.AppendLine($"{indent}{callExpression};");
+                            var callExpressionNode = node.FunctionCallExpression ?? node.StatementExpression;
+                            var callExpression = GenerateExpression(callExpressionNode, null);
+                            if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
+                            {
+                                sb.AppendLine($"{indent}{callExpression};");
+                            }
+                            else
+                            {
+                                sb.AppendLine($"{indent}{node.FunctionName}({node.FunctionArguments});");
+                            }
+                            break;
                         }
-                        else
-                        {
-                            sb.AppendLine($"{indent}{node.FunctionName}({node.FunctionArguments});");
-                        }
-                        break;
-                    }
                     case NodeKind.WriteLine:
                         if (!string.IsNullOrWhiteSpace(node.StringValue))
                         {
@@ -593,15 +721,15 @@ namespace Puma
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.HasTraitStatement:
-                    {
-                        var variable = node.HasTraitVariableName ?? GenerateExpression(node.HasTraitExpression, node.HasTraitCondition);
-                        var traitType = node.HasTraitTypeName ?? "Trait";
-                        sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == typeof({traitType}))");
-                        sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementBody, sb, indent + "    ");
-                        sb.AppendLine($"{indent}}}");
-                        break;
-                    }
+                        {
+                            var variable = node.HasTraitVariableName ?? GenerateExpression(node.HasTraitExpression, node.HasTraitCondition);
+                            var traitType = node.HasTraitTypeName ?? "Trait";
+                            sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == typeof({traitType}))");
+                            sb.AppendLine($"{indent}{{");
+                            EmitStatements(node.StatementBody, sb, indent + "    ");
+                            sb.AppendLine($"{indent}}}");
+                            break;
+                        }
                     case NodeKind.ReturnStatement:
                         sb.AppendLine($"{indent}return {UnwrapOutermostParentheses(GenerateExpression(node.StatementExpression, node.StatementValue))};");
                         break;

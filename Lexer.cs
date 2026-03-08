@@ -2,7 +2,7 @@
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //
-// Copyright © 2024-2025 by Darryl Anthony Burchfield
+// Copyright © 2024-2026 by Darryl Anthony Burchfield
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.

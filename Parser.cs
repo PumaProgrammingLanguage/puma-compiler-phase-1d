@@ -2,7 +2,7 @@
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //
-// Copyright © 2024-2025 by Darryl Anthony Burchfield
+// Copyright © 2024-2026 by Darryl Anthony Burchfield
 //
 //   Licensed under the Apache License, Version 2.0 (the "License");
 //   you may not use this file except in compliance with the License.
@@ -122,6 +122,7 @@ namespace Puma
         private string? _currentRecordName;
         private int? _currentRecordPackSize;
         private List<string> _currentRecordMembers = new();
+        private Dictionary<string, string> _currentRecordMemberTypes = new(StringComparer.Ordinal);
         private int? _propertiesSectionIndent;
         private FileDeclarationKind _currentFileKind;
         private Node? _currentSectionNode;
@@ -147,6 +148,13 @@ namespace Puma
         private static readonly HashSet<string> ParameterModifiers = new(StringComparer.Ordinal)
         {
             "readonly", "readwrite", "constant"
+        };
+        private static readonly HashSet<string> NumericCastSuffixes = new(StringComparer.Ordinal)
+        {
+            "int", "int64", "int32", "int16", "int8",
+            "uint", "uint64", "uint32", "uint16", "uint8",
+            "flt", "flt64", "flt32",
+            "fix", "fix64", "fix32"
         };
 
         private Section CurrentSection = Section.None;
@@ -201,6 +209,7 @@ namespace Puma
             _currentRecordName = null;
             _currentRecordPackSize = null;
             _currentRecordMembers = new List<string>();
+            _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
             _propertiesSectionIndent = null;
             _currentFileKind = FileDeclarationKind.None;
             _currentSectionNode = null;
@@ -767,6 +776,7 @@ namespace Puma
                 {
                     _currentRecordName = name;
                     _currentRecordMembers = new List<string>();
+                    _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
                     _currentRecordPackSize = null;
 
                     if (packIndex >= 0 && packIndex + 1 < headerTokens.Count)
@@ -793,7 +803,25 @@ namespace Puma
                     return;
                 }
 
-                var memberName = memberTokens[0].TokenText;
+                var equalsIndex = memberTokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
+                string memberName;
+                if (equalsIndex >= 0)
+                {
+                    var left = BuildQualifiedName(memberTokens.Take(equalsIndex));
+                    var rightTokens = memberTokens.Skip(equalsIndex + 1).ToList();
+                    var right = NormalizeAssignedValueTokens(rightTokens);
+                    if (TryExtractNumericLiteralWithSuffix(rightTokens, out _, out var memberType)
+                        && !string.IsNullOrWhiteSpace(left))
+                    {
+                        _currentRecordMemberTypes[left] = memberType;
+                    }
+                    memberName = $"{left}={right}";
+                }
+                else
+                {
+                    memberName = BuildQualifiedName(memberTokens);
+                }
+
                 if (!string.IsNullOrWhiteSpace(memberName))
                 {
                     _currentRecordMembers.Add(memberName);
@@ -1142,6 +1170,51 @@ namespace Puma
         private static string BuildQualifiedName(IEnumerable<LexerTokens> tokens)
         {
             return string.Concat(tokens.Select(t => t.TokenText));
+        }
+
+        private static string NormalizeAssignedValueTokens(List<LexerTokens> tokens)
+        {
+            if (tokens.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            if (TryExtractNumericLiteralWithSuffix(tokens, out var literal, out _))
+            {
+                return literal;
+            }
+
+            return BuildQualifiedName(tokens);
+        }
+
+        private static bool TryExtractNumericLiteralWithSuffix(List<LexerTokens> tokens, out string literal, out string suffix)
+        {
+            literal = string.Empty;
+            suffix = string.Empty;
+
+            if (tokens.Count != 2)
+            {
+                return false;
+            }
+
+            if (tokens[0].Category != TokenCategory.NumericLiteral)
+            {
+                return false;
+            }
+
+            if (tokens[1].Category is not (TokenCategory.Keyword or TokenCategory.Identifier))
+            {
+                return false;
+            }
+
+            if (!NumericCastSuffixes.Contains(tokens[1].TokenText))
+            {
+                return false;
+            }
+
+            literal = tokens[0].TokenText;
+            suffix = tokens[1].TokenText;
+            return true;
         }
 
         private void ParseUseStatement(LexerTokens firstToken)
@@ -1679,10 +1752,17 @@ namespace Puma
                 return;
             }
 
-            ast.Add(Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers));
+            var node = Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers);
+            foreach (var pair in _currentRecordMemberTypes)
+            {
+                node.RecordMemberTypes[pair.Key] = pair.Value;
+            }
+
+            ast.Add(node);
             _currentRecordName = null;
             _currentRecordPackSize = null;
             _currentRecordMembers = new List<string>();
+            _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
         private Node? ParsePropertyDeclaration(LexerTokens firstToken)
@@ -1699,11 +1779,34 @@ namespace Puma
                 var nameTokens = tokens.Take(equalsIndex).ToList();
                 var valueTokens = tokens.Skip(equalsIndex + 1).ToList();
                 var name = BuildQualifiedName(nameTokens);
-                var (value, modifiers) = SplitTrailingModifiers(valueTokens, PropertyModifiers);
+
+                var modifiers = new List<string>();
+                var valueEnd = valueTokens.Count - 1;
+                while (valueEnd >= 0)
+                {
+                    var trailing = valueTokens[valueEnd];
+                    if ((trailing.Category == TokenCategory.Keyword || trailing.Category == TokenCategory.Identifier)
+                        && PropertyModifiers.Contains(trailing.TokenText))
+                    {
+                        modifiers.Insert(0, trailing.TokenText);
+                        valueEnd--;
+                        continue;
+                    }
+
+                    break;
+                }
+
+                var coreValueTokens = valueEnd >= 0 ? valueTokens.Take(valueEnd + 1).ToList() : new List<LexerTokens>();
+                string? propertyType = null;
+                if (TryExtractNumericLiteralWithSuffix(coreValueTokens, out _, out var suffixType))
+                {
+                    propertyType = suffixType;
+                }
+                var value = NormalizeAssignedValueTokens(coreValueTokens);
 
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    var node = Node.CreatePropertyDeclaration(name, value, null, modifiers);
+                    var node = Node.CreatePropertyDeclaration(name, value, propertyType, modifiers);
                     ast.Add(node);
                     return node;
                 }

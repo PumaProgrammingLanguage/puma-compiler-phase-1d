@@ -1,3 +1,20 @@
+// LLVM Compiler for the Puma programming language
+//   as defined in the document "The Puma Programming Language Specification"
+//   available at https://github.com/ThePumaProgrammingLanguage
+//
+// Copyright © 2024-2026 by Darryl Anthony Burchfield
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Puma;
 
@@ -8,6 +25,17 @@ namespace test
     {
         private static string Normalize(string s) =>
             s.Replace("\r\n", "\n").Replace("\r", "\n");
+
+        private static List<Puma.Lexer.LexerTokens> GetSignificantTokens(List<Puma.Lexer.LexerTokens> tokens)
+        {
+            return tokens
+                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
+                    and not Puma.Lexer.TokenCategory.EndOfLine
+                    and not Puma.Lexer.TokenCategory.Indent
+                    and not Puma.Lexer.TokenCategory.Dedent
+                    and not Puma.Lexer.TokenCategory.Comment)
+                .ToList();
+        }
 
         [TestMethod]
         public void SourceExample_LexerParserCodegen_AreConsistent()
@@ -27,14 +55,8 @@ namespace test
             var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
-            var significant = tokens
-                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
-                    and not Puma.Lexer.TokenCategory.EndOfLine
-                    and not Puma.Lexer.TokenCategory.Indent
-                    and not Puma.Lexer.TokenCategory.Dedent
-                    and not Puma.Lexer.TokenCategory.Comment)
-                .Select(t => t.TokenText)
-                .ToArray();
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
 
             CollectionAssert.AreEqual(new[]
             {
@@ -46,6 +68,18 @@ namespace test
                 "e", "=", "5", "int16",
                 "f", "=", "6", "int8"
             }, significant);
+
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[3].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[6].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[10].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[14].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[18].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[22].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[7].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[11].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[15].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[19].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[23].Category);
 
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
@@ -87,14 +121,8 @@ namespace test
             var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
-            var significant = tokens
-                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
-                    and not Puma.Lexer.TokenCategory.EndOfLine
-                    and not Puma.Lexer.TokenCategory.Indent
-                    and not Puma.Lexer.TokenCategory.Dedent
-                    and not Puma.Lexer.TokenCategory.Comment)
-                .Select(t => t.TokenText)
-                .ToArray();
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
 
             CollectionAssert.AreEqual(new[]
             {
@@ -105,6 +133,17 @@ namespace test
                 "e", "=", "5", "uint16",
                 "f", "=", "6", "uint8"
             }, significant);
+
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[3].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[7].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[11].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[15].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[19].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[4].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[8].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[12].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[16].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[20].Category);
 
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
@@ -144,14 +183,8 @@ namespace test
             var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
-            var significant = tokens
-                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
-                    and not Puma.Lexer.TokenCategory.EndOfLine
-                    and not Puma.Lexer.TokenCategory.Indent
-                    and not Puma.Lexer.TokenCategory.Dedent
-                    and not Puma.Lexer.TokenCategory.Comment)
-                .Select(t => t.TokenText)
-                .ToArray();
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
 
             CollectionAssert.AreEqual(new[]
             {
@@ -161,6 +194,14 @@ namespace test
                 "c", "=", "3.3", "flt64",
                 "d", "=", "4.4", "flt32"
             }, significant);
+
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[3].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[6].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[10].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.NumericLiteral, significantTokens[14].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[7].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[11].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.Keyword, significantTokens[15].Category);
 
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
@@ -200,14 +241,8 @@ namespace test
             var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
-            var significant = tokens
-                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
-                    and not Puma.Lexer.TokenCategory.EndOfLine
-                    and not Puma.Lexer.TokenCategory.Indent
-                    and not Puma.Lexer.TokenCategory.Dedent
-                    and not Puma.Lexer.TokenCategory.Comment)
-                .Select(t => t.TokenText)
-                .ToArray();
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
 
             CollectionAssert.AreEqual(new[]
             {
@@ -261,14 +296,8 @@ int main()
             var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
-            var significant = tokens
-                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
-                    and not Puma.Lexer.TokenCategory.EndOfLine
-                    and not Puma.Lexer.TokenCategory.Indent
-                    and not Puma.Lexer.TokenCategory.Dedent
-                    and not Puma.Lexer.TokenCategory.Comment)
-                .Select(t => t.TokenText)
-                .ToArray();
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
 
             CollectionAssert.AreEqual(new[]
             {
@@ -320,14 +349,8 @@ auto e = """"s;
             var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
-            var significant = tokens
-                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
-                    and not Puma.Lexer.TokenCategory.EndOfLine
-                    and not Puma.Lexer.TokenCategory.Indent
-                    and not Puma.Lexer.TokenCategory.Dedent
-                    and not Puma.Lexer.TokenCategory.Comment)
-                .Select(t => t.TokenText)
-                .ToArray();
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
 
             CollectionAssert.AreEqual(new[]
             {
@@ -344,7 +367,7 @@ auto e = """"s;
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(6, properties.Count);
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, properties.Select(p => p.PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "1", "2int", "3int64", "4int32", "5int16", "6int8" }, properties.Select(p => p.PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, properties.Select(p => p.PropertyValue).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -377,14 +400,8 @@ auto f = (int8_t)6;
             var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
-            var significant = tokens
-                .Where(t => t.Category is not Puma.Lexer.TokenCategory.Whitespace
-                    and not Puma.Lexer.TokenCategory.EndOfLine
-                    and not Puma.Lexer.TokenCategory.Indent
-                    and not Puma.Lexer.TokenCategory.Dedent
-                    and not Puma.Lexer.TokenCategory.Comment)
-                .Select(t => t.TokenText)
-                .ToArray();
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
 
             CollectionAssert.AreEqual(new[]
             {
@@ -400,7 +417,7 @@ auto f = (int8_t)6;
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(5, properties.Count);
             CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, properties.Select(p => p.PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "2uint", "3uint64", "4uint32", "5uint16", "6uint8" }, properties.Select(p => p.PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, properties.Select(p => p.PropertyValue).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -410,6 +427,168 @@ auto c = (uint64_t)3;
 auto d = (uint32_t)4;
 auto e = (uint16_t)5;
 auto f = (uint8_t)6;
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void RecordsExample_BoolAndString_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"records
+    MyRecord
+        a = false
+        b = true
+        c = bool
+        d = """"
+        e = str
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "records",
+                "MyRecord",
+                "a", "=", "false",
+                "b", "=", "true",
+                "c", "=", "bool",
+                "d", "=", "\"\"",
+                "e", "=", "str"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var record = ast.Single(n => n.Kind == NodeKind.RecordDeclaration && n.RecordName == "MyRecord");
+            CollectionAssert.AreEqual(new[] { "a=false", "b=true", "c=bool", "d=\"\"", "e=str" }, record.RecordMembers.ToArray());
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdbool.h>
+#include <string>
+
+// records
+struct MyRecord
+{
+    bool a = false;
+    bool b = true;
+    bool c = false;
+    str:string d = """"s;
+    str:string e = """"s;
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void RecordsExample_Integers_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"records
+    MyRecord
+        a = 1
+        b = 2 int
+        c = 3 int64
+        d = 4 int32
+        e = 5 int16
+        f = 6 int8
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "records",
+                "MyRecord",
+                "a", "=", "1",
+                "b", "=", "2", "int",
+                "c", "=", "3", "int64",
+                "d", "=", "4", "int32",
+                "e", "=", "5", "int16",
+                "f", "=", "6", "int8"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var record = ast.Single(n => n.Kind == NodeKind.RecordDeclaration && n.RecordName == "MyRecord");
+            CollectionAssert.AreEqual(new[] { "a=1", "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// records
+struct MyRecord
+{
+    int64_t a = 1;
+    int64_t b = 2;
+    int64_t c = 3;
+    int32_t d = 4;
+    int16_t e = 5;
+    int8_t f = 6;
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void RecordsExample_UnsignedIntegers_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"records
+    MyRecord
+        b = 2 uint
+        c = 3 uint64
+        d = 4 uint32
+        e = 5 uint16
+        f = 6 uint8
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "records",
+                "MyRecord",
+                "b", "=", "2", "uint",
+                "c", "=", "3", "uint64",
+                "d", "=", "4", "uint32",
+                "e", "=", "5", "uint16",
+                "f", "=", "6", "uint8"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var record = ast.Single(n => n.Kind == NodeKind.RecordDeclaration && n.RecordName == "MyRecord");
+            CollectionAssert.AreEqual(new[] { "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// records
+struct MyRecord
+{
+    uint64_t b = 2;
+    uint64_t c = 3;
+    uint32_t d = 4;
+    uint16_t e = 5;
+    uint8_t f = 6;
+};
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
