@@ -722,10 +722,7 @@ namespace Puma
                 }
 
                 var memberTokens = ReadTokensUntilEol(token.Value);
-                var memberNameTokens = memberTokens
-                    .TakeWhile(t => !(t.Category == TokenCategory.Operator && t.TokenText == "="))
-                    .ToList();
-                var memberName = BuildQualifiedName(memberNameTokens);
+                var memberName = BuildQualifiedName(memberTokens);
                 if (!string.IsNullOrWhiteSpace(memberName))
                 {
                     _currentEnumMembers.Add(memberName);

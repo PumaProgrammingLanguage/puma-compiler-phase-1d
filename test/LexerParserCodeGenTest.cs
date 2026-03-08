@@ -593,5 +593,97 @@ struct MyRecord
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
+
+        [TestMethod]
+        public void EnumsExample_UnassignedMembers_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"enums
+    MyEnum
+        A
+        B
+        C
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "enums",
+                "MyEnum",
+                "A",
+                "B",
+                "C"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumName == "MyEnum");
+            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.EnumMembers.ToArray());
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// enums
+Enums MyEnum
+{
+    A,
+    B,
+    C,
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void EnumsExample_AssignedMembers_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"enums
+    MyEnum
+        A = 1
+        B = 3
+        C = 5
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "enums",
+                "MyEnum",
+                "A", "=", "1",
+                "B", "=", "3",
+                "C", "=", "5"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumName == "MyEnum");
+            CollectionAssert.AreEqual(new[] { "A=1", "B=3", "C=5" }, enumNode.EnumMembers.ToArray());
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// enums
+Enums MyEnum
+{
+    A=1,
+    B=3,
+    C=5,
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
     }
 }

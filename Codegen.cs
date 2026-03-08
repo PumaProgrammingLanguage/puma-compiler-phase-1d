@@ -159,13 +159,14 @@ namespace Puma
         {
             foreach (var node in ast.Where(n => n.Kind == NodeKind.EnumDeclaration))
             {
-                sb.AppendLine($"typedef enum {node.EnumName} {{");
-                for (var i = 0; i < node.EnumMembers.Count; i++)
+                sb.AppendLine("// enums");
+                sb.AppendLine($"Enums {node.EnumName}");
+                sb.AppendLine("{");
+                foreach (var member in node.EnumMembers)
                 {
-                    var suffix = i == node.EnumMembers.Count - 1 ? string.Empty : ",";
-                    sb.AppendLine($"    {node.EnumMembers[i]}{suffix}");
+                    sb.AppendLine($"    {member},");
                 }
-                sb.AppendLine($"}} {node.EnumName};");
+                sb.AppendLine("}");
                 sb.AppendLine();
             }
         }
