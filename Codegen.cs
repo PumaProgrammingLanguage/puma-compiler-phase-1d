@@ -36,6 +36,16 @@ namespace Puma
                 includes.Add("<stdio.h>");
             }
 
+            var needsStdBool = ast.Any(n => n.Kind == NodeKind.AssignmentStatement
+                && n.AssignmentOperator == "="
+                && (string.Equals(n.AssignmentRight, "true", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(n.AssignmentRight, "false", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(n.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)));
+            if (needsStdBool)
+            {
+                includes.Add("<stdbool.h>");
+            }
+
             foreach (var node in ast.Where(n => n.Kind == NodeKind.UseStatement))
             {
                 if (node.UseIsFilePath && !string.IsNullOrWhiteSpace(node.UseTarget))
@@ -206,7 +216,32 @@ namespace Puma
                 sb.AppendLine($"    initialize({FormatArguments(initSection.SectionParameterList)});");
             }
             var statements = CollectStatements(ast, index + 1);
-            EmitStatements(statements, sb, "    ");
+            var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
+                .Select(n => n.PropertyName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.Ordinal);
+            var localNames = new HashSet<string>(StringComparer.Ordinal);
+            var bufferedStatements = new List<Node>();
+
+            foreach (var statement in statements)
+            {
+                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    "))
+                {
+                    if (bufferedStatements.Count > 0)
+                    {
+                        EmitStatements(bufferedStatements, sb, "    ");
+                        bufferedStatements.Clear();
+                    }
+                    continue;
+                }
+
+                bufferedStatements.Add(statement);
+            }
+
+            if (bufferedStatements.Count > 0)
+            {
+                EmitStatements(bufferedStatements, sb, "    ");
+            }
             if (finalIndex >= 0 && finalSection != null)
             {
                 sb.AppendLine($"    finalize({FormatArguments(finalSection.SectionParameterList)});");
@@ -657,6 +692,150 @@ namespace Puma
             }
 
             return statements;
+        }
+
+        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent)
+        {
+            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentOperator != "=")
+            {
+                return false;
+            }
+
+            var leftName = statement.AssignmentLeft;
+            if (string.IsNullOrWhiteSpace(leftName) || !IsSimpleIdentifier(leftName))
+            {
+                return false;
+            }
+
+            if (globalNames.Contains(leftName) || localNames.Contains(leftName))
+            {
+                return false;
+            }
+
+            if (!TryGetTypedLiteralDeclaration(statement.AssignmentRight ?? string.Empty, out var typeName, out var value))
+            {
+                return false;
+            }
+
+            sb.AppendLine($"{indent}{typeName} {leftName} = {value};");
+            localNames.Add(leftName);
+            return true;
+        }
+
+        private static bool IsSimpleIdentifier(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            if (!(char.IsLetter(value[0]) || value[0] == '_'))
+            {
+                return false;
+            }
+
+            for (var i = 1; i < value.Length; i++)
+            {
+                if (!(char.IsLetterOrDigit(value[i]) || value[i] == '_'))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryGetTypedLiteralDeclaration(string rightText, out string typeName, out string literalValue)
+        {
+            typeName = "int64_t";
+            literalValue = rightText;
+
+            if (string.IsNullOrWhiteSpace(rightText))
+            {
+                return false;
+            }
+
+            var text = rightText.Trim();
+
+            if (string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text, "false", StringComparison.OrdinalIgnoreCase))
+            {
+                typeName = "bool";
+                literalValue = text.ToLowerInvariant();
+                return true;
+            }
+
+            if (string.Equals(text, "bool", StringComparison.OrdinalIgnoreCase))
+            {
+                typeName = "bool";
+                literalValue = "false";
+                return true;
+            }
+
+            if (text.StartsWith("\"", StringComparison.Ordinal))
+            {
+                typeName = "stdstr";
+                literalValue = text;
+                return true;
+            }
+
+            if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase))
+            {
+                typeName = "stdstr";
+                literalValue = "\"\"";
+                return true;
+            }
+
+            var index = 0;
+            var dotSeen = false;
+            while (index < text.Length)
+            {
+                var ch = text[index];
+                if (char.IsDigit(ch))
+                {
+                    index++;
+                    continue;
+                }
+
+                if (ch == '.' && !dotSeen)
+                {
+                    dotSeen = true;
+                    index++;
+                    continue;
+                }
+
+                break;
+            }
+
+            if (index == 0)
+            {
+                return false;
+            }
+
+            literalValue = text[..index];
+            var suffix = text[index..];
+            if (string.IsNullOrWhiteSpace(suffix))
+            {
+                typeName = dotSeen ? "double" : "int64_t";
+                return true;
+            }
+
+            typeName = suffix switch
+            {
+                "int" or "int64" => "int64_t",
+                "int32" => "int32_t",
+                "int16" => "int16_t",
+                "int8" => "int8_t",
+                "uint" or "uint64" => "uint64_t",
+                "uint32" => "uint32_t",
+                "uint16" => "uint16_t",
+                "uint8" => "uint8_t",
+                "flt" or "flt64" => "double",
+                "flt32" => "float",
+                _ => "int64_t"
+            };
+
+            return true;
         }
     }
 }

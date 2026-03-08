@@ -1580,6 +1580,14 @@ namespace Puma
 
                 if (token.Category is TokenCategory.StringLiteral or TokenCategory.NumericLiteral or TokenCategory.CharLiteral)
                 {
+                    if (token.Category == TokenCategory.NumericLiteral
+                        && _index < _tokens.Count
+                        && (_tokens[_index].Category is TokenCategory.Identifier or TokenCategory.Keyword)
+                        && IsNumericTypeSuffix(_tokens[_index].TokenText))
+                    {
+                        _index++;
+                    }
+
                     return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText };
                 }
 
@@ -1641,6 +1649,14 @@ namespace Puma
 
                 value = string.Empty;
                 return false;
+            }
+
+            private static bool IsNumericTypeSuffix(string tokenText)
+            {
+                return tokenText is "int" or "int64" or "int32" or "int16" or "int8"
+                    or "uint" or "uint64" or "uint32" or "uint16" or "uint8"
+                    or "fix" or "fix64" or "fix32"
+                    or "flt" or "flt64" or "flt32";
             }
         }
 
