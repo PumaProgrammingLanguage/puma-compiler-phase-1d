@@ -46,6 +46,32 @@ namespace Puma
                 includes.Add("<stdbool.h>");
             }
 
+            var needsString = ast.Any(n => n.Kind == NodeKind.AssignmentStatement
+                && n.AssignmentOperator == "="
+                && (!string.IsNullOrWhiteSpace(n.AssignmentRight)
+                    && (string.Equals(n.AssignmentRight, "str", StringComparison.OrdinalIgnoreCase)
+                        || n.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))));
+            if (needsString)
+            {
+                includes.Add("<string>");
+            }
+
+            var hasStartSection = ast.Any(n => n.Kind == NodeKind.Section && n.Section == Section.Start);
+            var propertyDeclarations = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            var autoPropertiesMode = !hasStartSection && propertyDeclarations.Count > 0;
+            if (autoPropertiesMode)
+            {
+                if (propertyDeclarations.Any(p => IsBooleanPropertyValue(p.PropertyValue)))
+                {
+                    includes.Add("<stdbool.h>");
+                }
+
+                if (propertyDeclarations.Any(p => IsStringPropertyValue(p.PropertyValue)))
+                {
+                    includes.Add("<string>");
+                }
+            }
+
             foreach (var node in ast.Where(n => n.Kind == NodeKind.UseStatement))
             {
                 if (node.UseIsFilePath && !string.IsNullOrWhiteSpace(node.UseTarget))
@@ -137,17 +163,123 @@ namespace Puma
 
         private static void EmitGlobals(List<Node> ast, StringBuilder sb, HashSet<Node> typeProperties)
         {
-            foreach (var node in ast.Where(n => n.Kind == NodeKind.PropertyDeclaration && !typeProperties.Contains(n)))
+            var hasStartSection = ast.Any(n => n.Kind == NodeKind.Section && n.Section == Section.Start);
+            var globalProperties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration && !typeProperties.Contains(n)).ToList();
+
+            if (!hasStartSection && globalProperties.Count > 0)
+            {
+                sb.AppendLine("// properties");
+                foreach (var node in globalProperties)
+                {
+                    var initializer = FormatAutoPropertyInitializer(node.PropertyValue);
+                    sb.AppendLine($"auto {node.PropertyName} = {initializer};");
+                }
+
+                sb.AppendLine();
+                return;
+            }
+
+            foreach (var node in globalProperties)
             {
                 var (type, value) = InferCTypeAndValue(node.PropertyValue);
                 var modifiers = node.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
                 sb.AppendLine($"{modifiers}{type} {node.PropertyName} = {value};");
             }
 
-            if (ast.Any(n => n.Kind == NodeKind.PropertyDeclaration && !typeProperties.Contains(n)))
+            if (globalProperties.Count > 0)
             {
                 sb.AppendLine();
             }
+        }
+
+        private static bool IsBooleanPropertyValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "false", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "bool", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsStringPropertyValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            return string.Equals(value, "str", StringComparison.OrdinalIgnoreCase)
+                || value.StartsWith("\"", StringComparison.Ordinal);
+        }
+
+        private static string FormatAutoPropertyInitializer(string? value)
+        {
+            var text = value?.Trim() ?? string.Empty;
+            if (string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text, "false", StringComparison.OrdinalIgnoreCase))
+            {
+                return text.ToLowerInvariant();
+            }
+
+            if (string.Equals(text, "bool", StringComparison.OrdinalIgnoreCase))
+            {
+                return "false";
+            }
+
+            if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) || text.StartsWith("\"", StringComparison.Ordinal))
+            {
+                var literal = string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : text;
+                return $"{literal}s";
+            }
+
+            var index = 0;
+            var dotSeen = false;
+            while (index < text.Length)
+            {
+                var ch = text[index];
+                if (char.IsDigit(ch))
+                {
+                    index++;
+                    continue;
+                }
+
+                if (ch == '.' && !dotSeen)
+                {
+                    dotSeen = true;
+                    index++;
+                    continue;
+                }
+
+                break;
+            }
+
+            if (index == 0)
+            {
+                return text;
+            }
+
+            var numeric = text[..index];
+            var suffix = text[index..];
+            var castType = suffix switch
+            {
+                "" => "int64_t",
+                "int" or "int64" => "int64_t",
+                "int32" => "int32_t",
+                "int16" => "int16_t",
+                "int8" => "int8_t",
+                "uint" or "uint64" => "uint64_t",
+                "uint32" => "uint32_t",
+                "uint16" => "uint16_t",
+                "uint8" => "uint8_t",
+                "flt" or "flt64" => "double",
+                "flt32" => "float",
+                _ => "int64_t"
+            };
+
+            return $"({castType}){numeric}";
         }
 
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
@@ -717,7 +849,14 @@ namespace Puma
                 return false;
             }
 
-            sb.AppendLine($"{indent}{typeName} {leftName} = {value};");
+            var initializer = typeName switch
+            {
+                "std::string" => $"{value}s",
+                "bool" => value,
+                _ => $"({typeName}){value}"
+            };
+
+            sb.AppendLine($"{indent}auto {leftName} = {initializer};");
             localNames.Add(leftName);
             return true;
         }
@@ -774,14 +913,14 @@ namespace Puma
 
             if (text.StartsWith("\"", StringComparison.Ordinal))
             {
-                typeName = "stdstr";
+                typeName = "std::string";
                 literalValue = text;
                 return true;
             }
 
             if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase))
             {
-                typeName = "stdstr";
+                typeName = "std::string";
                 literalValue = "\"\"";
                 return true;
             }
