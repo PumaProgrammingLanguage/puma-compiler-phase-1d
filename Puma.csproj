@@ -55,8 +55,4 @@
     <None Include=".github\FUNDING.yml" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Puma.Tests\" />
-  </ItemGroup>
-
 </Project>
