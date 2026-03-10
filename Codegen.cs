@@ -128,15 +128,38 @@ namespace Puma
             EmitFunctions(ast, sb, typeFunctions);
             EmitInitializeFinalize(ast, sb);
             EmitMain(ast, sb);
-            EmitTypes(typeDeclarations, sb);
-            EmitTraits(typeDeclarations, sb);
+            EmitTypes(ast, typeDeclarations, sb);
+            EmitTraits(ast, typeDeclarations, sb);
 
             if (sb.Length == 0 && ast.Any(n => n.Kind == NodeKind.Section && n.Section == Section.Functions))
             {
                 sb.Append("// functions\\n");
             }
 
-            return sb.ToString();
+            var output = sb.ToString();
+            var moduleNode = ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration
+                && string.Equals(n.DeclarationKind, "module", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(n.DeclarationName));
+            if (moduleNode != null)
+            {
+                var moduleBody = output.TrimEnd();
+                output = $"namespace {moduleNode.DeclarationName}\n{{\n{IndentBlock(moduleBody)}\n}}\n";
+            }
+
+            return output;
+        }
+
+        private static string IndentBlock(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return string.Empty;
+            }
+
+            var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace("\r", "\n", StringComparison.Ordinal)
+                .Split('\n');
+            return string.Join("\n", lines.Select(l => $"    {l}"));
         }
 
         private static string SectionToString(Section section) => section switch
@@ -460,7 +483,14 @@ namespace Puma
 
         private static void EmitInitializeFinalize(List<Node> ast, StringBuilder sb)
         {
-            EmitSectionFunction(ast, sb, Section.Initialize, "initialize");
+            var hasTypeOrTrait = ast.Any(n => n.Kind == NodeKind.TypeDeclaration
+                && (string.Equals(n.DeclarationKind, "type", StringComparison.Ordinal)
+                    || string.Equals(n.DeclarationKind, "trait", StringComparison.Ordinal)));
+
+            if (!hasTypeOrTrait)
+            {
+                EmitSectionFunction(ast, sb, Section.Initialize, "initialize");
+            }
             EmitSectionFunction(ast, sb, Section.Finalize, "finalize");
         }
 
@@ -537,8 +567,11 @@ namespace Puma
             sb.AppendLine();
         }
 
-        private static void EmitTypes(List<Node> typeDeclarations, StringBuilder sb)
+        private static void EmitTypes(List<Node> ast, List<Node> typeDeclarations, StringBuilder sb)
         {
+            var (initIndex, _) = FindSection(ast, Section.Initialize);
+            var initializeStatements = initIndex >= 0 ? CollectStatements(ast, initIndex + 1) : new List<Node>();
+
             foreach (var node in typeDeclarations.Where(n => n.DeclarationKind == "type"))
             {
                 var name = ToCppQualifiedName(node.DeclarationName) ?? "Type";
@@ -561,6 +594,13 @@ namespace Puma
                 sb.AppendLine($"class {name}{inheritance}");
                 sb.AppendLine("{");
                 sb.AppendLine("public:");
+                if (initializeStatements.Count > 0)
+                {
+                    sb.AppendLine($"    {name}()");
+                    sb.AppendLine("    {");
+                    EmitStatements(initializeStatements, sb, "        ");
+                    sb.AppendLine("    }");
+                }
                 EmitTypeProperties(node, sb, "    ");
                 EmitTypeFunctions(node, sb, "    ");
                 sb.AppendLine("};");
@@ -568,14 +608,24 @@ namespace Puma
             }
         }
 
-        private static void EmitTraits(List<Node> typeDeclarations, StringBuilder sb)
+        private static void EmitTraits(List<Node> ast, List<Node> typeDeclarations, StringBuilder sb)
         {
+            var (initIndex, _) = FindSection(ast, Section.Initialize);
+            var initializeStatements = initIndex >= 0 ? CollectStatements(ast, initIndex + 1) : new List<Node>();
+
             foreach (var node in typeDeclarations.Where(n => n.DeclarationKind == "trait"))
             {
                 var name = ToCppQualifiedName(node.DeclarationName) ?? "Trait";
                 sb.AppendLine($"class {name}");
                 sb.AppendLine("{");
                 sb.AppendLine("public:");
+                if (initializeStatements.Count > 0)
+                {
+                    sb.AppendLine($"    {name}()");
+                    sb.AppendLine("    {");
+                    EmitStatements(initializeStatements, sb, "        ");
+                    sb.AppendLine("    }");
+                }
                 EmitTypeProperties(node, sb, "    ");
                 EmitTypeFunctions(node, sb, "    ");
                 sb.AppendLine("};");

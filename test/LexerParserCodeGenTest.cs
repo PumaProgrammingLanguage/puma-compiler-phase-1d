@@ -104,6 +104,174 @@ namespace test
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
+        [TestMethod]
+        public void TraitInitializeExample_Floats_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"trait
+    MyTrait
+
+initialize
+    a = 1.1
+    b = 2.2 flt
+    c = 3.3 flt64
+    d = 4.4 flt32
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "trait", "MyTrait",
+                "initialize",
+                "a", "=", "1.1",
+                "b", "=", "2.2", "flt",
+                "c", "=", "3.3", "flt64",
+                "d", "=", "4.4", "flt32"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"class MyTrait
+{
+public:
+    MyTrait()
+    {
+        a = 1.1;
+        b = 2.2;
+        c = 3.3;
+        d = 4.4;
+    }
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void ModuleStartExample_Integers_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"module
+    MyModule
+
+start
+    a = 1
+    b = 2 int
+    c = 3 int64
+    d = 4 int32
+    e = 5 int16
+    f = 6 int8
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "module", "MyModule",
+                "start",
+                "a", "=", "1",
+                "b", "=", "2", "int",
+                "c", "=", "3", "int64",
+                "d", "=", "4", "int32",
+                "e", "=", "5", "int16",
+                "f", "=", "6", "int8"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
+            Assert.AreEqual(6, assignments.Count);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"namespace MyModule
+{
+    int main()
+    {
+        auto a = (int64_t)1;
+        auto b = (int64_t)2;
+        auto c = (int64_t)3;
+        auto d = (int32_t)4;
+        auto e = (int16_t)5;
+        auto f = (int8_t)6;
+        return 0;
+    }
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void TraitInitializeExample_BoolAndString_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"trait
+    MyTrait
+
+initialize
+    a = false
+    b = true
+    c = bool
+    d = """"
+    e = str
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "trait", "MyTrait",
+                "initialize",
+                "a", "=", "false",
+                "b", "=", "true",
+                "c", "=", "bool",
+                "d", "=", "\"\"",
+                "e", "=", "str"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdbool.h>
+#include <string>
+
+class MyTrait
+{
+public:
+    MyTrait()
+    {
+        a = false;
+        b = true;
+        c = bool;
+        d = """"s;
+        e = str;
+    }
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
 
         [TestMethod]
         public void StartExample_UnsignedIntegers_LexerParserCodegen_AreConsistent()
@@ -169,6 +337,63 @@ namespace test
         }
 
         [TestMethod]
+        public void ModuleStartExample_UnsignedIntegers_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"module
+    MyModule
+
+start
+    b = 2 uint64
+    c = 3 uint64
+    d = 4 uint32
+    e = 5 uint16
+    f = 6 uint8
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "module", "MyModule",
+                "start",
+                "b", "=", "2", "uint64",
+                "c", "=", "3", "uint64",
+                "d", "=", "4", "uint32",
+                "e", "=", "5", "uint16",
+                "f", "=", "6", "uint8"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
+            Assert.AreEqual(5, assignments.Count);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"namespace MyModule
+{
+    int main()
+    {
+        auto b = (uint64_t)2;
+        auto c = (uint64_t)3;
+        auto d = (uint32_t)4;
+        auto e = (uint16_t)5;
+        auto f = (uint8_t)6;
+        return 0;
+    }
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void InitializeExample_Floats_LexerParserCodegen_AreConsistent()
         {
             const string src =
@@ -226,6 +451,57 @@ void initialize(void)
         }
 
         [TestMethod]
+        public void TypeInitializeExample_Floats_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"type
+    MyType is object
+
+initialize
+    a = 1.1
+    b = 2.2 flt
+    c = 3.3 flt64
+    d = 4.4 flt32
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "type", "MyType", "is", "object",
+                "initialize",
+                "a", "=", "1.1",
+                "b", "=", "2.2", "flt",
+                "c", "=", "3.3", "flt64",
+                "d", "=", "4.4", "flt32"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"class MyType : public object
+{
+public:
+    MyType()
+    {
+        a = 1.1;
+        b = 2.2;
+        c = 3.3;
+        d = 4.4;
+    }
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void InitializeExample_BoolAndString_LexerParserCodegen_AreConsistent()
         {
             const string src =
@@ -275,6 +551,63 @@ void initialize(void)
     d = """"s;
     e = str;
 }
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void TypeInitializeExample_BoolAndString_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"type
+    MyType is object
+
+initialize
+    a = false
+    b = true
+    c = bool
+    d = """"
+    e = str
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "type", "MyType", "is", "object",
+                "initialize",
+                "a", "=", "false",
+                "b", "=", "true",
+                "c", "=", "bool",
+                "d", "=", "\"\"",
+                "e", "=", "str"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdbool.h>
+#include <string>
+
+class MyType : public object
+{
+public:
+    MyType()
+    {
+        a = false;
+        b = true;
+        c = bool;
+        d = """"s;
+        e = str;
+    }
+};
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
