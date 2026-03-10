@@ -38,7 +38,7 @@ namespace test
         }
 
         [TestMethod]
-        public void SourceExample_LexerParserCodegen_AreConsistent()
+        public void StartExample_Integers_LexerParserCodegen_AreConsistent()
         {
             const string src =
 @"start
@@ -104,8 +104,9 @@ namespace test
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
+
         [TestMethod]
-        public void SourceExample_UnsignedIntegers_LexerParserCodegen_AreConsistent()
+        public void StartExample_UnsignedIntegers_LexerParserCodegen_AreConsistent()
         {
             const string src =
 @"start
@@ -168,10 +169,10 @@ namespace test
         }
 
         [TestMethod]
-        public void SourceExample_Floats_LexerParserCodegen_AreConsistent()
+        public void InitializeExample_Floats_LexerParserCodegen_AreConsistent()
         {
             const string src =
-@"start
+@"initialize
     a = 1.1
     b = 2.2 flt
     c = 3.3 flt64
@@ -188,7 +189,7 @@ namespace test
 
             CollectionAssert.AreEqual(new[]
             {
-                "start",
+                "initialize",
                 "a", "=", "1.1",
                 "b", "=", "2.2", "flt",
                 "c", "=", "3.3", "flt64",
@@ -211,13 +212,13 @@ namespace test
 
             var generated = codegen.Generate(ast);
             var expected =
-@"int main()
+@"// initialize
+void initialize(void)
 {
-    auto a = (double)1.1;
-    auto b = (double)2.2;
-    auto c = (double)3.3;
-    auto d = (float)4.4;
-    return 0;
+    a = 1.1;
+    b = 2.2;
+    c = 3.3;
+    d = 4.4;
 }
 ";
 
@@ -225,10 +226,10 @@ namespace test
         }
 
         [TestMethod]
-        public void SourceExample_BoolAndString_LexerParserCodegen_AreConsistent()
+        public void InitializeExample_BoolAndString_LexerParserCodegen_AreConsistent()
         {
             const string src =
-@"start
+@"initialize
     a = false
     b = true
     c = bool
@@ -246,7 +247,7 @@ namespace test
 
             CollectionAssert.AreEqual(new[]
             {
-                "start",
+                "initialize",
                 "a", "=", "false",
                 "b", "=", "true",
                 "c", "=", "bool",
@@ -265,14 +266,14 @@ namespace test
 @"#include <stdbool.h>
 #include <string>
 
-int main()
+// initialize
+void initialize(void)
 {
-    auto a = false;
-    auto b = true;
-    auto c = false;
-    auto d = """"s;
-    auto e = """"s;
-    return 0;
+    a = false;
+    b = true;
+    c = bool;
+    d = """"s;
+    e = str;
 }
 ";
 
@@ -680,6 +681,64 @@ Enums MyEnum
     A=1,
     B=3,
     C=5,
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void PropertiesAndFinalizeExample_StringLifecycle_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    s = ""Hello, World!\n""
+finalize
+    s = """"
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "s", "=", "\"Hello, World!\\n\"",
+                "finalize",
+                "s", "=", "\"\""
+            }, significant);
+
+            Assert.AreEqual(Puma.Lexer.TokenCategory.StringLiteral, significantTokens[3].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.StringLiteral, significantTokens[7].Category);
+
+            var ast = parser.Parse(tokens);
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            Assert.AreEqual(1, properties.Count);
+            Assert.AreEqual("s", properties[0].PropertyName);
+            Assert.AreEqual("\"Hello, World!\\n\"", properties[0].PropertyValue);
+
+            var finalizeSection = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Puma.Parser.Section.Finalize);
+            Assert.IsNotNull(finalizeSection);
+            var finalizeAssignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement && n.AssignmentLeft == "s").ToList();
+            Assert.AreEqual(1, finalizeAssignments.Count);
+            Assert.AreEqual("\"\"", finalizeAssignments[0].AssignmentRightExpression?.Value);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <string>
+
+// properties
+auto s = ""hello world""s;
+
+// finalize
+void finalize(void)
+{
+    s = """"s;
 }
 ";
 

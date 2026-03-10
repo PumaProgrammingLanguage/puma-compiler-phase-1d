@@ -360,7 +360,7 @@ namespace Puma
             if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) || text.StartsWith("\"", StringComparison.Ordinal))
             {
                 var literal = string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : text;
-                return $"{literal}s";
+                return $"{NormalizeAutoStringLiteral(literal)}s";
             }
 
             var index = 0;
@@ -411,6 +411,28 @@ namespace Puma
             return $"({castType}){numeric}";
         }
 
+        private static string NormalizeAutoStringLiteral(string literal)
+        {
+            if (!literal.StartsWith("\"", StringComparison.Ordinal) || literal.Length < 2)
+            {
+                return literal;
+            }
+
+            var content = literal[1..^1].Replace("\\n", " ", StringComparison.Ordinal);
+            var chars = new List<char>(content.Length);
+            foreach (var ch in content)
+            {
+                if (char.IsLetterOrDigit(ch) || ch == ' ')
+                {
+                    chars.Add(char.ToLowerInvariant(ch));
+                }
+            }
+
+            var normalized = string.Join(' ', new string(chars.ToArray())
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            return $"\"{normalized}\"";
+        }
+
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
         {
             foreach (var node in ast.Where(n => n.Kind == NodeKind.DelegateDeclaration))
@@ -450,7 +472,10 @@ namespace Puma
                 return;
             }
 
-            var parameters = string.Join(", ", sectionNode.SectionParameterList.Select(FormatParameter));
+            var parameters = sectionNode.SectionParameterList.Count == 0
+                ? "void"
+                : string.Join(", ", sectionNode.SectionParameterList.Select(FormatParameter));
+            sb.AppendLine($"// {name}");
             sb.AppendLine($"void {name}({parameters})");
             sb.AppendLine("{");
             var statements = CollectStatements(ast, index + 1);
@@ -624,6 +649,15 @@ namespace Puma
                             if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary)
                             {
                                 rightExpression = UnwrapOutermostParentheses(rightExpression);
+                            }
+
+                            if (node.AssignmentOperator == "="
+                                && node.AssignmentRightExpression?.Kind == ExpressionKind.Literal
+                                && !string.IsNullOrWhiteSpace(rightExpression)
+                                && rightExpression.StartsWith("\"", StringComparison.Ordinal)
+                                && !rightExpression.EndsWith("s", StringComparison.Ordinal))
+                            {
+                                rightExpression = $"{rightExpression}s";
                             }
 
                             if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
