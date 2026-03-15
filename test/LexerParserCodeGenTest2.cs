@@ -193,5 +193,46 @@ int Add(a int, b int)
             var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Hello");
             Assert.AreEqual(0, function.FunctionParameterList.Count);
         }
+
+        [TestMethod]
+        public void FunctionsExample_MissingParameterListAndReturnType_DefaultToVoid()
+        {
+            const string src =
+@"functions
+    Hello()
+        x = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "functions",
+                "Hello", "(", ")",
+                "x", "=", "1"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Hello");
+            Assert.AreEqual(0, function.FunctionParameterList.Count);
+            Assert.IsTrue(string.IsNullOrWhiteSpace(function.FunctionDeclarationReturnType));
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// functions
+void Hello(void)
+{
+    x = 1;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
     }
 }
