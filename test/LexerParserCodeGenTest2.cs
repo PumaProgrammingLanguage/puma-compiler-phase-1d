@@ -127,6 +127,232 @@ int Add(a int, b int)
         }
 
         [TestMethod]
+        public void PropertiesFunctions_MatchWhileRepeat_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 5
+    b = 10
+functions
+    F()
+        match a
+            when a < b
+                a = b
+            when a > b
+                b = a
+            when a == b
+                a = b + 1
+
+    G()
+        while a < b
+            a++
+
+    H()
+        repeat 1
+            b--
+            if b <= a
+                break
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "5",
+                "b", "=", "10",
+                "functions",
+                "F", "(", ")",
+                "match", "a",
+                "when", "a", "<", "b",
+                "a", "=", "b",
+                "when", "a", ">", "b",
+                "b", "=", "a",
+                "when", "a", "==", "b",
+                "a", "=", "b", "+", "1",
+                "G", "(", ")",
+                "while", "a", "<", "b",
+                "a", "++",
+                "H", "(", ")",
+                "repeat", "1",
+                "b", "--",
+                "if", "b", "<=", "a",
+                "break"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
+            Assert.AreEqual(3, functions.Count);
+            Assert.AreEqual("F", functions[0].FunctionDeclarationName);
+            Assert.AreEqual("G", functions[1].FunctionDeclarationName);
+            Assert.AreEqual("H", functions[2].FunctionDeclarationName);
+            Assert.AreEqual(NodeKind.MatchStatement, functions[0].FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.WhileStatement, functions[1].FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.RepeatStatement, functions[2].FunctionBody[0].Kind);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// properties
+auto a = (int64_t)5;
+auto b = (int64_t)10;
+
+// functions
+void F(void)
+{
+    switch (a)
+    {
+        case (a < b):
+            a = b;
+            break;
+        case (a > b):
+            b = a;
+            break;
+        case (a == b):
+            a = b + 1;
+            break;
+    }
+}
+
+void G(void)
+{
+    while (a < b)
+    {
+        a++;
+    }
+}
+
+void H(void)
+{
+    do
+    {
+        b--;
+        if (b <= a)
+        {
+            break;
+        }
+    } while (1);
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void PropertiesAndFunctions_IfElseExamples_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 1
+    b = 2
+functions
+    F()
+        if a != b
+            a = b
+
+    G()
+        if a == b
+            a += 1
+        else
+            a = b
+
+    H()
+        if a == b
+            a += 1
+        else if a < b
+            a = b + 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "1",
+                "b", "=", "2",
+                "functions",
+                "F", "(", ")",
+                "if", "a", "!=", "b",
+                "a", "=", "b",
+                "G", "(", ")",
+                "if", "a", "==", "b",
+                "a", "+=", "1",
+                "else",
+                "a", "=", "b",
+                "H", "(", ")",
+                "if", "a", "==", "b",
+                "a", "+=", "1",
+                "else", "if", "a", "<", "b",
+                "a", "=", "b", "+", "1"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            Assert.AreEqual(2, properties.Count);
+            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => p.PropertyName).ToArray());
+
+            var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
+            Assert.AreEqual(3, functions.Count);
+            CollectionAssert.AreEqual(new[] { "F", "G", "H" }, functions.Select(f => f.FunctionDeclarationName).ToArray());
+            Assert.AreEqual(NodeKind.IfStatement, functions[0].FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.IfStatement, functions[1].FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.IfStatement, functions[2].FunctionBody[0].Kind);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// properties
+auto a = (int64_t)1;
+auto b = (int64_t)2;
+
+// functions
+void F(void)
+{
+    if (a != b)
+    {
+        a = b;
+    }
+}
+
+void G(void)
+{
+    if (a == b)
+    {
+        a += 1;
+    }
+    else
+    {
+        a = b;
+    }
+}
+
+void H(void)
+{
+    if (a == b)
+    {
+        a += 1;
+    }
+    else
+    {
+        a = b + 1;
+    }
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void FunctionsExample_MissingParameterType_Parser_ThrowsCompilerError()
         {
             const string src =
