@@ -158,7 +158,7 @@ int Add(a int, b int)
         {
             const string src =
 @"functions
-    Add(int, b int) int
+    F(int, b int) int
         return b
 ";
 
@@ -172,7 +172,7 @@ int Add(a int, b int)
             CollectionAssert.AreEqual(new[]
             {
                 "functions",
-                "Add", "(", "int", ",", "b", "int", ")", "int",
+                "F", "(", "int", ",", "b", "int", ")", "int",
                 "return", "b"
             }, significant);
 
@@ -300,7 +300,7 @@ int Add(a int, b int)
         {
             const string src =
 @"functions
-    Hello() int
+    F() int
         return 1
 ";
 
@@ -314,12 +314,12 @@ int Add(a int, b int)
             CollectionAssert.AreEqual(new[]
             {
                 "functions",
-                "Hello", "(", ")", "int",
+                "F", "(", ")", "int",
                 "return", "1"
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Hello");
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
             Assert.AreEqual(0, function.FunctionParameterList.Count);
         }
 
@@ -328,7 +328,7 @@ int Add(a int, b int)
         {
             const string src =
 @"functions
-    Hello()
+    F()
         x = 1
 ";
 
@@ -343,19 +343,19 @@ int Add(a int, b int)
             CollectionAssert.AreEqual(new[]
             {
                 "functions",
-                "Hello", "(", ")",
+                "F", "(", ")",
                 "x", "=", "1"
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Hello");
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
             Assert.AreEqual(0, function.FunctionParameterList.Count);
             Assert.IsTrue(string.IsNullOrWhiteSpace(function.FunctionDeclarationReturnType));
 
             var generated = codegen.Generate(ast);
             var expected =
 @"// functions
-void Hello(void)
+void F(void)
 {
     x = 1;
 }
