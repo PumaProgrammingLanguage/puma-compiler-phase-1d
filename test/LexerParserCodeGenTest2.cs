@@ -20,6 +20,22 @@ namespace test
                 .ToList();
         }
 
+        private static void AssertParserError(string src, string expectedMessagePart)
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+            try
+            {
+                parser.Parse(tokens);
+                Assert.Fail($"Expected parser error containing '{expectedMessagePart}' but no exception was thrown. Source:\n{src}");
+            }
+            catch (InvalidOperationException ex)
+            {
+                StringAssert.Contains(ex.Message, expectedMessagePart);
+            }
+        }
+
         [TestMethod]
         public void FunctionsExample_HelloAndAdd_LexerParserCodegen_AreConsistent()
         {
@@ -164,6 +180,53 @@ int Add(a int, b int)
 
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
             StringAssert.Contains(ex.Message, "missing the name and type");
+        }
+
+        [TestMethod]
+        public void ParserErrorMessages_AreCovered()
+        {
+            var cases = new (string Source, string MessagePart)[]
+            {
+                ("start\n    a = 1\ninitialize\n    b = 2\n", "Only one of 'start' or 'initialize'"),
+                ("module\n    M\ntype\n    T is object\n", "Only one of 'module', 'type', or 'trait'"),
+                ("properties\n    a = 1\nproperties\n    b = 2\n", "Duplicate section 'properties'"),
+                ("start\n    a = 1\nproperties\n    b = 2\n", "is out of order after 'start'"),
+                ("a = 1\nfunctions\n    F()\n", "Sections are not allowed after implicit start statements"),
+                ("type\n    MyType is object\nstart\n    a = 1\n", "start section is only allowed in module files"),
+                ("start\n    WriteLine \"x\")\n", "Expected '(' after WriteLine."),
+                ("start\n    WriteLine(1)\n", "Expected string literal in WriteLine"),
+                ("start\n    WriteLine(\"x\"\n", "Expected ')' after WriteLine argument."),
+                ("trait\n    MyTrait is object\n", "Unexpected inheritance in trait declaration"),
+                ("type\n    MyType object\n", "must include an 'is' base type"),
+                ("type\n    MyType is\n", "Missing base type after 'is'."),
+                ("type\n    MyType is object has\n", "Missing trait list after 'has'."),
+                ("use\n    a/b.h as\n", "Expected alias identifier after 'as'"),
+                ("use\n    a/b.h as alias\n", "File path use statements cannot specify an alias"),
+                ("start\n    a = b if c\n", "Conditional expressions require an 'else' branch"),
+                ("start\n    a = 1 == 2 == 3\n", "Only one consecutive equality expression is allowed"),
+                ("start\n    a = 1 < 2 < 3\n", "Only one consecutive relational expression is allowed"),
+                ("start\n    a = 1:2:3\n", "Only one consecutive pair or range expression is allowed"),
+                ("start\n    a = !!b\n", "Unary operators cannot be repeated consecutively"),
+                ("properties\n    a int\n", "Property declarations must use assignment"),
+                ("start\n    = 1\n", "Assignment statements require left and right expressions"),
+                ("start\n    has\n", "Has statements require a condition"),
+                ("start\n    if\n", "If statements require a condition expression"),
+                ("start\n    match\n", "Match statements require an expression"),
+                ("start\n    when\n", "When statements require a condition"),
+                ("start\n    while\n", "While statements require a condition"),
+                ("start\n    for in in xs\n", "For statements require the 'in' keyword and a variable name"),
+                ("functions\n    Add a int\n", "Function declarations require a parameter list"),
+                ("functions\n    (a int) int\n", "Function declarations require a name"),
+                ("functions\n    Add(a, b int) int\n", "missing the type"),
+                ("functions\n    Add(int, b int) int\n", "missing the name"),
+                ("functions\n    Add(a int, , b int) int\n", "missing the name and type"),
+                ("start(\n", "Unterminated parameter list in section header")
+            };
+
+            foreach (var (source, messagePart) in cases)
+            {
+                AssertParserError(source, messagePart);
+            }
         }
 
         [TestMethod]
