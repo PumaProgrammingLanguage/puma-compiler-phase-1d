@@ -36,6 +36,31 @@ namespace test
             }
         }
 
+        private static void AssertParserSuccess(string src)
+        {
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            Assert.IsTrue(ast.Count > 0, $"Expected non-empty AST. Source:\n{src}");
+        }
+
+        private static void AssertLexerHasUnknownToken(string src)
+        {
+            var lexer = new Puma.Lexer();
+            var tokens = lexer.Tokenize(src);
+            Assert.IsTrue(tokens.Any(t => t.Category == Puma.Lexer.TokenCategory.Unknown),
+                $"Expected at least one Unknown token. Source:\n{src}");
+        }
+
+        private static void AssertLexerHasNoUnknownToken(string src)
+        {
+            var lexer = new Puma.Lexer();
+            var tokens = lexer.Tokenize(src);
+            Assert.IsFalse(tokens.Any(t => t.Category == Puma.Lexer.TokenCategory.Unknown),
+                $"Expected no Unknown tokens. Source:\n{src}");
+        }
+
         [TestMethod]
         public void FunctionsExample_HelloAndAdd_LexerParserCodegen_AreConsistent()
         {
@@ -230,6 +255,47 @@ int Add(a int, b int)
         }
 
         [TestMethod]
+        public void ParserErrorMessages_AreAvoided_WithValidInputs()
+        {
+            var validCases = new[]
+            {
+                "start\n    a = 1\n",
+                "module\n    M\n",
+                "properties\n    a = 1\nstart\n    b = 2\n",
+                "functions\n    F()\n",
+                "module\n    M\nstart\n    a = 1\n",
+                "start\n    WriteLine(\"x\")\n",
+                "trait\n    MyTrait\n",
+                "type\n    MyType is object\n",
+                "type\n    MyType is object has IPrintable\n",
+                "use\n    System.IO as IO\n",
+                "use\n    a/b.h\n",
+                "start\n    a = b if c else d\n",
+                "start\n    a = 1 == 2\n",
+                "start\n    a = 1 < 2\n",
+                "start\n    a = 1:2\n",
+                "start\n    a = !b\n",
+                "properties\n    a = 1\n",
+                "start\n    a = 1\n",
+                "start\n    has x\n",
+                "start\n    if x\n        a = 1\n",
+                "start\n    match x\n        when 1\n            a = 1\n",
+                "start\n    when x\n        a = 1\n",
+                "start\n    while x\n        a = 1\n",
+                "start\n    for i in xs\n        a = i\n",
+                "functions\n    Add(a int) int\n        return a\n",
+                "functions\n    Add(a int, b int) int\n        return a + b\n",
+                "functions\n    Add(a int, c int) int\n        return a + c\n",
+                "start()\n    a = 1\n"
+            };
+
+            foreach (var source in validCases)
+            {
+                AssertParserSuccess(source);
+            }
+        }
+
+        [TestMethod]
         public void FunctionsExample_EmptyParameterList_Parser_Accepts()
         {
             const string src =
@@ -296,6 +362,79 @@ void Hello(void)
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void LexerErrorPaths_AreCovered_WithUnknownTokens()
+        {
+            var invalidCases = new[]
+            {
+                "start\n    s = \"\\q\"\n",
+                "start\n    c = '\\q'\n",
+                "start\n    n = 0b102\n",
+                "start\n    a = @\n"
+            };
+
+            foreach (var source in invalidCases)
+            {
+                AssertLexerHasUnknownToken(source);
+            }
+        }
+
+        [TestMethod]
+        public void LexerErrorPaths_AreAvoided_WithValidInputs()
+        {
+            var validCases = new[]
+            {
+                "start\n    s = \"\\n\"\n",
+                "start\n    c = '\\n'\n",
+                "start\n    n = 0b1010\n",
+                "start\n    a = 1\n"
+            };
+
+            foreach (var source in validCases)
+            {
+                AssertLexerHasNoUnknownToken(source);
+            }
+        }
+
+        [TestMethod]
+        public void CodegenFallbackPaths_AreCovered_WithIncompleteAstData()
+        {
+            var ast = new List<Node>
+            {
+                new Node(Puma.Parser.Section.Properties),
+                Node.CreatePropertyDeclaration("p", "mysteryType", null),
+                new Node(Puma.Parser.Section.Start)
+            };
+
+            var codegen = new Puma.Codegen();
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "mysteryType p = {0};");
+            StringAssert.Contains(generated, "int main()");
+        }
+
+        [TestMethod]
+        public void CodegenFallbackPaths_AreAvoided_WithValidInput()
+        {
+            const string src =
+@"properties
+    p = 1 int
+start
+    q = 2 int
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.IsFalse(generated.Contains("{0}", StringComparison.Ordinal));
+            Assert.IsFalse(generated.Contains(" = ;", StringComparison.Ordinal));
         }
     }
 }
