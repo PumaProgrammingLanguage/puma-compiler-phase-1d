@@ -427,12 +427,22 @@ namespace Puma
             {
                 if (token.Category == TokenCategory.Punctuation && token.TokenText == ",")
                 {
+                    if (current.Count == 0)
+                    {
+                        throw new InvalidOperationException("Parameter is missing the name and type.");
+                    }
+
                     AddParameterFromTokens(parameters, current);
                     current.Clear();
                     continue;
                 }
 
                 current.Add(token);
+            }
+
+            if (current.Count == 0 && tokens.Any(t => t.Category == TokenCategory.Punctuation && t.TokenText == ","))
+            {
+                throw new InvalidOperationException("Parameter is missing the name and type.");
             }
 
             AddParameterFromTokens(parameters, current);
@@ -455,9 +465,25 @@ namespace Puma
                 return;
             }
 
+            if (nameAndTypeTokens.Count == 1)
+            {
+                var single = nameAndTypeTokens[0];
+                if (single.Category == TokenCategory.Keyword)
+                {
+                    throw new InvalidOperationException($"Parameter of type '{single.TokenText}' is missing the name.");
+                }
+
+                throw new InvalidOperationException($"Parameter '{single.TokenText}' is missing the type.");
+            }
+
             var name = nameAndTypeTokens[0].TokenText;
             var typeTokens = nameAndTypeTokens.Skip(1).ToList();
             var (type, modifiers) = SplitTrailingModifiers(typeTokens, ParameterModifiers);
+            if (string.IsNullOrWhiteSpace(type))
+            {
+                throw new InvalidOperationException($"Parameter '{name}' is missing the type.");
+            }
+
             var defaultValue = defaultTokens.Count > 0 ? BuildQualifiedName(defaultTokens) : null;
 
             parameters.Add(new Node.ParameterInfo

@@ -469,16 +469,37 @@ namespace Puma
                 sb.AppendLine();
             }
 
-            foreach (var node in ast.Where(n => n.Kind == NodeKind.FunctionDeclaration && !typeFunctions.Contains(n)))
+            var globalFunctions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration && !typeFunctions.Contains(n)).ToList();
+            if (globalFunctions.Count > 0)
             {
-                var returnType = MapType(node.FunctionDeclarationReturnType) ?? "void";
-                var parameters = string.Join(", ", node.FunctionParameterList.Select(FormatParameter));
+                sb.AppendLine("// functions");
+            }
+
+            foreach (var node in globalFunctions)
+            {
+                var returnType = string.IsNullOrWhiteSpace(node.FunctionDeclarationReturnType)
+                    ? "void"
+                    : node.FunctionDeclarationReturnType;
+                var parameters = node.FunctionParameterList.Count == 0
+                    ? "void"
+                    : string.Join(", ", node.FunctionParameterList.Select(FormatFunctionSignatureParameter));
                 sb.AppendLine($"{returnType} {node.FunctionDeclarationName}({parameters})");
                 sb.AppendLine("{");
                 EmitStatements(node.FunctionBody, sb, "    ");
                 sb.AppendLine("}");
                 sb.AppendLine();
             }
+        }
+
+        private static string FormatFunctionSignatureParameter(Node.ParameterInfo parameter)
+        {
+            var type = string.IsNullOrWhiteSpace(parameter.Type) ? "" : parameter.Type;
+            if (string.IsNullOrWhiteSpace(parameter.Name))
+            {
+                return type;
+            }
+
+            return $"{parameter.Name} {type}";
         }
 
         private static void EmitInitializeFinalize(List<Node> ast, StringBuilder sb)
