@@ -127,6 +127,86 @@ int Add(a int, b int)
         }
 
         [TestMethod]
+        public void PropertiesFunctions_ForLoops_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = -20
+    b = 20
+    myList = List()
+functions
+    F()
+        for x in myList
+            b = x
+
+    G()
+        for i in Range()
+            a = i
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "-", "20",
+                "b", "=", "20",
+                "myList", "=", "List", "(", ")",
+                "functions",
+                "F", "(", ")",
+                "for", "x", "in", "myList",
+                "b", "=", "x",
+                "G", "(", ")",
+                "for", "i", "in", "Range", "(", ")",
+                "a", "=", "i"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            Assert.AreEqual(3, properties.Count);
+            CollectionAssert.AreEqual(new[] { "a", "b", "myList" }, properties.Select(p => p.PropertyName).ToArray());
+
+            var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
+            Assert.AreEqual(2, functions.Count);
+            CollectionAssert.AreEqual(new[] { "F", "G" }, functions.Select(f => f.FunctionDeclarationName).ToArray());
+            Assert.AreEqual(NodeKind.ForStatement, functions[0].FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.ForStatement, functions[1].FunctionBody[0].Kind);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// properties
+auto a = -20;
+auto b = (int64_t)20;
+auto myList = List();
+
+// functions
+void F(void)
+{
+    for (auto x : myList)
+    {
+        b = x;
+    }
+}
+
+void G(void)
+{
+    for (auto i : Range())
+    {
+        a = i;
+    }
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesFunctions_MatchWhileRepeat_LexerParserCodegen_AreConsistent()
         {
             const string src =
