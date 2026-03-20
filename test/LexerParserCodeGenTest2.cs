@@ -134,6 +134,7 @@ int Add(a int, b int)
     a = -20
     b = 20
     myList = List()
+
 functions
     F()
         for x in myList
@@ -213,6 +214,7 @@ void G(void)
 @"properties
     a = 5
     b = 10
+
 functions
     F()
         match a
@@ -228,7 +230,7 @@ functions
             a++
 
     H()
-        repeat 1
+        repeat
             b--
             if b <= a
                 break
@@ -260,7 +262,7 @@ functions
                 "while", "a", "<", "b",
                 "a", "++",
                 "H", "(", ")",
-                "repeat", "1",
+                "repeat",
                 "b", "--",
                 "if", "b", "<=", "a",
                 "break"
@@ -278,7 +280,9 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// properties
+@"#include <stdbool.h>
+
+// properties
 auto a = (int64_t)5;
 auto b = (int64_t)10;
 
@@ -316,7 +320,7 @@ void H(void)
         {
             break;
         }
-    } while (1);
+    } while (true);
 }
 ";
 
@@ -727,6 +731,7 @@ void F(void)
             const string src =
 @"properties
     p = 1 int
+
 start
     q = 2 int
 ";

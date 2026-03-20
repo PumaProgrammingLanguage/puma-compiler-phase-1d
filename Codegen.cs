@@ -36,11 +36,19 @@ namespace Puma
                 includes.Add("<stdio.h>");
             }
 
-            var needsStdBool = ast.Any(n => n.Kind == NodeKind.AssignmentStatement
+            var allNodes = EnumerateAllNodes(ast).ToList();
+
+            var needsStdBool = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
                 && n.AssignmentOperator == "="
                 && (string.Equals(n.AssignmentRight, "true", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(n.AssignmentRight, "false", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(n.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)));
+            if (!needsStdBool)
+            {
+                needsStdBool = allNodes.Any(n => n.Kind == NodeKind.RepeatStatement
+                    && (string.IsNullOrWhiteSpace(n.RepeatExpression)
+                        || string.Equals(n.RepeatExpression, "1", StringComparison.Ordinal)));
+            }
             if (needsStdBool)
             {
                 includes.Add("<stdbool.h>");
@@ -813,7 +821,11 @@ namespace Puma
                         break;
                     case NodeKind.RepeatStatement:
                         {
-                            var repeatCondition = GenerateExpression(node.RepeatExpressionNode, node.RepeatExpression) ?? "1";
+                            var repeatCondition = GenerateExpression(node.RepeatExpressionNode, node.RepeatExpression);
+                            if (string.IsNullOrWhiteSpace(repeatCondition) || repeatCondition == "1")
+                            {
+                                repeatCondition = "true";
+                            }
                             sb.AppendLine($"{indent}do");
                             sb.AppendLine($"{indent}{{");
                             EmitStatements(node.StatementBody, sb, indent + "    ");
@@ -1209,6 +1221,34 @@ namespace Puma
             };
 
             return true;
+        }
+
+        private static IEnumerable<Node> EnumerateAllNodes(IEnumerable<Node> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                yield return node;
+
+                foreach (var functionNode in EnumerateAllNodes(node.FunctionBody))
+                {
+                    yield return functionNode;
+                }
+
+                foreach (var statementNode in EnumerateAllNodes(node.StatementBody))
+                {
+                    yield return statementNode;
+                }
+
+                foreach (var elseNode in EnumerateAllNodes(node.ElseBody))
+                {
+                    yield return elseNode;
+                }
+
+                foreach (var typeFunction in EnumerateAllNodes(node.TypeFunctions))
+                {
+                    yield return typeFunction;
+                }
+            }
         }
     }
 }
