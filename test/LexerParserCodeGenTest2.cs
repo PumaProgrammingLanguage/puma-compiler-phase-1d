@@ -110,14 +110,17 @@ namespace test
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// functions
+@"#include <stdint.h>
+#include <string.h>
+
+// functions
 void Hello(void)
 {
-    s = ""Hello, World!""s;
+    auto s = ""Hello, World!""s;
     PrintLn(s);
 }
 
-int Add(a int, b int)
+int Add(int64_t a, int64_t b)
 {
     return a + b;
 }
@@ -181,8 +184,10 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// properties
-auto a = -20;
+@"#include <stdint.h>
+
+// properties
+auto a = (int64_t)-20;
 auto b = (int64_t)20;
 auto myList = List();
 
@@ -280,7 +285,8 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdbool.h>
+@"#include <stdint.h>
+#include <stdbool.h>
 
 // properties
 auto a = (int64_t)5;
@@ -395,7 +401,9 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// properties
+@"#include <stdint.h>
+
+// properties
 auto a = (int64_t)1;
 auto b = (int64_t)2;
 

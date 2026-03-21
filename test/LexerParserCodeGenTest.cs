@@ -89,7 +89,9 @@ namespace test
 
             var generated = codegen.Generate(ast);
             var expected =
-@"int main()
+@"#include <cstdint>
+
+int main()
 {
     auto a = (int64_t)1;
     auto b = (int64_t)2;
@@ -144,10 +146,10 @@ initialize
 public:
     MyTrait()
     {
-        a = 1.1;
-        b = 2.2;
-        c = 3.3;
-        d = 4.4;
+        auto a = (double)1.1;
+        auto b = (double)2.2;
+        auto c = (double)3.3;
+        auto d = (float)4.4;
     }
 };
 ";
@@ -197,7 +199,9 @@ start
 
             var generated = codegen.Generate(ast);
             var expected =
-@"namespace MyModule
+@"#include <cstdint>
+
+namespace MyModule
 {
     int main()
     {
@@ -260,11 +264,11 @@ class MyTrait
 public:
     MyTrait()
     {
-        a = false;
-        b = true;
-        c = bool;
-        d = """"s;
-        e = str;
+        auto a = false;
+        auto b = true;
+        auto c = bool;
+        auto d = """"s;
+        auto e = str;
     }
 };
 ";
@@ -322,7 +326,9 @@ public:
 
             var generated = codegen.Generate(ast);
             var expected =
-@"int main()
+@"#include <cstdint>
+
+int main()
 {
     auto b = (uint64_t)2;
     auto c = (uint64_t)3;
@@ -376,7 +382,9 @@ start
 
             var generated = codegen.Generate(ast);
             var expected =
-@"namespace MyModule
+@"#include <cstdint>
+
+namespace MyModule
 {
     int main()
     {
@@ -440,10 +448,10 @@ start
 @"// initialize
 void initialize(void)
 {
-    a = 1.1;
-    b = 2.2;
-    c = 3.3;
-    d = 4.4;
+    auto a = (double)1.1;
+    auto b = (double)2.2;
+    auto c = (double)3.3;
+    auto d = (float)4.4;
 }
 ";
 
@@ -490,10 +498,10 @@ initialize
 public:
     MyType()
     {
-        a = 1.1;
-        b = 2.2;
-        c = 3.3;
-        d = 4.4;
+        auto a = (double)1.1;
+        auto b = (double)2.2;
+        auto c = (double)3.3;
+        auto d = (float)4.4;
     }
 };
 ";
@@ -545,11 +553,11 @@ public:
 // initialize
 void initialize(void)
 {
-    a = false;
-    b = true;
-    c = bool;
-    d = """"s;
-    e = str;
+    auto a = false;
+    auto b = true;
+    auto c = bool;
+    auto d = """"s;
+    auto e = str;
 }
 ";
 
@@ -601,11 +609,11 @@ class MyType : public object
 public:
     MyType()
     {
-        a = false;
-        b = true;
-        c = bool;
-        d = """"s;
-        e = str;
+        auto a = false;
+        auto b = true;
+        auto c = bool;
+        auto d = """"s;
+        auto e = str;
     }
 };
 ";
@@ -705,7 +713,9 @@ auto e = """"s;
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// properties
+@"#include <stdint.h>
+
+// properties
 auto a = (int64_t)1;
 auto b = (int64_t)2;
 auto c = (int64_t)3;
@@ -755,7 +765,9 @@ auto f = (int8_t)6;
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// properties
+@"#include <stdint.h>
+
+// properties
 auto b = (uint64_t)2;
 auto c = (uint64_t)3;
 auto d = (uint32_t)4;
@@ -810,14 +822,13 @@ auto f = (uint8_t)6;
 // records
 struct MyRecord
 {
-    bool a = false;
-    bool b = true;
-    bool c = false;
-    str:string d = """"s;
-    str:string e = """"s;
+    auto a = false;
+    auto b = true;
+    auto c = false;
+    auto d = """"s;
+    auto e = """"s;
 };
 ";
-
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
@@ -861,15 +872,17 @@ struct MyRecord
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// records
+@"#include <cstdint>
+
+// records
 struct MyRecord
 {
-    int64_t a = 1;
-    int64_t b = 2;
-    int64_t c = 3;
-    int32_t d = 4;
-    int16_t e = 5;
-    int8_t f = 6;
+    auto a = (int64_t)1;
+    auto b = (int64_t)2;
+    auto c = (int64_t)3;
+    auto d = (int32_t)4;
+    auto e = (int16_t)5;
+    auto f = (int8_t)6;
 };
 ";
 
@@ -914,14 +927,16 @@ struct MyRecord
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// records
+@"#include <cstdint>
+
+// records
 struct MyRecord
 {
-    uint64_t b = 2;
-    uint64_t c = 3;
-    uint32_t d = 4;
-    uint16_t e = 5;
-    uint8_t f = 6;
+    auto b = (uint64_t)2;
+    auto c = (uint64_t)3;
+    auto d = (uint32_t)4;
+    auto e = (uint16_t)5;
+    auto f = (uint8_t)6;
 };
 ";
 
