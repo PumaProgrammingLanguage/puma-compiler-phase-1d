@@ -130,6 +130,97 @@ int Add(int64_t a, int64_t b)
         }
 
         [TestMethod]
+        public void PropertiesFunctions_ArithmeticLogicalBitwise_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = -20
+    b = 20
+    c = true
+    d = false
+
+functions
+    F()
+        x = a + b
+        x = a - b
+        x = a * b
+        x = a / b
+
+        y = c and d
+        y = c or d
+
+        z = a & b
+        z = a | b
+        z = a ^ b
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "-", "20",
+                "b", "=", "20",
+                "c", "=", "true",
+                "d", "=", "false",
+                "functions",
+                "F", "(", ")",
+                "x", "=", "a", "+", "b",
+                "x", "=", "a", "-", "b",
+                "x", "=", "a", "*", "b",
+                "x", "=", "a", "/", "b",
+                "y", "=", "c", "and", "d",
+                "y", "=", "c", "or", "d",
+                "z", "=", "a", "&", "b",
+                "z", "=", "a", "|", "b",
+                "z", "=", "a", "^", "b"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            Assert.AreEqual(4, properties.Count);
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, properties.Select(p => p.PropertyName).ToArray());
+
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            Assert.AreEqual(9, function.FunctionBody.Count);
+            Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint.h>
+#include <stdbool.h>
+
+// properties
+auto a = (int64_t)-20;
+auto b = (int64_t)20;
+auto c = true;
+auto d = false;
+
+// functions
+void F(void)
+{
+    x = a + b;
+    x = a - b;
+    x = a * b;
+    x = a / b;
+    y = c and d;
+    y = c or d;
+    z = a & b;
+    z = a | b;
+    z = a ^ b;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesFunctions_ForLoops_LexerParserCodegen_AreConsistent()
         {
             const string src =
