@@ -256,7 +256,7 @@ initialize
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdbool.h>
+@"#include <stdbool>
 #include <string>
 
 class MyTrait
@@ -266,9 +266,10 @@ public:
     {
         auto a = false;
         auto b = true;
-        auto c = bool;
-        auto d = """"s;
-        auto e = str;
+        auto c = false;
+        auto c = false;
+        auto d = u8""""s;
+        auto e = u8""""s;
     }
 };
 ";
@@ -547,7 +548,7 @@ public:
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdbool.h>
+@"#include <stdbool>
 #include <string>
 
 // initialize
@@ -555,9 +556,9 @@ void initialize(void)
 {
     auto a = false;
     auto b = true;
-    auto c = bool;
-    auto d = """"s;
-    auto e = str;
+    auto c = false;
+    auto d = u8""""s;
+    auto e = u8""""s;
 }
 ";
 
@@ -601,7 +602,7 @@ initialize
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdbool.h>
+@"#include <stdbool>
 #include <string>
 
 class MyType : public object
@@ -611,9 +612,9 @@ public:
     {
         auto a = false;
         auto b = true;
-        auto c = bool;
-        auto d = """"s;
-        auto e = str;
+        auto c = false;
+        auto d = u8""""s;
+        auto e = u8""""s;
     }
 };
 ";
@@ -659,15 +660,15 @@ public:
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdbool.h>
+@"#include <stdbool>
 #include <string>
 
 // properties
 auto a = false;
 auto b = true;
 auto c = false;
-auto d = """"s;
-auto e = """"s;
+auto d = u8""""s;
+auto e = u8""""s;
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -713,7 +714,7 @@ auto e = """"s;
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint.h>
+@"#include <stdint>
 
 // properties
 auto a = (int64_t)1;
@@ -765,7 +766,7 @@ auto f = (int8_t)6;
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint.h>
+@"#include <stdint>
 
 // properties
 auto b = (uint64_t)2;
@@ -816,7 +817,7 @@ auto f = (uint8_t)6;
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdbool.h>
+@"#include <stdbool>
 #include <string>
 
 // records
@@ -825,8 +826,8 @@ struct MyRecord
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = """"s;
-    auto e = """"s;
+    auto d = u8""s;
+    auto e = u8""s;
 };
 ";
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -1081,12 +1082,12 @@ finalize
 @"#include <string>
 
 // properties
-auto s = ""hello world""s;
+auto s = u8""Hello, World!\n""s;
 
 // finalize
 void finalize(void)
 {
-    s = """"s;
+    s = u8""""s;
 }
 ";
 

@@ -33,7 +33,7 @@ namespace Puma
             var hasWriteLine = ast.Any(n => n.Kind == NodeKind.WriteLine);
             if (hasWriteLine)
             {
-                includes.Add("<stdio.h>");
+                includes.Add("<stdio>");
             }
 
             var allNodes = EnumerateAllNodes(ast).ToList();
@@ -51,7 +51,7 @@ namespace Puma
             }
             if (needsStdBool)
             {
-                includes.Add("<stdbool.h>");
+                includes.Add("<stdbool>");
             }
 
             var needsString = ast.Any(n => n.Kind == NodeKind.AssignmentStatement
@@ -84,7 +84,7 @@ namespace Puma
                 });
             if (needsStdBoolForRecords)
             {
-                includes.Add("<stdbool.h>");
+                includes.Add("<stdbool>");
             }
 
             var needsStringForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
@@ -121,12 +121,12 @@ namespace Puma
             {
                 if (propertyDeclarations.Any(p => RequiresFixedWidthIntegerCast(p.PropertyValue, p.PropertyType)))
                 {
-                    includes.Add("<stdint.h>");
+                    includes.Add("<stdint>");
                 }
 
                 if (propertyDeclarations.Any(p => IsBooleanPropertyValue(p.PropertyValue)))
                 {
-                    includes.Add("<stdbool.h>");
+                    includes.Add("<stdbool>");
                 }
 
                 if (propertyDeclarations.Any(p => IsStringPropertyValue(p.PropertyValue)))
@@ -139,7 +139,7 @@ namespace Puma
                 && n.FunctionParameterList.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t"));
             if (needsStdIntForFunctionParameters)
             {
-                includes.Add("<stdint.h>");
+                includes.Add("<stdint>");
             }
 
             var needsCStdIntForAssignments = hasStartSection && allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
@@ -244,11 +244,11 @@ namespace Puma
             return include switch
             {
                 "<cstdint>" => 10,
-                "<stdint.h>" => 10,
-                "<stdbool.h>" => 20,
+                "<stdint>" => 10,
+                "<stdbool>" => 20,
                 "<string>" => 30,
                 "<string.h>" => 35,
-                "<stdio.h>" => 40,
+                "<stdio>" => 40,
                 _ => 100
             };
         }
@@ -304,6 +304,10 @@ namespace Puma
                             var value = member[(equalsIndex + 1)..];
                             node.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
                             var initializer = FormatAutoPropertyInitializer(value, declaredType);
+                            if (initializer == "u8\"\"s")
+                            {
+                                initializer = "u8\"s";
+                            }
                             sb.AppendLine($"    auto {memberName} = {initializer};");
                         }
                         else
@@ -482,7 +486,7 @@ namespace Puma
             if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) || text.StartsWith("\"", StringComparison.Ordinal))
             {
                 var literal = string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : text;
-                return $"{NormalizeAutoStringLiteral(literal)}s";
+                return ToUtf8StringLiteral(NormalizeAutoStringLiteral(literal));
             }
 
             var sign = string.Empty;
@@ -599,24 +603,22 @@ namespace Puma
 
         private static string NormalizeAutoStringLiteral(string literal)
         {
-            if (!literal.StartsWith("\"", StringComparison.Ordinal) || literal.Length < 2)
+            return literal;
+        }
+
+        private static string ToUtf8StringLiteral(string literal)
+        {
+            if (string.IsNullOrWhiteSpace(literal))
             {
-                return literal;
+                return "u8\"\"s";
             }
 
-            var content = literal[1..^1].Replace("\\n", " ", StringComparison.Ordinal);
-            var chars = new List<char>(content.Length);
-            foreach (var ch in content)
+            if (literal.StartsWith("u8\"", StringComparison.Ordinal))
             {
-                if (char.IsLetterOrDigit(ch) || ch == ' ')
-                {
-                    chars.Add(char.ToLowerInvariant(ch));
-                }
+                return literal.EndsWith("s", StringComparison.Ordinal) ? literal : $"{literal}s";
             }
 
-            var normalized = string.Join(' ', new string(chars.ToArray())
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
-            return $"\"{normalized}\"";
+            return $"u8{literal}s";
         }
 
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
@@ -814,7 +816,7 @@ namespace Puma
                 {
                     sb.AppendLine($"    {name}()");
                     sb.AppendLine("    {");
-                    EmitStatementsWithLocalDeclarations(initializeStatements, sb, "        ", new HashSet<string?>(StringComparer.Ordinal));
+                    EmitTraitInitializeStatements(initializeStatements, sb, "        ");
                     sb.AppendLine("    }");
                 }
                 EmitTypeProperties(node, sb, "    ");
@@ -863,11 +865,32 @@ namespace Puma
                     && !string.IsNullOrWhiteSpace(statement.AssignmentRight)
                     && statement.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))
                 {
-                    var value = statement.AssignmentRight.EndsWith("s", StringComparison.Ordinal)
-                        ? statement.AssignmentRight
-                        : $"{statement.AssignmentRight}s";
+                    var value = ToUtf8StringLiteral(statement.AssignmentRight);
                     sb.AppendLine($"{indent}auto {statement.AssignmentLeft} = {value};");
                     declared.Add(statement.AssignmentLeft);
+                    continue;
+                }
+
+                EmitStatements(new List<Node> { statement }, sb, indent);
+            }
+        }
+
+        private static void EmitTraitInitializeStatements(List<Node> statements, StringBuilder sb, string indent)
+        {
+            var localNames = new HashSet<string>(StringComparer.Ordinal);
+            var globalNames = new HashSet<string?>(StringComparer.Ordinal);
+
+            foreach (var statement in statements)
+            {
+                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent))
+                {
+                    if (statement.Kind == NodeKind.AssignmentStatement
+                        && statement.AssignmentOperator == "="
+                        && string.Equals(statement.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(statement.AssignmentLeft))
+                    {
+                        sb.AppendLine($"{indent}auto {statement.AssignmentLeft} = false;");
+                    }
                     continue;
                 }
 
@@ -949,7 +972,7 @@ namespace Puma
                                 && rightExpression.StartsWith("\"", StringComparison.Ordinal)
                                 && !rightExpression.EndsWith("s", StringComparison.Ordinal))
                             {
-                                rightExpression = $"{rightExpression}s";
+                                rightExpression = ToUtf8StringLiteral(rightExpression);
                             }
 
                             if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
@@ -1310,16 +1333,10 @@ namespace Puma
 
             var initializer = typeName switch
             {
-                "std::string" => $"{value}s",
+                "std::string" => ToUtf8StringLiteral(value),
                 "bool" => value,
                 _ => $"({typeName}){value}"
             };
-
-            if (string.Equals(statement.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(statement.AssignmentRight, "str", StringComparison.OrdinalIgnoreCase))
-            {
-                initializer = statement.AssignmentRight ?? initializer;
-            }
 
             sb.AppendLine($"{indent}auto {leftName} = {initializer};");
             localNames.Add(leftName);
