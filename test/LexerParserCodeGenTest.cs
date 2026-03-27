@@ -267,7 +267,6 @@ public:
         auto a = false;
         auto b = true;
         auto c = false;
-        auto c = false;
         auto d = u8""""s;
         auto e = u8""""s;
     }
@@ -826,8 +825,8 @@ struct MyRecord
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = u8""s;
-    auto e = u8""s;
+    auto d = u8""""s;
+    auto e = u8""""s;
 };
 ";
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());

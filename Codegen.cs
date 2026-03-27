@@ -304,10 +304,6 @@ namespace Puma
                             var value = member[(equalsIndex + 1)..];
                             node.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
                             var initializer = FormatAutoPropertyInitializer(value, declaredType);
-                            if (initializer == "u8\"\"s")
-                            {
-                                initializer = "u8\"s";
-                            }
                             sb.AppendLine($"    auto {memberName} = {initializer};");
                         }
                         else
@@ -884,13 +880,6 @@ namespace Puma
             {
                 if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent))
                 {
-                    if (statement.Kind == NodeKind.AssignmentStatement
-                        && statement.AssignmentOperator == "="
-                        && string.Equals(statement.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)
-                        && !string.IsNullOrWhiteSpace(statement.AssignmentLeft))
-                    {
-                        sb.AppendLine($"{indent}auto {statement.AssignmentLeft} = false;");
-                    }
                     continue;
                 }
 
