@@ -15,9 +15,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-using Microsoft.VisualStudio.TestPlatform.Utilities;
 using System.Diagnostics;
-using System.IO;
 using System.Reflection;
 using System.Text;
 
@@ -36,7 +34,7 @@ namespace Puma
         protected static string OutputFileName = "";
         // variable to store the source code.
         protected static string source = "";
-        
+
         /// <summary>
         /// // Main method of the Puma compiler.
         /// </summary>
@@ -197,7 +195,7 @@ namespace Puma
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "clang++", // switched to C++ compiler
+                    FileName = "clang++", // use the LLVM C++ compiler
                     Arguments = ClangArguments,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,   // capture errors
