@@ -1,13 +1,11 @@
-// PumaTypes.cpp : Defines the functions for the static library.
+// PumaType.cpp : Defines the functions for the static library.
 //
-#include "pch.h"
-#include "framework.h"
 #include "String.hpp"
 #include <memory.h>
 #include <new>
 
 namespace Puma {
-namespace Types
+namespace Type
 {
 
 	// Default-constructs an empty String (no heap allocation).
@@ -19,16 +17,16 @@ namespace Types
 	}
 
 	// Constructs a String from raw UTF‑8 bytes and explicit length in bytes.
-	String::String(const char* data, size_t dataSize) noexcept
-		: String(reinterpret_cast<const uint8_t*>(data), static_cast<uint32_t>(dataSize))
+	String::String(const char* utf8, size_t dataSize) noexcept
+		: String(reinterpret_cast<const uint8_t*>(utf8), static_cast<uint32_t>(dataSize))
 	{
 	}
 
 	// Constructs a String from raw UTF‑8 bytes and explicit length in bytes.
-	String::String(const uint8_t* data, uint32_t dataSize) noexcept
+	String::String(const uint8_t* utf8, uint32_t dataSize) noexcept
 		: String()
 	{
-		if (data == nullptr || dataSize == 0)
+		if (utf8 == nullptr || dataSize == 0)
 		{
 			// Empty string: no heap allocation needed, just leave the default empty state.
 			return;
@@ -44,7 +42,7 @@ namespace Types
 			if (dataSize > 0)
 			{
 				// Copy the string data into the codeUnits array.
-				memcpy(shortStr.codeUnits, data, dataSize);
+				memcpy(shortStr.codeUnits, utf8, dataSize);
 			}
 		}
 		else
@@ -53,7 +51,7 @@ namespace Types
 			if (buf != nullptr)
 			{
 				// Copy the string data into the newly allocated buffer.
-				memcpy(buf, data, dataSize);
+				memcpy(buf, utf8, dataSize);
 				longStr.ptr = buf;
 				// Set as long string with ownership.
 				longStr.tag = LONG_OWNER_FLAG;
@@ -77,14 +75,23 @@ namespace Types
 		packedValues.secondHalf = source.packedValues.secondHalf;
 
 		// check if we should transfer ownership
-		if(moveOwner && source.isLongOwner())
+		if(source.isLongOwner())
 		{
-			// transfer ownership of the string data from the source to this string.
-			// Set the source string as a borrower (non-owner) since ownership is being transferred.
-			source.SetBorrower();
-			// Set this string as the new owner of the data.
-			SetOwner();
+			if (moveOwner)
+			{
+				// transfer ownership of the string data from the source to this string.
+				// Set the source string as a borrower (non-owner) since ownership is being transferred.
+				source.SetBorrower();
+				// Set this string as the new owner of the data.
+				SetOwner();
+			}
+			else
+			{
+				// Do not transfer ownership. This string will be a borrower (non-owner) of the same data as the source string.
+				SetBorrower();
+			}
 		}
+		// else, default is borrower (non-owner) since string copying typically doesn't transfer ownership.
 	}
 
 	String::~String() noexcept
@@ -109,6 +116,8 @@ namespace Types
 		{
 			SetBorrower();
 		}
+		// else, if source is a short string, it is a value type and doesn't have ownership semantics.
+		// else, if source is a long string but not an owner, it is a borrower and we also don't transfer ownership.
 		return *this;
 	}
 
@@ -225,7 +234,7 @@ namespace Types
 	String String::ToString() noexcept
 	{
 		// Return a copy of this string (copy constructor semantics).
-		return *this;
+		return String(*this);
 	}
 
 	// Iterator support: first code unit.
@@ -292,5 +301,5 @@ namespace Types
 		return prevIt;
 	}
 
-} // namespace Types
+} // namespace Type
 } // namespace Puma

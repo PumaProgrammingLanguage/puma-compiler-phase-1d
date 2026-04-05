@@ -1,11 +1,9 @@
-#include "pch.h"
-#include "framework.h"
 #include "Charactor.hpp"
 #include "String.hpp" // needed for Charactor::ToString()
 #include <cstddef>
 
 namespace Puma {
-namespace Types
+namespace Type
 {
 	namespace
 	{
@@ -31,7 +29,7 @@ namespace Types
 	{
 	}
 
-	Charactor::Charactor(const uint8_t* data) noexcept
+	Charactor::Charactor(const uint8_t* utf8) noexcept
 	: packedValue(0U)
 	{
 		if (data == nullptr)
@@ -39,10 +37,10 @@ namespace Types
 			return;
 		}
 
-		const uint8_t charSize = GetCharSize(data[0]); // 1..4
+		const uint8_t charSize = GetCharSize(utf8[0]); // 1..4
 
 		// Copy up to 4 bytes
-		memcpy_s(codeUnits, sizeof(codeUnits), data, charSize);
+		memcpy_s(codeUnits, sizeof(codeUnits), utf8, charSize);
 	}
 
 	Charactor::~Charactor() noexcept = default;
@@ -76,5 +74,5 @@ namespace Types
 	{
 		return UTF8CharSizeLookup[c >> 3];
 	}
-} // namespace Types
+} // namespace Type
 } // namespace Puma

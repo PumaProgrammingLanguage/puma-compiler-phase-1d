@@ -1,12 +1,12 @@
-#ifndef PUMA_TYPES_CHARACTOR_HPP
-#define PUMA_TYPES_CHARACTOR_HPP
+#ifndef PUMA_TYPE_CHARACTOR_HPP
+#define PUMA_TYPE_CHARACTOR_HPP
 
 #pragma once
 
 #include <cstdint>
 
 namespace Puma {
-namespace Types
+namespace Type
 {
     // Forward declaration to avoid circular include with String.hpp
     union String;
@@ -18,7 +18,7 @@ namespace Types
         // Lifetime
         Charactor() noexcept;
         Charactor(const Charactor& source) noexcept;
-        Charactor(const uint8_t* data) noexcept;
+        Charactor(const uint8_t* utf8 noexcept;
         ~Charactor() noexcept;
 
         // Assignment
@@ -43,7 +43,7 @@ namespace Types
         // Packed 32-bit representation of the same 4 bytes
         uint32_t packedValue;
     };
-} // namespace Types
+} // namespace Type
 } // namespace Puma
 
-#endif // PUMA_TYPES_CHARACTOR_HPP
+#endif // PUMA_TYPE_CHARACTOR_HPP

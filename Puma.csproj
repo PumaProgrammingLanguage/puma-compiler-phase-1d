@@ -56,6 +56,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="PumaType\" />
     <Folder Include="tmp\" />
   </ItemGroup>
 

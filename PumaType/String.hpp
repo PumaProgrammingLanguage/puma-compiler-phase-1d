@@ -1,5 +1,5 @@
-#ifndef PUMA_TYPES_STRING_HPP
-#define PUMA_TYPES_STRING_HPP
+#ifndef PUMA_TYPE_STRING_HPP
+#define PUMA_TYPE_STRING_HPP
 
 #pragma once
 
@@ -13,7 +13,7 @@
 using namespace std;
 
 namespace Puma {
-namespace Types
+namespace Type
 {
 #pragma pack(push, 1)
     union String
@@ -25,9 +25,9 @@ namespace Types
 		// Copy constructor - creates a new String with the same content as the source. Can transfer ownership.
         String(String& source, bool moveOwner = false) noexcept;
 		// Constructs a String from the raw UTF‑8 bytes and explicit length in bytes.
-        String(const uint8_t* data, uint32_t dataSize) noexcept;
+        String(const uint8_t* utf8, uint32_t dataSize) noexcept;
 		// Constructs a String from the raw UTF‑8 bytes and explicit length in bytes.
-        String(const char* data, size_t dataSize) noexcept;
+        String(const char* utf8, size_t dataSize) noexcept;
 		// Destructor - releases owned resources if this String is an owner of long string data.
         ~String() noexcept;
 
@@ -103,7 +103,7 @@ namespace Types
     };
 #pragma pack(pop)
 
-} // namespace Types
+} // namespace Type
 } // namespace Puma
 
-#endif // PUMA_TYPES_STRING_HPP
+#endif // PUMA_TYPE_STRING_HPP
