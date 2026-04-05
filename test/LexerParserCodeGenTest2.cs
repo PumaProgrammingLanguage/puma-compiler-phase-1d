@@ -111,12 +111,12 @@ namespace test
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdint>
-#include <string.h>
+#include <String.hpp>
 
 // functions
 void Hello(void)
 {
-    auto s = u8""Hello, World!""s;
+    auto s = String(""Hello, World!"");
     PrintLn(s);
 }
 

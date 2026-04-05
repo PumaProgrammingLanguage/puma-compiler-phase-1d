@@ -257,7 +257,7 @@ initialize
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <string>
+#include <String.hpp>
 
 class MyTrait
 {
@@ -267,8 +267,8 @@ public:
         auto a = false;
         auto b = true;
         auto c = false;
-        auto d = u8""""s;
-        auto e = u8""""s;
+        auto d = String("""");
+        auto e = String("""");
     }
 };
 ";
@@ -548,7 +548,7 @@ public:
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <string>
+#include <String.hpp>
 
 // initialize
 void initialize(void)
@@ -556,8 +556,8 @@ void initialize(void)
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = u8""""s;
-    auto e = u8""""s;
+    auto d = String("""");
+    auto e = String("""");
 }
 ";
 
@@ -602,7 +602,7 @@ initialize
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <string>
+#include <String.hpp>
 
 class MyType : public object
 {
@@ -612,8 +612,8 @@ public:
         auto a = false;
         auto b = true;
         auto c = false;
-        auto d = u8""""s;
-        auto e = u8""""s;
+        auto d = String("""");
+        auto e = String("""");
     }
 };
 ";
@@ -660,14 +660,14 @@ public:
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <string>
+#include <String.hpp>
 
 // properties
 auto a = false;
 auto b = true;
 auto c = false;
-auto d = u8""""s;
-auto e = u8""""s;
+auto d = String("""");
+auto e = String("""");
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -817,7 +817,7 @@ auto f = (uint8_t)6;
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <string>
+#include <String.hpp>
 
 // records
 struct MyRecord
@@ -825,8 +825,8 @@ struct MyRecord
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = u8""""s;
-    auto e = u8""""s;
+    auto d = String("""");
+    auto e = String("""");
 };
 ";
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -1078,15 +1078,15 @@ finalize
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <string>
+@"#include <String.hpp>
 
 // properties
-auto s = u8""Hello, World!\n""s;
+auto s = String(""Hello, World!\n"");
 
 // finalize
 void finalize(void)
 {
-    s = u8""""s;
+    s = String("""");
 }
 ";
 

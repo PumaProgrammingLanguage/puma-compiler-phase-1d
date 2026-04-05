@@ -61,7 +61,7 @@ namespace Puma
                         || n.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))));
             if (needsString)
             {
-                includes.Add("<string>");
+                includes.Add("<String.hpp>");
             }
 
             var needsStringH = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration)
@@ -72,7 +72,7 @@ namespace Puma
                         && n.AssignmentRight.StartsWith("\"", StringComparison.Ordinal)));
             if (needsStringH)
             {
-                includes.Add("<string.h>");
+                includes.Add("<String.hpp>");
             }
 
             var needsStdBoolForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
@@ -96,7 +96,7 @@ namespace Puma
                 });
             if (needsStringForRecords)
             {
-                includes.Add("<string>");
+                includes.Add("<String.hpp>");
             }
 
             var needsCStdIntForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
@@ -131,7 +131,7 @@ namespace Puma
 
                 if (propertyDeclarations.Any(p => IsStringPropertyValue(p.PropertyValue)))
                 {
-                    includes.Add("<string>");
+                    includes.Add("<String.hpp>");
                 }
             }
 
@@ -246,8 +246,7 @@ namespace Puma
                 "<cstdint>" => 10,
                 "<stdint>" => 10,
                 "<stdbool>" => 20,
-                "<string>" => 30,
-                "<string.h>" => 35,
+                "<String.hpp>" => 30,
                 "<stdio>" => 40,
                 _ => 100
             };
@@ -482,7 +481,7 @@ namespace Puma
             if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) || text.StartsWith("\"", StringComparison.Ordinal))
             {
                 var literal = string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : text;
-                return ToUtf8StringLiteral(NormalizeAutoStringLiteral(literal));
+                return ToPumaStringLiteral(NormalizeAutoStringLiteral(literal));
             }
 
             var sign = string.Empty;
@@ -602,19 +601,19 @@ namespace Puma
             return literal;
         }
 
-        private static string ToUtf8StringLiteral(string literal)
+        private static string ToPumaStringLiteral(string literal)
         {
             if (string.IsNullOrWhiteSpace(literal))
             {
-                return "u8\"\"s";
+                return "String(\"\")";
             }
 
-            if (literal.StartsWith("u8\"", StringComparison.Ordinal))
+            if (literal.StartsWith("String(", StringComparison.Ordinal))
             {
-                return literal.EndsWith("s", StringComparison.Ordinal) ? literal : $"{literal}s";
+                return literal;
             }
 
-            return $"u8{literal}s";
+            return $"String({literal})";
         }
 
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
@@ -861,7 +860,7 @@ namespace Puma
                     && !string.IsNullOrWhiteSpace(statement.AssignmentRight)
                     && statement.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))
                 {
-                    var value = ToUtf8StringLiteral(statement.AssignmentRight);
+                    var value = ToPumaStringLiteral(statement.AssignmentRight);
                     sb.AppendLine($"{indent}auto {statement.AssignmentLeft} = {value};");
                     declared.Add(statement.AssignmentLeft);
                     continue;
@@ -961,7 +960,7 @@ namespace Puma
                                 && rightExpression.StartsWith("\"", StringComparison.Ordinal)
                                 && !rightExpression.EndsWith("s", StringComparison.Ordinal))
                             {
-                                rightExpression = ToUtf8StringLiteral(rightExpression);
+                                rightExpression = ToPumaStringLiteral(rightExpression);
                             }
 
                             if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
@@ -1143,7 +1142,7 @@ namespace Puma
             var type = MapType(parameter.Type) ?? "int64_t";
             return type switch
             {
-                "stdstr" => "\"\"",
+                "Puma::Type::String" => "String(\"\")",
                 "bool_t" => "false",
                 _ => "0"
             };
@@ -1171,8 +1170,8 @@ namespace Puma
                 "fix" or "fix64" => "int64_t",
                 "fix32" => "int32_t",
                 "bool" => "bool_t",
-                "char" => "uint8[4]",
-                "str" => "stdstr",
+                "char" => "Puma::Type::Charactor",
+                "str" => "Puma::Type::String",
                 _ => type
             };
         }
@@ -1212,7 +1211,7 @@ namespace Puma
 
             if (value.StartsWith("\"", StringComparison.Ordinal))
             {
-                return ("stdstr", value);
+                return ("Puma::Type::String", value);
             }
 
             if (bool.TryParse(value, out _))
@@ -1322,7 +1321,7 @@ namespace Puma
 
             var initializer = typeName switch
             {
-                "std::string" => ToUtf8StringLiteral(value),
+                "Puma::Type::String" => ToPumaStringLiteral(value),
                 "bool" => value,
                 _ => $"({typeName}){value}"
             };
@@ -1384,14 +1383,14 @@ namespace Puma
 
             if (text.StartsWith("\"", StringComparison.Ordinal))
             {
-                typeName = "std::string";
+                typeName = "Puma::Type::String";
                 literalValue = text;
                 return true;
             }
 
             if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase))
             {
-                typeName = "std::string";
+                typeName = "Puma::Type::String";
                 literalValue = "\"\"";
                 return true;
             }
