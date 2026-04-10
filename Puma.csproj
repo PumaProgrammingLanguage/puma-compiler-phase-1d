@@ -11,13 +11,13 @@
     <FileVersion>0.0.1.0</FileVersion>
     <PublishAot>True</PublishAot>
     <Description>LLVM compiler for the puma programming language.</Description>
-    <Copyright>Copyright © 2024 by Darryl Anthony Burchfield</Copyright>
+    <Copyright>Copyright © 2024 - 2026 by Darryl Anthony Burchfield</Copyright>
     <PackageReleaseNotes>Initial release</PackageReleaseNotes>
     <Title>Puma Programming Language</Title>
     <Company>Puma Programming Language Project</Company>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>compiler, translator</PackageTags>
-    <Version>00.01.00</Version>
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
