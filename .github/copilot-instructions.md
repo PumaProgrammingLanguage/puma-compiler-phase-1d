@@ -11,5 +11,9 @@
 - Prioritize parser/lexer work first; do codegen unit tests last.
 - Do as many small tasks as possible each session, then report remaining tasks.
 
+## Unit Testing
+- Use the new unit test file for all new unit tests.
+- Move newly added tests out of older test files into the new test file when requested.
+
 ## Specification Reference
 - The specification text file is located at `C:\Users\dabur\source\repos\Puma Programming Language Specification.txt`.
