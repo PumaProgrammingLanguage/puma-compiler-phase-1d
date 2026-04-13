@@ -1976,15 +1976,18 @@ namespace Puma
             var assignmentOperator = tokens[assignmentIndex].TokenText;
             var left = BuildQualifiedName(leftTokens);
             var right = BuildQualifiedName(rightTokens);
+            var leftExpression = ParseExpression(leftTokens);
+            var rightExpression = ParseExpression(rightTokens);
 
-            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            if ((string.IsNullOrWhiteSpace(left) && leftExpression == null)
+                || (string.IsNullOrWhiteSpace(right) && rightExpression == null))
             {
                 throw new InvalidOperationException("Assignment statements require left and right expressions.");
             }
 
             var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
-            node.AssignmentLeftExpression = ParseExpression(leftTokens);
-            node.AssignmentRightExpression = ParseExpression(rightTokens);
+            node.AssignmentLeftExpression = leftExpression;
+            node.AssignmentRightExpression = rightExpression;
             target.Add(node);
             return true;
         }

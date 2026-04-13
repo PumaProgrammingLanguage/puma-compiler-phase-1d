@@ -1105,8 +1105,10 @@ namespace Puma
             {
                 ExpressionKind.Identifier => node.Value ?? string.Empty,
                 ExpressionKind.Literal => node.Value ?? string.Empty,
-                ExpressionKind.Unary => $"{node.Value}{GenerateExpression(node.Left, null)}",
-                ExpressionKind.Cast => $"({node.Value}){GenerateExpression(node.Left, null)}",
+                ExpressionKind.Unary => string.Equals(node.Value, "not", StringComparison.Ordinal)
+                    ? $"not {GenerateExpression(node.Left, null)}"
+                    : $"{node.Value}{GenerateExpression(node.Left, null)}",
+                ExpressionKind.Cast => $"({node.Value}){GenerateExpression(node.Left, null)}", 
                 ExpressionKind.Conditional => $"({GenerateExpression(node.Left, null)} ? {GenerateExpression(node.Right, null)} : {GenerateExpression(node.Arguments.FirstOrDefault(), null)})",
                 ExpressionKind.Binary => $"({GenerateExpression(node.Left, null)} {node.Value} {GenerateExpression(node.Right, null)})",
                 ExpressionKind.MemberAccess => $"{GenerateExpression(node.Left, null)}.{node.Value}",

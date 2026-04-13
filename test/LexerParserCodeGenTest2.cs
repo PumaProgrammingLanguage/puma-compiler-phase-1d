@@ -165,10 +165,16 @@ functions
 
         y = c and d
         y = c or d
+        y = not c
+
+        x = a << b
+        x = a >> b
 
         z = a & b
         z = a | b
         z = a ^ b
+        x = a % b
+        x = ~a
 ";
 
             var lexer = new Puma.Lexer();
@@ -194,9 +200,14 @@ functions
                 "x", "=", "a", "/", "b",
                 "y", "=", "c", "and", "d",
                 "y", "=", "c", "or", "d",
+                "y", "=", "not", "c",
+                "x", "=", "a", "<<", "b",
+                "x", "=", "a", ">>", "b",
                 "z", "=", "a", "&", "b",
                 "z", "=", "a", "|", "b",
-                "z", "=", "a", "^", "b"
+                "z", "=", "a", "^", "b",
+                "x", "=", "a", "%", "b",
+                "x", "=", "~", "a"
             }, significant);
 
             var ast = parser.Parse(tokens);
@@ -205,7 +216,7 @@ functions
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, properties.Select(p => p.PropertyName).ToArray());
 
             var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
-            Assert.AreEqual(9, function.FunctionBody.Count);
+            Assert.AreEqual(14, function.FunctionBody.Count);
             Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
 
             var generated = codegen.Generate(ast);
@@ -228,9 +239,14 @@ void F(void)
     x = a / b;
     y = c and d;
     y = c or d;
+    y = not c;
+    x = a << b;
+    x = a >> b;
     z = a & b;
     z = a | b;
     z = a ^ b;
+    x = a % b;
+    x = ~a;
 }
 ";
 
@@ -347,6 +363,12 @@ functions
             b--
             if b <= a
                 break
+
+    I()
+        repeat
+            a++
+            if a >= b
+                break
 ";
 
             var lexer = new Puma.Lexer();
@@ -378,18 +400,25 @@ functions
                 "repeat",
                 "b", "--",
                 "if", "b", "<=", "a",
+                "break",
+                "I", "(", ")",
+                "repeat",
+                "a", "++",
+                "if", "a", ">=", "b",
                 "break"
             }, significant);
 
             var ast = parser.Parse(tokens);
             var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
-            Assert.AreEqual(3, functions.Count);
+            Assert.AreEqual(4, functions.Count);
             Assert.AreEqual("F", functions[0].FunctionDeclarationName);
             Assert.AreEqual("G", functions[1].FunctionDeclarationName);
             Assert.AreEqual("H", functions[2].FunctionDeclarationName);
+            Assert.AreEqual("I", functions[3].FunctionDeclarationName);
             Assert.AreEqual(NodeKind.MatchStatement, functions[0].FunctionBody[0].Kind);
             Assert.AreEqual(NodeKind.WhileStatement, functions[1].FunctionBody[0].Kind);
             Assert.AreEqual(NodeKind.RepeatStatement, functions[2].FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.RepeatStatement, functions[3].FunctionBody[0].Kind);
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -431,6 +460,18 @@ void H(void)
     {
         b--;
         if (b <= a)
+        {
+            break;
+        }
+    } while (true);
+}
+
+void I(void)
+{
+    do
+    {
+        a++;
+        if (a >= b)
         {
             break;
         }

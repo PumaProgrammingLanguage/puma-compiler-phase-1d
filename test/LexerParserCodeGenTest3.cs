@@ -73,6 +73,8 @@ functions
         x = a - b * f
         x = a / b + e
         x = a * b - f
+        x = ~a % b
+        x = ~(a % b)
 
         y = c and d or g
         y = c or d and h
@@ -120,6 +122,8 @@ functions
                 "x", "=", "a", "-", "b", "*", "f",
                 "x", "=", "a", "/", "b", "+", "e",
                 "x", "=", "a", "*", "b", "-", "f",
+                "x", "=", "~", "a", "%", "b",
+                "x", "=", "~", "(", "a", "%", "b", ")",
                 "y", "=", "c", "and", "d", "or", "g",
                 "y", "=", "c", "or", "d", "and", "h",
                 "z", "=", "a", "&", "b", "|", "e",
@@ -136,7 +140,7 @@ functions
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f", "g", "h" }, properties.Select(p => p.PropertyName).ToArray());
 
             var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
-            Assert.AreEqual(20, function.FunctionBody.Count);
+            Assert.AreEqual(22, function.FunctionBody.Count);
             Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
 
             var generated = codegen.Generate(ast);
@@ -169,6 +173,8 @@ void F(void)
     x = a - (b * f);
     x = (a / b) + e;
     x = (a * b) - f;
+    x = ~a % b;
+    x = ~(a % b);
     y = (c and d) or g;
     y = c or (d and h);
     z = (a & b) | e;
@@ -181,6 +187,295 @@ void F(void)
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void PropertiesFunctions_AssignmentOperators_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 64
+    b = 8
+
+functions
+    F()
+        x = a
+        x /= b
+        x *= b
+        x %= b
+        x += b
+        x -= b
+        x <<= 1
+        x >>= 1
+        x &= b
+        x ^= b
+        x |= b
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            Assert.IsFalse(tokens.Any(t => t.Category == Puma.Lexer.TokenCategory.Unknown), "Expected lexer to tokenize assignment operators without Unknown tokens.");
+
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "64",
+                "b", "=", "8",
+                "functions",
+                "F", "(", ")",
+                "x", "=", "a",
+                "x", "/=", "b",
+                "x", "*=", "b",
+                "x", "%=", "b",
+                "x", "+=", "b",
+                "x", "-=", "b",
+                "x", "<<=", "1",
+                "x", ">>=", "1",
+                "x", "&=", "b",
+                "x", "^=", "b",
+                "x", "|=", "b"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            Assert.AreEqual(2, properties.Count);
+            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => p.PropertyName).ToArray());
+
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            Assert.AreEqual(11, function.FunctionBody.Count);
+            Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
+
+            var generated = codegen.Generate(ast);
+            StringAssert.Contains(generated, "x = a;");
+            StringAssert.Contains(generated, "x /= b;");
+            StringAssert.Contains(generated, "x *= b;");
+            StringAssert.Contains(generated, "x %= b;");
+            StringAssert.Contains(generated, "x += b;");
+            StringAssert.Contains(generated, "x -= b;");
+            StringAssert.Contains(generated, "x <<= 1;");
+            StringAssert.Contains(generated, "x >>= 1;");
+            StringAssert.Contains(generated, "x &= b;");
+            StringAssert.Contains(generated, "x ^= b;");
+            StringAssert.Contains(generated, "x |= b;");
+        }
+
+        [TestMethod]
+        public void PropertiesFunctions_PrefixPostfixMemberAccess_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    counter = 0
+    obj = state
+
+functions
+    F()
+        preInc = ++counter
+        preDec = --counter
+        counter++
+        counter--
+        memberVal = obj.value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            Assert.IsFalse(tokens.Any(t => t.Category == Puma.Lexer.TokenCategory.Unknown), "Expected lexer to tokenize increment/decrement/member-access operators without Unknown tokens.");
+
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "counter", "=", "0",
+                "obj", "=", "state",
+                "functions",
+                "F", "(", ")",
+                "preInc", "=", "++", "counter",
+                "preDec", "=", "--", "counter",
+                "counter", "++",
+                "counter", "--",
+                "memberVal", "=", "obj", ".", "value"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            Assert.AreEqual(2, properties.Count);
+            CollectionAssert.AreEqual(new[] { "counter", "obj" }, properties.Select(p => p.PropertyName).ToArray());
+
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            Assert.AreEqual(5, function.FunctionBody.Count);
+            Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+// properties
+auto counter = (int64_t)0;
+auto obj = state;
+
+// functions
+void F(void)
+{
+    preInc = ++counter;
+    preDec = --counter;
+    counter++;
+    counter--;
+    memberVal = obj.value;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void UseSection_NamespaceAndFilePath_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"use
+    System.IO
+    a/b.h
+
+start
+    x = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "use",
+                "System", ".", "IO",
+                "a", "/", "b", ".", "h",
+                "start",
+                "x", "=", "1"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "#include <System/IO>");
+            StringAssert.Contains(generated, "#include \"a/b.h\"");
+            StringAssert.Contains(generated, "int main()");
+            StringAssert.Contains(generated, "auto x = (int64_t)1;");
+        }
+
+        [TestMethod]
+        public void Start_HasTraitStatement_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"start
+    has trait Printable obj
+        x = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "start",
+                "has", "trait", "Printable", "obj",
+                "x", "=", "1"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "if (obj != null && typeof(obj) == typeof(Printable))");
+            StringAssert.Contains(generated, "x = 1;");
+        }
+
+        [TestMethod]
+        public void Functions_YieldErrorCatch_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"functions
+    F()
+        yield 1
+        error ""boom""
+        catch ex
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "functions",
+                "F", "(", ")",
+                "yield", "1",
+                "error", "\"boom\"",
+                "catch", "ex"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "/* yield 1 */");
+            StringAssert.Contains(generated, "/* error \"boom\" */");
+            StringAssert.Contains(generated, "/* catch ex */");
+        }
+
+        [TestMethod]
+        public void PropertiesFunctions_IndexExpression_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    arr = items
+
+functions
+    F()
+        x = arr[i]
+        x = arr[i + 1]
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "arr", "=", "items",
+                "functions",
+                "F", "(", ")",
+                "x", "=", "arr", "[", "i", "]",
+                "x", "=", "arr", "[", "i", "+", "1", "]"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var fn = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            Assert.AreEqual(2, fn.FunctionBody.Count);
+
+            var generated = codegen.Generate(ast);
+            StringAssert.Contains(generated, "x = arr[i];");
+            StringAssert.Contains(generated, "x = arr[(i + 1)];");
         }
     }
 }
