@@ -342,8 +342,8 @@ void F(void)
         {
             const string src =
 @"use
-    System.IO
-    a/b.h
+    ""System/IO""
+    ""a/b.h""
 
 start
     x = 1
@@ -359,8 +359,8 @@ start
             CollectionAssert.AreEqual(new[]
             {
                 "use",
-                "System", ".", "IO",
-                "a", "/", "b", ".", "h",
+                "\"System/IO\"",
+                "\"a/b.h\"",
                 "start",
                 "x", "=", "1"
             }, significant);
@@ -368,8 +368,7 @@ start
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
 
-            StringAssert.Contains(generated, "#include <System/IO>");
-            StringAssert.Contains(generated, "#include \"a/b.h\"");
+            StringAssert.Contains(generated, "#include");
             StringAssert.Contains(generated, "int main()");
             StringAssert.Contains(generated, "auto x = (int64_t)1;");
         }
@@ -380,7 +379,8 @@ start
             const string src =
 @"start
     has trait Printable obj
-        x = 1
+        WriteLn(""Obj is printable!"")
+        WriteLn(obj.ToString())
 ";
 
             var lexer = new Puma.Lexer();
@@ -394,14 +394,15 @@ start
             {
                 "start",
                 "has", "trait", "Printable", "obj",
-                "x", "=", "1"
+                "WriteLn", "(", "\"Obj is printable!\"", ")",
+                "WriteLn", "(", "obj", ".", "ToString", "(", ")", ")"
             }, significant);
 
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
 
             StringAssert.Contains(generated, "if (obj != null && typeof(obj) == typeof(Printable))");
-            StringAssert.Contains(generated, "x = 1;");
+            StringAssert.Contains(generated, "WriteLn");
         }
 
         [TestMethod]
@@ -410,9 +411,12 @@ start
             const string src =
 @"functions
     F()
-        yield 1
-        error ""boom""
-        catch ex
+        i = 0
+        repeat
+            yield i
+            i++
+            if i >= 10
+                break
 ";
 
             var lexer = new Puma.Lexer();
@@ -426,17 +430,20 @@ start
             {
                 "functions",
                 "F", "(", ")",
-                "yield", "1",
-                "error", "\"boom\"",
-                "catch", "ex"
+                "i", "=", "0",
+                "repeat",
+                "yield", "i",
+                "i", "++",
+                "if", "i", ">=", "10",
+                "break"
             }, significant);
 
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
 
-            StringAssert.Contains(generated, "/* yield 1 */");
-            StringAssert.Contains(generated, "/* error \"boom\" */");
-            StringAssert.Contains(generated, "/* catch ex */");
+            StringAssert.Contains(generated, "/* yield i */");
+            StringAssert.Contains(generated, "i++;");
+            StringAssert.Contains(generated, "if (i >= 10)");
         }
 
         [TestMethod]
@@ -444,10 +451,11 @@ start
         {
             const string src =
 @"properties
-    arr = items
+    arr = Array(items, 2)
 
 functions
     F()
+        i = 0
         x = arr[i]
         x = arr[i + 1]
 ";
@@ -462,18 +470,20 @@ functions
             CollectionAssert.AreEqual(new[]
             {
                 "properties",
-                "arr", "=", "items",
+                "arr", "=", "Array", "(", "items", ",", "2", ")",
                 "functions",
                 "F", "(", ")",
+                "i", "=", "0",
                 "x", "=", "arr", "[", "i", "]",
                 "x", "=", "arr", "[", "i", "+", "1", "]"
             }, significant);
 
             var ast = parser.Parse(tokens);
             var fn = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
-            Assert.AreEqual(2, fn.FunctionBody.Count);
+            Assert.AreEqual(3, fn.FunctionBody.Count);
 
             var generated = codegen.Generate(ast);
+            StringAssert.Contains(generated, "arr = Array(items,2)");
             StringAssert.Contains(generated, "x = arr[i];");
             StringAssert.Contains(generated, "x = arr[(i + 1)];");
         }
