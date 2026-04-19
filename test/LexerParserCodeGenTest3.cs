@@ -488,5 +488,57 @@ functions
             StringAssert.Contains(generated, "x = arr[i];");
             StringAssert.Contains(generated, "x = arr[(i + 1)];");
         }
+
+        [TestMethod]
+        public void RecordsExample_BoolAndString_Packed_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"records
+    MyRecord packed
+        a = false
+        b = true
+        c = bool
+        d = """"
+        e = str
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "records",
+                "MyRecord", "packed",
+                "a", "=", "false",
+                "b", "=", "true",
+                "c", "=", "bool",
+                "d", "=", "\"\"",
+                "e", "=", "str"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdbool>
+#include <String.hpp>
+
+// records
+struct MyRecord [[gnu::packed]]
+{
+    auto a = false;
+    auto b = true;
+    auto c = false;
+    auto d = String("""");
+    auto e = String("""");
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
     }
 }

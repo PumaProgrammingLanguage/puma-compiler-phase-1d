@@ -289,10 +289,11 @@ namespace Puma
             foreach (var node in ast.Where(n => n.Kind == NodeKind.RecordDeclaration))
             {
                 var hasAssignedMembers = node.RecordMembers.Any(m => m.Contains('=', StringComparison.Ordinal));
+                var packedSuffix = node.RecordPackSize.HasValue ? " [[gnu::packed]]" : string.Empty;
                 if (hasAssignedMembers)
                 {
                     sb.AppendLine("// records");
-                    sb.AppendLine($"struct {node.RecordName}");
+                    sb.AppendLine($"struct {node.RecordName}{packedSuffix}");
                     sb.AppendLine("{");
                     foreach (var member in node.RecordMembers)
                     {

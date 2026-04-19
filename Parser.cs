@@ -792,7 +792,9 @@ namespace Puma
             {
                 FinalizeRecord();
                 var headerTokens = ReadTokensUntilEol(token.Value);
-                var packIndex = headerTokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "pack");
+                var packIndex = headerTokens.FindIndex(t =>
+                    (t.Category is TokenCategory.Keyword or TokenCategory.Identifier)
+                    && (t.TokenText == "pack" || t.TokenText == "packed"));
                 var nameTokens = packIndex >= 0 ? headerTokens.Take(packIndex).ToList() : headerTokens;
                 var name = BuildQualifiedName(nameTokens);
                 if (!string.IsNullOrWhiteSpace(name))
@@ -802,11 +804,21 @@ namespace Puma
                     _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
                     _currentRecordPackSize = null;
 
-                    if (packIndex >= 0 && packIndex + 1 < headerTokens.Count)
+                    if (packIndex >= 0)
                     {
-                        if (int.TryParse(headerTokens[packIndex + 1].TokenText, out var packSize))
+                        var packToken = headerTokens[packIndex].TokenText;
+                        if (packToken == "packed")
+                        {
+                            _currentRecordPackSize = 1;
+                        }
+                        else if (packIndex + 1 < headerTokens.Count
+                            && int.TryParse(headerTokens[packIndex + 1].TokenText, out var packSize))
                         {
                             _currentRecordPackSize = packSize;
+                        }
+                        else
+                        {
+                            _currentRecordPackSize = 1;
                         }
                     }
                 }
