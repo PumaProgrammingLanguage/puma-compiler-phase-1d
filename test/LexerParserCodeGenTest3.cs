@@ -410,7 +410,7 @@ start
         {
             const string src =
 @"functions
-    F()
+    F() int generator
         i = 0
         repeat
             yield i
@@ -429,7 +429,7 @@ start
             CollectionAssert.AreEqual(new[]
             {
                 "functions",
-                "F", "(", ")",
+                "F", "(", ")", "int", "generator",
                 "i", "=", "0",
                 "repeat",
                 "yield", "i",
@@ -441,6 +441,7 @@ start
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
 
+            StringAssert.Contains(generated, "intgenerator F(void)");
             StringAssert.Contains(generated, "/* yield i */");
             StringAssert.Contains(generated, "i++;");
             StringAssert.Contains(generated, "if (i >= 10)");
