@@ -16,3 +16,6 @@
 
 ## Specification Reference
 - The specification text file is located at `C:\Users\dabur\source\repos\Puma Programming Language Specification.txt`.
+
+## Version Control
+- Always commit `.github/upgrades/scenarios/new-dotnet-version_7f6cdd/scenario.json` when it is modified, alongside related changes.
