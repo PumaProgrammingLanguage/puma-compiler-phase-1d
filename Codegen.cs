@@ -524,7 +524,7 @@ namespace Puma
             var effectiveType = !string.IsNullOrWhiteSpace(declaredType) ? declaredType : suffix;
             var castType = effectiveType switch
             {
-                "" => "int64_t",
+                "" => dotSeen ? "double" : "int64_t",
                 "int" or "int64" => "int64_t",
                 "int32" => "int32_t",
                 "int16" => "int16_t",
@@ -782,9 +782,9 @@ namespace Puma
                 var inheritance = bases.Count > 0 ? $" : {string.Join(", ", bases)}" : string.Empty;
                 sb.AppendLine($"class {name}{inheritance}");
                 sb.AppendLine("{");
-                sb.AppendLine("public:");
                 if (initializeStatements.Count > 0)
                 {
+                    sb.AppendLine("public:");
                     sb.AppendLine($"    {name}()");
                     sb.AppendLine("    {");
                     EmitStatementsWithLocalDeclarations(initializeStatements, sb, "        ", new HashSet<string?>(StringComparer.Ordinal));
@@ -807,9 +807,9 @@ namespace Puma
                 var name = ToCppQualifiedName(node.DeclarationName) ?? "Trait";
                 sb.AppendLine($"class {name}");
                 sb.AppendLine("{");
-                sb.AppendLine("public:");
                 if (initializeStatements.Count > 0)
                 {
+                    sb.AppendLine("public:");
                     sb.AppendLine($"    {name}()");
                     sb.AppendLine("    {");
                     EmitTraitInitializeStatements(initializeStatements, sb, "        ");
@@ -889,12 +889,40 @@ namespace Puma
 
         private static void EmitTypeProperties(Node node, StringBuilder sb, string indent)
         {
+            var protectedProperties = new List<Node>();
+            var publicProperties = new List<Node>();
+
             foreach (var property in node.TypeProperties)
             {
-                var type = MapType(property.PropertyType) ?? InferCTypeAndValue(property.PropertyValue).Type;
-                var value = property.PropertyValue ?? InferCTypeAndValue(property.PropertyValue).Value;
+                if (property.PropertyModifiers.Contains("public"))
+                {
+                    publicProperties.Add(property);
+                }
+                else
+                {
+                    // Puma private/internal/default map to C++ protected.
+                    protectedProperties.Add(property);
+                }
+            }
+
+            EmitPropertiesForAccess(protectedProperties, "protected", sb, indent);
+            EmitPropertiesForAccess(publicProperties, "public", sb, indent);
+        }
+
+        private static void EmitPropertiesForAccess(List<Node> properties, string access, StringBuilder sb, string indent)
+        {
+            if (properties.Count == 0)
+            {
+                return;
+            }
+
+            sb.AppendLine($"{indent}{access}:");
+            sb.AppendLine($"{indent}// properties");
+            foreach (var property in properties)
+            {
+                var value = FormatAutoPropertyInitializer(property.PropertyValue, property.PropertyType);
                 var modifiers = property.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
-                sb.AppendLine($"{indent}{modifiers}{type} {property.PropertyName} = {value};");
+                sb.AppendLine($"{indent}{modifiers}auto {property.PropertyName} = {value};");
             }
         }
 

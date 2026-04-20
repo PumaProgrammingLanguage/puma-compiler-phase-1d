@@ -113,7 +113,7 @@ int main()
 @"trait
     MyTrait
 
-initialize
+properties
     a = 1.1
     b = 2.2 flt
     c = 3.3 flt64
@@ -131,7 +131,7 @@ initialize
             CollectionAssert.AreEqual(new[]
             {
                 "trait", "MyTrait",
-                "initialize",
+                "properties",
                 "a", "=", "1.1",
                 "b", "=", "2.2", "flt",
                 "c", "=", "3.3", "flt64",
@@ -143,14 +143,12 @@ initialize
             var expected =
 @"class MyTrait
 {
-public:
-    MyTrait()
-    {
-        auto a = (double)1.1;
-        auto b = (double)2.2;
-        auto c = (double)3.3;
-        auto d = (float)4.4;
-    }
+    protected:
+    // properties
+    auto a = (double)1.1;
+    auto b = (double)2.2;
+    auto c = (double)3.3;
+    auto d = (float)4.4;
 };
 ";
 
@@ -226,7 +224,7 @@ namespace MyModule
 @"trait
     MyTrait
 
-initialize
+properties
     a = false
     b = true
     c = bool
@@ -245,7 +243,7 @@ initialize
             CollectionAssert.AreEqual(new[]
             {
                 "trait", "MyTrait",
-                "initialize",
+                "properties",
                 "a", "=", "false",
                 "b", "=", "true",
                 "c", "=", "bool",
@@ -261,15 +259,13 @@ initialize
 
 class MyTrait
 {
-public:
-    MyTrait()
-    {
-        auto a = false;
-        auto b = true;
-        auto c = false;
-        auto d = String("""");
-        auto e = String("""");
-    }
+    protected:
+    // properties
+    auto a = false;
+    auto b = true;
+    auto c = false;
+    auto d = String("""");
+    auto e = String("""");
 };
 ";
 
