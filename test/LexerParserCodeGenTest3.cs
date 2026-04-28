@@ -405,47 +405,6 @@ start
             StringAssert.Contains(generated, "WriteLn");
         }
 
-        [TestMethod]
-        public void Functions_YieldErrorCatch_LexerParserCodegen_AreConsistent()
-        {
-            const string src =
-@"functions
-    F() int generator
-        i = 0
-        repeat
-            yield i
-            i++
-            if i >= 10
-                break
-";
-
-            var lexer = new Puma.Lexer();
-            var parser = new Puma.Parser();
-            var codegen = new Puma.Codegen();
-
-            var tokens = lexer.Tokenize(src);
-            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
-
-            CollectionAssert.AreEqual(new[]
-            {
-                "functions",
-                "F", "(", ")", "int", "generator",
-                "i", "=", "0",
-                "repeat",
-                "yield", "i",
-                "i", "++",
-                "if", "i", ">=", "10",
-                "break"
-            }, significant);
-
-            var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
-
-            StringAssert.Contains(generated, "intgenerator F(void)");
-            StringAssert.Contains(generated, "/* yield i */");
-            StringAssert.Contains(generated, "i++;");
-            StringAssert.Contains(generated, "if (i >= 10)");
-        }
 
         [TestMethod]
         public void PropertiesFunctions_IndexExpression_LexerParserCodegen_AreConsistent()

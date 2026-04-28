@@ -91,6 +91,7 @@ namespace test
             var expected =
 @"#include <cstdint>
 
+// start
 int main()
 {
     auto a = (int64_t)1;
@@ -100,6 +101,64 @@ int main()
     auto e = (int16_t)5;
     auto f = (int8_t)6;
     return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void PropertiesAndInitialize_NoMainGenerated_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0
+    b = 0.0
+    c = """"
+
+initialize
+    a = 5
+    b = 6.5
+    c = ""Hello""
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "0",
+                "b", "=", "0.0",
+                "c", "=", "\"\"",
+                "initialize",
+                "a", "=", "5",
+                "b", "=", "6.5",
+                "c", "=", "\"Hello\""
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+#include <String.hpp>
+
+// properties
+auto a = (int64_t)0;
+auto b = (double)0.0;
+auto c = String("""");
+
+// initialize
+void initialize(void)
+{
+    a = 5;
+    b = 6.5;
+    c = String(""Hello"");
 }
 ";
 
@@ -201,6 +260,7 @@ start
 
 namespace MyModule
 {
+    // start
     int main()
     {
         auto a = (int64_t)1;
@@ -324,6 +384,7 @@ class MyTrait
             var expected =
 @"#include <cstdint>
 
+// start
 int main()
 {
     auto b = (uint64_t)2;
@@ -382,6 +443,7 @@ start
 
 namespace MyModule
 {
+    // start
     int main()
     {
         auto b = (uint64_t)2;
@@ -1083,6 +1145,64 @@ auto s = String(""Hello, World!\n"");
 void finalize(void)
 {
     s = String("""");
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void PropertiesAndStart_AssignmentsAndStringUpdate_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0
+    b = 0.0
+    c = """"
+
+start
+    a = 5
+    b = 6.5
+    c = ""Hello""
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "0",
+                "b", "=", "0.0",
+                "c", "=", "\"\"",
+                "start",
+                "a", "=", "5",
+                "b", "=", "6.5",
+                "c", "=", "\"Hello\""
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <cstdint>
+#include <String.hpp>
+
+auto a = (int64_t)0;
+auto b = (double)0.0;
+auto c = String("""");
+
+// start
+int main()
+{
+    a = 5;
+    b = 6.5;
+    c = String(""Hello"");
+    return 0;
 }
 ";
 

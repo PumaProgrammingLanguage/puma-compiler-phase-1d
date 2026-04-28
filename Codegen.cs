@@ -431,9 +431,23 @@ namespace Puma
 
             foreach (var node in globalProperties)
             {
-                var (type, value) = InferCTypeAndValue(node.PropertyValue);
                 var modifiers = node.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
-                sb.AppendLine($"{modifiers}{type} {node.PropertyName} = {value};");
+                var trimmed = node.PropertyValue?.Trim() ?? string.Empty;
+                var shouldUseAuto = IsBooleanPropertyValue(node.PropertyValue)
+                    || IsStringPropertyValue(node.PropertyValue)
+                    || RequiresFixedWidthIntegerCast(node.PropertyValue, node.PropertyType)
+                    || double.TryParse(trimmed, out _);
+
+                if (shouldUseAuto)
+                {
+                    var initializer = FormatAutoPropertyInitializer(node.PropertyValue, node.PropertyType);
+                    sb.AppendLine($"{modifiers}auto {node.PropertyName} = {initializer};");
+                }
+                else
+                {
+                    var (type, value) = InferCTypeAndValue(node.PropertyValue);
+                    sb.AppendLine($"{modifiers}{type} {node.PropertyName} = {value};");
+                }
             }
 
             if (globalProperties.Count > 0)
@@ -693,7 +707,11 @@ namespace Puma
             var statements = CollectStatements(ast, index + 1);
             if (section == Section.Initialize)
             {
-                EmitStatementsWithLocalDeclarations(statements, sb, "    ", new HashSet<string?>(StringComparer.Ordinal));
+                var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
+                    .Select(n => n.PropertyName)
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+                    .ToHashSet(StringComparer.Ordinal);
+                EmitStatementsWithLocalDeclarations(statements, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
             }
             else
             {
@@ -705,26 +723,28 @@ namespace Puma
 
         private static void EmitMain(List<Node> ast, StringBuilder sb)
         {
-            var (index, _) = FindSection(ast, Section.Start);
-            if (index < 0)
+            var (initIndex, initSection) = FindSection(ast, Section.Initialize);
+            var (finalIndex, finalSection) = FindSection(ast, Section.Finalize);
+            var (startIndex, _) = FindSection(ast, Section.Start);
+            var globalPropertyNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
+                .Select(n => n.PropertyName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (startIndex < 0)
             {
                 return;
             }
 
-            var (initIndex, initSection) = FindSection(ast, Section.Initialize);
-            var (finalIndex, finalSection) = FindSection(ast, Section.Finalize);
-
+            sb.AppendLine("// start");
             sb.AppendLine("int main()");
             sb.AppendLine("{");
             if (initIndex >= 0 && initSection != null)
             {
                 sb.AppendLine($"    initialize({FormatArguments(initSection.SectionParameterList)});");
             }
-            var statements = CollectStatements(ast, index + 1);
-            var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
-                .Select(n => n.PropertyName)
-                .Where(n => !string.IsNullOrWhiteSpace(n))
-                .ToHashSet(StringComparer.Ordinal);
+            var statements = startIndex >= 0 ? CollectStatements(ast, startIndex + 1) : new List<Node>();
+            var globalNames = globalPropertyNames;
             var localNames = new HashSet<string>(StringComparer.Ordinal);
             var bufferedStatements = new List<Node>();
 
