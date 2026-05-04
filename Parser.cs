@@ -139,11 +139,11 @@ namespace Puma
         };
         private static readonly HashSet<string> AccessModifiers = new(StringComparer.Ordinal)
         {
-            "public", "private", "internal"
+            "public", "private"
         };
         private static readonly HashSet<string> PropertyModifiers = new(StringComparer.Ordinal)
         {
-            "public", "private", "internal", "readonly", "readwrite", "constant", "optional"
+            "public", "private", "readonly", "readwrite", "constant", "optional"
         };
         private static readonly HashSet<string> ParameterModifiers = new(StringComparer.Ordinal)
         {
@@ -151,7 +151,7 @@ namespace Puma
         };
         private static readonly HashSet<string> FunctionModifiers = new(StringComparer.Ordinal)
         {
-            "public", "private", "internal"
+            "public", "private"
         };
         private static readonly HashSet<string> NumericCastSuffixes = new(StringComparer.Ordinal)
         {

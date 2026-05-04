@@ -101,7 +101,7 @@ namespace Puma
         {
             "use", "as", "type", "trait", "module", "is", "has", "value", "object", "base", "number",
             "optional", "enums", "records", "pack", "packed", "properties", "functions", "start", "initialize", "finalize",
-            "return", "yield", "public", "private", "internal", "override", "delegate", "constant", "readonly",
+            "return", "yield", "public", "private", "override", "delegate", "constant", "readonly",
             "readwrite", "int128", "int64", "int32", "int16", "int8", "int", "uint128", "uint64", "uint32",
             "uint16", "uint8", "uint", "flt128", "flt64", "flt32", "flt", "fix128", "fix64", "fix32", "fix",
             "char", "str", "fstr", "vstr", "bool", "true", "false", "hex", "oct", "bin", "implicit", "explicit",
@@ -112,7 +112,7 @@ namespace Puma
 
         private static readonly HashSet<string> _accessModifiers = new(StringComparer.Ordinal)
         {
-            "public", "private", "internal"
+            "public", "private"
         };
 
         /// <summary>
@@ -858,7 +858,7 @@ namespace Puma
             {
                 "use" or "as" or "type" or "trait" or "module" or "is" or "has" or "value" or "object" or "base" or "number"
                     or "optional" or "enums" or "records" or "pack" or "properties" or "functions" or "start" or "initialize" or "finalize"
-                    or "return" or "yield" or "public" or "private" or "internal" or "override" or "delegate" or "constant" or "readonly"
+                    or "return" or "yield" or "public" or "private" or "override" or "delegate" or "constant" or "readonly"
                     or "readwrite" or "int128" or "int64" or "int32" or "int16" or "int8" or "int" or "uint128" or "uint64" or "uint32"
                     or "uint16" or "uint8" or "uint" or "flt128" or "flt64" or "flt32" or "flt" or "fix128" or "fix64" or "fix32" or "fix"
                     or "char" or "str" or "fstr" or "vstr" or "bool" or "true" or "false" or "hex" or "oct" or "bin" or "implicit" or "explicit"
