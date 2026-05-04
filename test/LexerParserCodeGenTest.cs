@@ -202,8 +202,8 @@ properties
             var expected =
 @"class MyTrait
 {
-    protected:
     // properties
+    protected:
     auto a = (double)1.1;
     auto b = (double)2.2;
     auto c = (double)3.3;
@@ -319,8 +319,8 @@ properties
 
 class MyTrait
 {
-    protected:
     // properties
+    protected:
     auto a = false;
     auto b = true;
     auto c = false;

@@ -100,7 +100,7 @@ namespace Puma
         private readonly HashSet<string> _keywords = new(StringComparer.Ordinal)
         {
             "use", "as", "type", "trait", "module", "is", "has", "value", "object", "base", "number",
-            "optional", "enums", "records", "pack", "properties", "functions", "start", "initialize", "finalize",
+            "optional", "enums", "records", "pack", "packed", "properties", "functions", "start", "initialize", "finalize",
             "return", "yield", "public", "private", "internal", "override", "delegate", "constant", "readonly",
             "readwrite", "int128", "int64", "int32", "int16", "int8", "int", "uint128", "uint64", "uint32",
             "uint16", "uint8", "uint", "flt128", "flt64", "flt32", "flt", "fix128", "fix64", "fix32", "fix",
@@ -108,6 +108,11 @@ namespace Puma
             "operator", "get", "set", "with", "self", "if", "else", "and", "or", "not", "for", "in", "while",
             "repeat", "forall", "break", "continue", "match", "when", "error", "catch", "multithread",
             "multiprocess"
+        };
+
+        private static readonly HashSet<string> _accessModifiers = new(StringComparer.Ordinal)
+        {
+            "public", "private", "internal"
         };
 
         /// <summary>
@@ -252,7 +257,55 @@ namespace Puma
                 tokens.Add(new LexerTokens() { TokenText = "0", Category = TokenCategory.Dedent });
             }
 
+            NormalizeFunctionHeaderModifierOrder(tokens);
+
             return tokens;
+        }
+
+        private static void NormalizeFunctionHeaderModifierOrder(List<LexerTokens> tokens)
+        {
+            var significantIndices = new List<int>();
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Category is not TokenCategory.Whitespace
+                    and not TokenCategory.EndOfLine
+                    and not TokenCategory.Indent
+                    and not TokenCategory.Dedent
+                    and not TokenCategory.Comment)
+                {
+                    significantIndices.Add(i);
+                }
+            }
+
+            for (var s = 1; s < significantIndices.Count - 1; s++)
+            {
+                var modifierIndex = significantIndices[s];
+                var nextIndex = significantIndices[s + 1];
+                var prevIndex = significantIndices[s - 1];
+
+                var modifier = tokens[modifierIndex];
+                if (modifier.Category != TokenCategory.Keyword || !_accessModifiers.Contains(modifier.TokenText))
+                {
+                    continue;
+                }
+
+                var previous = tokens[prevIndex];
+                if (previous.Category != TokenCategory.Delimiter || previous.TokenText != ")")
+                {
+                    continue;
+                }
+
+                var next = tokens[nextIndex];
+                if (next.Category is not (TokenCategory.Keyword or TokenCategory.Identifier))
+                {
+                    continue;
+                }
+
+                // Canonicalize function header return declaration to "<type> <modifier>"
+                // for forms like: F() private int
+                tokens[modifierIndex] = next;
+                tokens[nextIndex] = modifier;
+            }
         }
 
         private static TokenCategory TokenizeUnidentified(List<LexerTokens> tokens, ref string currentToken, char currentChar)

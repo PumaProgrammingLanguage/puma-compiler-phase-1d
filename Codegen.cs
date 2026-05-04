@@ -927,6 +927,11 @@ namespace Puma
 
             EmitPropertiesForAccess(protectedProperties, "protected", sb, indent);
             EmitPropertiesForAccess(publicProperties, "public", sb, indent);
+
+            if ((protectedProperties.Count > 0 || publicProperties.Count > 0) && node.TypeFunctions.Count > 0)
+            {
+                sb.AppendLine();
+            }
         }
 
         private static void EmitPropertiesForAccess(List<Node> properties, string access, StringBuilder sb, string indent)
@@ -936,8 +941,8 @@ namespace Puma
                 return;
             }
 
-            sb.AppendLine($"{indent}{access}:");
             sb.AppendLine($"{indent}// properties");
+            sb.AppendLine($"{indent}{access}:");
             foreach (var property in properties)
             {
                 var value = FormatAutoPropertyInitializer(property.PropertyValue, property.PropertyType);
@@ -948,7 +953,36 @@ namespace Puma
 
         private static void EmitTypeFunctions(Node node, StringBuilder sb, string indent)
         {
+            var protectedFunctions = new List<Node>();
+            var publicFunctions = new List<Node>();
+
             foreach (var function in node.TypeFunctions)
+            {
+                if (function.FunctionModifiers.Contains("private") || function.FunctionModifiers.Contains("internal"))
+                {
+                    protectedFunctions.Add(function);
+                }
+                else
+                {
+                    publicFunctions.Add(function);
+                }
+            }
+
+            EmitFunctionsForAccess(protectedFunctions, "protected", sb, indent);
+            EmitFunctionsForAccess(publicFunctions, "public", sb, indent);
+        }
+
+        private static void EmitFunctionsForAccess(List<Node> functions, string access, StringBuilder sb, string indent)
+        {
+            if (functions.Count == 0)
+            {
+                return;
+            }
+
+            sb.AppendLine($"{indent}// functions");
+            sb.AppendLine($"{indent}{access}:");
+
+            foreach (var function in functions)
             {
                 var returnType = MapType(function.FunctionDeclarationReturnType) ?? "void";
                 var parameters = string.Join(", ", function.FunctionParameterList.Select(FormatParameter));
@@ -1157,7 +1191,7 @@ namespace Puma
                 ExpressionKind.Unary => string.Equals(node.Value, "not", StringComparison.Ordinal)
                     ? $"not {GenerateExpression(node.Left, null)}"
                     : $"{node.Value}{GenerateExpression(node.Left, null)}",
-                ExpressionKind.Cast => $"({node.Value}){GenerateExpression(node.Left, null)}", 
+                ExpressionKind.Cast => $"({node.Value}){GenerateExpression(node.Left, null)}",
                 ExpressionKind.Conditional => $"({GenerateExpression(node.Left, null)} ? {GenerateExpression(node.Right, null)} : {GenerateExpression(node.Arguments.FirstOrDefault(), null)})",
                 ExpressionKind.Binary => $"({GenerateExpression(node.Left, null)} {node.Value} {GenerateExpression(node.Right, null)})",
                 ExpressionKind.MemberAccess => $"{GenerateExpression(node.Left, null)}.{node.Value}",

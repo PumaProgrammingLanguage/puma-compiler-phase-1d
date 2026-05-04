@@ -149,6 +149,10 @@ namespace Puma
         {
             "readonly", "readwrite", "constant"
         };
+        private static readonly HashSet<string> FunctionModifiers = new(StringComparer.Ordinal)
+        {
+            "public", "private", "internal"
+        };
         private static readonly HashSet<string> NumericCastSuffixes = new(StringComparer.Ordinal)
         {
             "int", "int64", "int32", "int16", "int8",
@@ -508,8 +512,12 @@ namespace Puma
             }
 
             var tokenIndex = 0;
-            if (tokens.Count > 0 && tokens[0].Category == TokenCategory.Keyword && AccessModifiers.Contains(tokens[0].TokenText))
+            var functionModifiers = new List<string>();
+            while (tokenIndex < tokens.Count
+                && tokens[tokenIndex].Category == TokenCategory.Keyword
+                && FunctionModifiers.Contains(tokens[tokenIndex].TokenText))
             {
+                functionModifiers.Add(tokens[tokenIndex].TokenText);
                 tokenIndex++;
             }
 
@@ -532,7 +540,12 @@ namespace Puma
             var parameterList = ParseParameterList(parameterTokens);
 
             var returnTokens = tokens.Skip(closeIndex + 1).ToList();
-            var returnType = returnTokens.Count > 0 ? BuildQualifiedName(returnTokens) : null;
+            var (returnType, trailingModifiers) = SplitTrailingModifiers(returnTokens, FunctionModifiers);
+            if (string.IsNullOrWhiteSpace(returnType))
+            {
+                returnType = null;
+            }
+            functionModifiers.AddRange(trailingModifiers);
 
             var isDelegate = returnTokens.Any(t => t.Category == TokenCategory.Keyword && t.TokenText == "delegate")
                 || string.Equals(returnType, "delegate", StringComparison.OrdinalIgnoreCase);
@@ -546,7 +559,7 @@ namespace Puma
                 return;
             }
 
-            _currentFunctionNode = Node.CreateFunctionDeclaration(name, parameters, returnType, Array.Empty<Node>(), parameterList);
+            _currentFunctionNode = Node.CreateFunctionDeclaration(name, parameters, returnType, Array.Empty<Node>(), parameterList, functionModifiers);
             _currentFunctionBody = new List<Node>();
             _currentFunctionIsDelegate = false;
         }

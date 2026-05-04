@@ -173,6 +173,7 @@ namespace Puma
         public string? FunctionDeclarationName { get; set; }
         public string? FunctionDeclarationParameters { get; set; }
         public string? FunctionDeclarationReturnType { get; set; }
+        public List<string> FunctionModifiers { get; } = new();
         public List<Node> FunctionBody { get; } = new();
         public List<ParameterInfo> FunctionParameterList { get; } = new();
 
@@ -381,7 +382,7 @@ namespace Puma
             };
         }
 
-        public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList)
+        public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList, IEnumerable<string>? modifiers = null)
         {
             var node = new Node
             {
@@ -393,6 +394,10 @@ namespace Puma
 
             node.FunctionParameterList.AddRange(parameterList);
             node.FunctionBody.AddRange(body);
+            if (modifiers != null)
+            {
+                node.FunctionModifiers.AddRange(modifiers);
+            }
             return node;
         }
 

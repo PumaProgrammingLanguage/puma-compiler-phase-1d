@@ -190,6 +190,115 @@ void F(void)
         }
 
         [TestMethod]
+        public void TypePropertiesAndFunctions_DefaultVisibility_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"type
+    DemoType is object
+
+properties
+    value = 1
+
+functions
+    GetValue() int
+        return value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "type", "DemoType", "is", "object",
+                "properties",
+                "value", "=", "1",
+                "functions",
+                "GetValue", "(", ")", "int",
+                "return", "value"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+class DemoType : public object
+{
+    // properties
+    protected:
+    auto value = (int64_t)1;
+
+    // functions
+    public:
+    int64_t GetValue()
+    {
+        return value;
+    }
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+        [TestMethod]
+        public void TypePublicPropertyAndPrivateFunction_VisibilityMapsToCpp_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"type
+    DemoType is object
+
+properties
+    value = 1 public
+
+functions
+    GetValue() private int
+        return value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "type", "DemoType", "is", "object",
+                "properties",
+                "value", "=", "1", "public",
+                "functions",
+                "GetValue", "(", ")", "int", "private",
+                "return", "value"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+class DemoType : public object
+{
+    // properties
+    public:
+    auto value = (int64_t)1;
+
+    // functions
+    protected:
+    int64_t GetValue()
+    {
+        return value;
+    }
+};
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesFunctions_AssignmentOperators_LexerParserCodegen_AreConsistent()
         {
             const string src =
