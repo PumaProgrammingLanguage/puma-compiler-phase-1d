@@ -190,6 +190,29 @@ void F(void)
         }
 
         [TestMethod]
+        public void PropertiesStart_ReassignConstant_ThrowsParserError()
+        {
+            const string src =
+@"properties
+    PI = 3.14159 constant
+    MAX_RADIUS = 5.0 constant
+
+start
+    MAX_RADIUS = 10
+    PI = 3.14
+    r = MAX_RADIUS
+    area = 2.0 * PI * (r * r)
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to constant property");
+        }
+
+        [TestMethod]
         public void TypePropertiesAndFunctions_DefaultVisibility_LexerParserCodegen_AreConsistent()
         {
             const string src =

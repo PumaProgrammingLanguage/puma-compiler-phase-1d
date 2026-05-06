@@ -130,6 +130,7 @@ namespace Puma
         private Node? _currentFunctionNode;
         private List<Node> _currentFunctionBody = new();
         private bool _currentFunctionIsDelegate;
+        private readonly HashSet<string> _constantProperties = new(StringComparer.Ordinal);
         private readonly Stack<List<Node>> _statementTargetStack = new();
         private List<Node>? _pendingBlockTarget;
         private Node? _typeOrTraitNode;
@@ -221,6 +222,7 @@ namespace Puma
             _currentFunctionNode = null;
             _currentFunctionBody = new List<Node>();
             _currentFunctionIsDelegate = false;
+            _constantProperties.Clear();
             _statementTargetStack.Clear();
             _pendingBlockTarget = null;
             _typeOrTraitNode = null;
@@ -1856,6 +1858,10 @@ namespace Puma
                 {
                     var node = Node.CreatePropertyDeclaration(name, value, propertyType, modifiers);
                     ast.Add(node);
+                    if (modifiers.Contains("constant"))
+                    {
+                        _constantProperties.Add(name);
+                    }
                     return node;
                 }
 
@@ -2003,6 +2009,11 @@ namespace Puma
             var right = BuildQualifiedName(rightTokens);
             var leftExpression = ParseExpression(leftTokens);
             var rightExpression = ParseExpression(rightTokens);
+
+            if (assignmentOperator == "=" && _constantProperties.Contains(left))
+            {
+                throw new InvalidOperationException($"Cannot assign to constant property '{left}'.");
+            }
 
             if ((string.IsNullOrWhiteSpace(left) && leftExpression == null)
                 || (string.IsNullOrWhiteSpace(right) && rightExpression == null))
