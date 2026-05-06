@@ -474,7 +474,7 @@ namespace Puma
 
             if (currentChar == '\'')
             {
-                // found the end of the charactor
+                    // found the end of the character
                 currentToken += currentChar;
                 var category = invalidCharEscape ? TokenCategory.Unknown : currentTokenType;
                 tokens.Add(new LexerTokens() { TokenText = currentToken, Category = category });
@@ -485,7 +485,7 @@ namespace Puma
             }
             else
             {
-                // charactor continues
+                    // character continues
                 currentToken += currentChar;
             }
         }
@@ -577,7 +577,7 @@ namespace Puma
                 // comment line ends at the end of line marker
                 // save the comment line as a token
                 tokens.Add(new LexerTokens() { TokenText = currentToken, Category = currentTokenType });
-                // place current charactor as first char of eol token
+                // place current character as first char of eol token
                 currentToken = currentCharString;
                 // set token type to end of line token
                 currentTokenType = TokenCategory.EndOfLine;
@@ -644,7 +644,7 @@ namespace Puma
                 // don't keep the whitespace tokens
                 currentToken = string.Empty;
                 currentTokenType = TokenCategory.Unknown;
-                // current charactor is next token.  reset the index by one character
+                // current character is next token.  reset the index by one character
                 i--;
             }
         }
@@ -715,7 +715,7 @@ namespace Puma
             }
             else if (currentChar == '\'')
             {
-                // found start of a charactor
+                    // found start of a character
                 currentToken = currentChar.ToString();
                 currentTokenType = TokenCategory.CharLiteral;
             }

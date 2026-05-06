@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Charactor.hpp"
+#include "Character.hpp"
 #include "StringIterator.hpp"
 #include <cstdint>
 #include <cstddef>

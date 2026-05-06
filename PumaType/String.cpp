@@ -176,7 +176,7 @@ namespace Type
 		for (uint32_t i = 0; i < strSize; )
 		{
 			const uint8_t c = ptr[i];
-			const uint8_t charSize = Charactor::GetCharSize(c);
+     const uint8_t charSize = Character::GetCharSize(c);
 			i += charSize;
 			++charCount;
 		}

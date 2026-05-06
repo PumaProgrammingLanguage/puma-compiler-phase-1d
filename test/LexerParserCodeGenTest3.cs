@@ -299,6 +299,64 @@ class DemoType : public object
         }
 
         [TestMethod]
+        public void PropertiesStart_ConstantsAndAreaExpression_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    PI = 3.14159 constant
+    MAX_RADIUS = 5.0 constant
+
+start
+    r = MAX_RADIUS
+    area = PI * (r * r)
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "PI", "=", "3.14159", "constant",
+                "MAX_RADIUS", "=", "5.0", "constant",
+                "start",
+                "r", "=", "MAX_RADIUS",
+                "area", "=", "PI", "*", "(", "r", "*", "r", ")"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "const auto PI = (double)3.14159;");
+            StringAssert.Contains(generated, "const auto MAX_RADIUS = (double)5.0;");
+            StringAssert.Contains(generated, "// start");
+            StringAssert.Contains(generated, "int main()");
+            StringAssert.Contains(generated, "auto r = MAX_RADIUS;");
+            StringAssert.Contains(generated, "auto area =");
+            StringAssert.Contains(generated, "PI");
+            StringAssert.Contains(generated, "r * r");
+
+            var expected =
+@"// properties
+const auto PI = (double)3.14159;
+const auto MAX_RADIUS = (double)5.0;
+
+// start
+int main()
+{
+    auto r = MAX_RADIUS;
+    auto area = PI * (r * r);
+
+    return 0;
+}";
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesFunctions_AssignmentOperators_LexerParserCodegen_AreConsistent()
         {
             const string src =

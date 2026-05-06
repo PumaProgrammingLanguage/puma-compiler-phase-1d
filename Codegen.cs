@@ -431,6 +431,16 @@ namespace Puma
 
             foreach (var node in globalProperties)
             {
+                if (hasStartSection && globalProperties.Any(p => p.PropertyModifiers.Contains("constant")))
+                {
+                    sb.AppendLine("// properties");
+                }
+
+                break;
+            }
+
+            foreach (var node in globalProperties)
+            {
                 var modifiers = node.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
                 var trimmed = node.PropertyValue?.Trim() ?? string.Empty;
                 var shouldUseAuto = IsBooleanPropertyValue(node.PropertyValue)
@@ -747,11 +757,13 @@ namespace Puma
             var globalNames = globalPropertyNames;
             var localNames = new HashSet<string>(StringComparer.Ordinal);
             var bufferedStatements = new List<Node>();
+            var emittedExpressionBasedLocalDeclaration = false;
 
             foreach (var statement in statements)
             {
-                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    "))
+                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    ", out var usedExpressionFallback))
                 {
+                    emittedExpressionBasedLocalDeclaration |= usedExpressionFallback;
                     if (bufferedStatements.Count > 0)
                     {
                         EmitStatements(bufferedStatements, sb, "    ");
@@ -767,6 +779,12 @@ namespace Puma
             {
                 EmitStatements(bufferedStatements, sb, "    ");
             }
+
+            if (emittedExpressionBasedLocalDeclaration)
+            {
+                sb.AppendLine();
+            }
+
             if (finalIndex >= 0 && finalSection != null)
             {
                 sb.AppendLine($"    finalize({FormatArguments(finalSection.SectionParameterList)});");
@@ -1255,7 +1273,7 @@ namespace Puma
                 "fix" or "fix64" => "int64_t",
                 "fix32" => "int32_t",
                 "bool" => "bool_t",
-                "char" => "Puma::Type::Charactor",
+                "char" => "Puma::Type::Character",
                 "str" => "Puma::Type::String",
                 _ => type
             };
@@ -1275,6 +1293,101 @@ namespace Puma
 
             return node.FunctionParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase))
                 || node.DelegateParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool TryGetExpressionTypeAndInitializer(Node statement, out string typeName, out string initializer)
+        {
+            typeName = "int64_t";
+            initializer = string.Empty;
+
+            if (statement.AssignmentRightExpression == null)
+            {
+                return false;
+            }
+
+            var expressionText = GenerateExpression(statement.AssignmentRightExpression, statement.AssignmentRight);
+            if (string.IsNullOrWhiteSpace(expressionText))
+            {
+                return false;
+            }
+
+            if (ContainsBooleanKeyword(statement.AssignmentRightExpression))
+            {
+                typeName = "bool";
+            }
+            else if (ContainsStringLiteral(statement.AssignmentRightExpression))
+            {
+                typeName = "Puma::Type::String";
+            }
+            else if (ContainsDecimalLiteral(statement.AssignmentRightExpression))
+            {
+                typeName = "double";
+            }
+            else
+            {
+                typeName = "int64_t";
+            }
+
+            initializer = expressionText;
+            return true;
+        }
+
+        private static bool ContainsDecimalLiteral(ExpressionNode? expression)
+        {
+            if (expression == null)
+            {
+                return false;
+            }
+
+            if (expression.Kind == ExpressionKind.Literal
+                && !string.IsNullOrWhiteSpace(expression.Value)
+                && expression.Value.Contains('.'))
+            {
+                return true;
+            }
+
+            return ContainsDecimalLiteral(expression.Left)
+                || ContainsDecimalLiteral(expression.Right)
+                || expression.Arguments.Any(ContainsDecimalLiteral);
+        }
+
+        private static bool ContainsStringLiteral(ExpressionNode? expression)
+        {
+            if (expression == null)
+            {
+                return false;
+            }
+
+            if (expression.Kind == ExpressionKind.Literal
+                && !string.IsNullOrWhiteSpace(expression.Value)
+                && expression.Value.StartsWith("\"", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return ContainsStringLiteral(expression.Left)
+                || ContainsStringLiteral(expression.Right)
+                || expression.Arguments.Any(ContainsStringLiteral);
+        }
+
+        private static bool ContainsBooleanKeyword(ExpressionNode? expression)
+        {
+            if (expression == null)
+            {
+                return false;
+            }
+
+            if (expression.Kind == ExpressionKind.Identifier
+                && (string.Equals(expression.Value, "true", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(expression.Value, "false", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(expression.Value, "bool", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            return ContainsBooleanKeyword(expression.Left)
+                || ContainsBooleanKeyword(expression.Right)
+                || expression.Arguments.Any(ContainsBooleanKeyword);
         }
 
         private static string? ToCppQualifiedName(string? name)
@@ -1383,6 +1496,13 @@ namespace Puma
 
         private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent)
         {
+            return TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent, out _);
+        }
+
+        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent, out bool usedExpressionFallback)
+        {
+            usedExpressionFallback = false;
+
             if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentOperator != "=")
             {
                 return false;
@@ -1399,9 +1519,24 @@ namespace Puma
                 return false;
             }
 
+            var expressionFallback = false;
             if (!TryGetTypedLiteralDeclaration(statement.AssignmentRight ?? string.Empty, out var typeName, out var value))
             {
-                return false;
+                if (!TryGetExpressionTypeAndInitializer(statement, out typeName, out value))
+                {
+                    return false;
+                }
+
+                expressionFallback = true;
+            }
+
+            if (expressionFallback)
+            {
+                usedExpressionFallback = true;
+                var normalized = UnwrapOutermostParentheses(value);
+                sb.AppendLine($"{indent}auto {leftName} = {normalized};");
+                localNames.Add(leftName);
+                return true;
             }
 
             var initializer = typeName switch
@@ -1512,6 +1647,12 @@ namespace Puma
             {
                 typeName = dotSeen ? "double" : "int64_t";
                 return true;
+            }
+
+            // Non-literal expressions (e.g. 2.0*PI*(r*r)) should be handled by expression inference.
+            if (suffix.Any(ch => !char.IsLetterOrDigit(ch)))
+            {
+                return false;
             }
 
             typeName = suffix switch
