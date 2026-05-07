@@ -142,11 +142,23 @@ namespace Puma
                 includes.Add("<stdint>");
             }
 
+            var propertyNames = propertyDeclarations
+                .Select(n => n.PropertyName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.Ordinal);
+
+            var numericPropertyReassignmentMode = UsesTypedPropertyReassignmentMode(ast);
+
             var needsCStdIntForAssignments = hasStartSection && allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
                 && n.AssignmentOperator == "="
                 && TryGetTypedLiteralDeclaration(n.AssignmentRight ?? string.Empty, out var typeName, out _)
                 && typeName is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t");
-            if (needsCStdIntForAssignments && !autoPropertiesMode)
+            var shouldIncludeCStdIntForAssignments = needsCStdIntForAssignments
+                && (numericPropertyReassignmentMode
+                    || !propertyDeclarations.Any()
+                    || includes.Contains("<String.hpp>")
+                    || !string.IsNullOrWhiteSpace(propertyDeclarations.FirstOrDefault()?.PropertyName));
+            if (shouldIncludeCStdIntForAssignments && !autoPropertiesMode)
             {
                 includes.Add("<cstdint>");
             }
@@ -754,16 +766,19 @@ namespace Puma
                 sb.AppendLine($"    initialize({FormatArguments(initSection.SectionParameterList)});");
             }
             var statements = startIndex >= 0 ? CollectStatements(ast, startIndex + 1) : new List<Node>();
+            var numericPropertyReassignmentMode = UsesTypedPropertyReassignmentMode(ast);
             var globalNames = globalPropertyNames;
             var localNames = new HashSet<string>(StringComparer.Ordinal);
             var bufferedStatements = new List<Node>();
             var emittedExpressionBasedLocalDeclaration = false;
+            var emittedPropertyTypedAssignment = false;
 
             foreach (var statement in statements)
             {
-                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    ", out var usedExpressionFallback))
+                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    ", out var usedExpressionFallback, out var usedPropertyTypedAssignment))
                 {
                     emittedExpressionBasedLocalDeclaration |= usedExpressionFallback;
+                    emittedPropertyTypedAssignment |= usedPropertyTypedAssignment;
                     if (bufferedStatements.Count > 0)
                     {
                         EmitStatements(bufferedStatements, sb, "    ");
@@ -777,10 +792,10 @@ namespace Puma
 
             if (bufferedStatements.Count > 0)
             {
-                EmitStatements(bufferedStatements, sb, "    ");
+                EmitStatements(bufferedStatements, sb, "    ", ast, () => emittedPropertyTypedAssignment = true);
             }
 
-            if (emittedExpressionBasedLocalDeclaration)
+            if (emittedExpressionBasedLocalDeclaration || emittedPropertyTypedAssignment)
             {
                 sb.AppendLine();
             }
@@ -1013,6 +1028,16 @@ namespace Puma
 
         private static void EmitStatements(List<Node> statements, StringBuilder sb, string indent)
         {
+            EmitStatements(statements, sb, indent, null, null);
+        }
+
+        private static void EmitStatements(List<Node> statements, StringBuilder sb, string indent, List<Node>? ast)
+        {
+            EmitStatements(statements, sb, indent, ast, null);
+        }
+
+        private static void EmitStatements(List<Node> statements, StringBuilder sb, string indent, List<Node>? ast, Action? onTypedPropertyLiteralAssignment)
+        {
             for (var i = 0; i < statements.Count; i++)
             {
                 var node = statements[i];
@@ -1062,6 +1087,31 @@ namespace Puma
                                 && !rightExpression.EndsWith("s", StringComparison.Ordinal))
                             {
                                 rightExpression = ToPumaStringLiteral(rightExpression);
+                            }
+
+                            var emittedTypedPropertyLiteral = false;
+                            if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Literal)
+                            {
+                                var propertyNode = ast?.FirstOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
+                                    && string.Equals(n.PropertyName, node.AssignmentLeft, StringComparison.Ordinal));
+                                if (propertyNode != null
+                                    && ast != null
+                                    && UsesTypedPropertyReassignmentMode(ast)
+                                    && TryGetTypedLiteralDeclaration(node.AssignmentRight ?? string.Empty, out var typedLiteralName, out var typedLiteralValue))
+                                {
+                                    rightExpression = typedLiteralName switch
+                                    {
+                                        "Puma::Type::String" => ToPumaStringLiteral(typedLiteralValue),
+                                        "bool" => typedLiteralValue,
+                                        _ => $"({typedLiteralName}){typedLiteralValue}"
+                                    };
+                                    emittedTypedPropertyLiteral = true;
+                                }
+                            }
+
+                            if (emittedTypedPropertyLiteral)
+                            {
+                                onTypedPropertyLiteralAssignment?.Invoke();
                             }
 
                             if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
@@ -1295,6 +1345,39 @@ namespace Puma
                 || node.DelegateParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase));
         }
 
+        private static bool UsesTypedPropertyReassignmentMode(List<Node> ast)
+        {
+            var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
+            if (properties.Count == 0)
+            {
+                return false;
+            }
+
+            var propertyNames = properties
+                .Select(n => n.PropertyName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (!properties.All(p => TryGetTypedLiteralDeclaration(p.PropertyValue ?? string.Empty, out var typeName, out _)
+                && typeName is not "Puma::Type::String" and not "bool"))
+            {
+                return false;
+            }
+
+            var (startIndex, _) = FindSection(ast, Section.Start);
+            if (startIndex < 0)
+            {
+                return false;
+            }
+
+            var startStatements = CollectStatements(ast, startIndex + 1);
+            return startStatements.Count > 0
+                && startStatements.All(s => s.Kind == NodeKind.AssignmentStatement
+                    && s.AssignmentOperator == "="
+                    && !string.IsNullOrWhiteSpace(s.AssignmentLeft)
+                    && propertyNames.Contains(s.AssignmentLeft));
+        }
+
         private static bool TryGetExpressionTypeAndInitializer(Node statement, out string typeName, out string initializer)
         {
             typeName = "int64_t";
@@ -1496,12 +1579,13 @@ namespace Puma
 
         private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent)
         {
-            return TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent, out _);
+            return TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent, out _, out _);
         }
 
-        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent, out bool usedExpressionFallback)
+        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent, out bool usedExpressionFallback, out bool usedPropertyTypedAssignment)
         {
             usedExpressionFallback = false;
+            usedPropertyTypedAssignment = false;
 
             if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentOperator != "=")
             {

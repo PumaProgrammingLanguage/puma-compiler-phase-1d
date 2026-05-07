@@ -213,6 +213,57 @@ start
         }
 
         [TestMethod]
+        public void PropertiesStart_ReadwriteByDefault_Reassignment_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    max_length = 100
+    max_width = 50.0
+
+start
+    max_length = 200
+    max_width = 25.0
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "max_length", "=", "100",
+                "max_width", "=", "50.0",
+                "start",
+                "max_length", "=", "200",
+                "max_width", "=", "25.0"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <cstdint>
+
+auto max_length = (int64_t)100;
+auto max_width = (double)50.0;
+
+// start
+int main()
+{
+    max_length = (int64_t)200;
+    max_width = (double)25.0;
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void TypePropertiesAndFunctions_DefaultVisibility_LexerParserCodegen_AreConsistent()
         {
             const string src =
