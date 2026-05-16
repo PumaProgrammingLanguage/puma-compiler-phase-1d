@@ -73,7 +73,7 @@ namespace test
         }
 
         [TestMethod]
-        public void Convertion_ImplicitAndExplicitExample_OutputText_AreConsistent()
+        public void Convertion_ExplicitExample_OutputText_AreConsistent()
         {
             const string pumaSource =
 @"properties
@@ -91,7 +91,7 @@ namespace test
     l = 11 uint8
 
 start
-    m = a
+    m = a uint8
     n = b uint16
     o = c uint32
     p = d uint64
@@ -125,7 +125,7 @@ start
                 "k", "=", "10", "uint8",
                 "l", "=", "11", "uint8",
                 "start",
-                "m", "=", "a",
+                "m", "=", "a", "uint8",
                 "n", "=", "b", "uint16",
                 "o", "=", "c", "uint32",
                 "p", "=", "d", "uint64",
@@ -165,7 +165,7 @@ start
             sb.AppendLine("// properties");
             foreach (var (name, value) in fromProperties)
             {
-                sb.AppendLine($"    uint8 {name} = {value};");
+                sb.AppendLine($"    auto {name} = {BuildConvertedAssignment(Convertion.Type.UINT8, Convertion.Type.UINT8, value.ToString())};");
             }
 
             sb.AppendLine();
@@ -175,7 +175,7 @@ start
             foreach (var (target, source, toType) in startAssignments)
             {
                 var expr = BuildConvertedAssignment(Convertion.Type.UINT8, toType, source);
-                sb.AppendLine($"    {target} = {expr};");
+                sb.AppendLine($"    auto {target} = {expr};");
             }
             sb.AppendLine();
             sb.AppendLine("    return 0;");
@@ -183,34 +183,328 @@ start
 
             var expected =
 @"// properties
-    uint8 a = 0;
-    uint8 b = 1;
-    uint8 c = 2;
-    uint8 d = 3;
-    uint8 e = 4;
-    uint8 f = 5;
-    uint8 g = 6;
-    uint8 h = 7;
-    uint8 i = 8;
-    uint8 j = 9;
-    uint8 k = 10;
-    uint8 l = 11;
+    auto a = (uint8) 0;
+    auto b = (uint8) 1;
+    auto c = (uint8) 2;
+    auto d = (uint8) 3;
+    auto e = (uint8) 4;
+    auto f = (uint8) 5;
+    auto g = (uint8) 6;
+    auto h = (uint8) 7;
+    auto i = (uint8) 8;
+    auto j = (uint8) 9;
+    auto k = (uint8) 10;
+    auto l = (uint8) 11;
 
 // start
 int main(void)
 {
-    m = (uint8) a;
-    n = (uint16) b;
-    o = (uint32) c;
-    p = (uint64) d;
-    q = (int8) e;
-    r = (int16) f;
-    s = (int32) g;
-    t = (int64) h;
-    u = (flt32) i;
-    v = (flt64) j;
-    w = (fix32) k;
-    x = (fix64) l;
+    auto m = (uint8) a;
+    auto n = (uint16) b;
+    auto o = (uint32) c;
+    auto p = (uint64) d;
+    auto q = (int8) e;
+    auto r = (int16) f;
+    auto s = (int32) g;
+    auto t = (int64) h;
+    auto u = (flt32) i;
+    auto v = (flt64) j;
+    auto w = (fix32) k;
+    auto x = (fix64) l;
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(sb.ToString()).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ExplicitExample_Int16_OutputText_AreConsistent()
+        {
+            const string pumaSource =
+@"properties
+    a = 0 int16
+    b = 1 int16
+    c = 2 int16
+    d = 3 int16
+    e = 4 int16
+    f = 5 int16
+    g = 6 int16
+    h = 7 int16
+    i = 8 int16
+    j = 9 int16
+    k = 10 int16
+    l = 11 int16
+
+start
+    m = a uint8
+    n = b uint16
+    o = c uint32
+    p = d uint64
+    q = e int8
+    r = f int16
+    s = g int32
+    t = h int64
+    u = i flt32
+    v = j flt64
+    w = k fix32
+    x = l fix64
+";
+
+            var lexer = new Puma.Lexer();
+            var tokens = lexer.Tokenize(pumaSource);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "0", "int16",
+                "b", "=", "1", "int16",
+                "c", "=", "2", "int16",
+                "d", "=", "3", "int16",
+                "e", "=", "4", "int16",
+                "f", "=", "5", "int16",
+                "g", "=", "6", "int16",
+                "h", "=", "7", "int16",
+                "i", "=", "8", "int16",
+                "j", "=", "9", "int16",
+                "k", "=", "10", "int16",
+                "l", "=", "11", "int16",
+                "start",
+                "m", "=", "a", "uint8",
+                "n", "=", "b", "uint16",
+                "o", "=", "c", "uint32",
+                "p", "=", "d", "uint64",
+                "q", "=", "e", "int8",
+                "r", "=", "f", "int16",
+                "s", "=", "g", "int32",
+                "t", "=", "h", "int64",
+                "u", "=", "i", "flt32",
+                "v", "=", "j", "flt64",
+                "w", "=", "k", "fix32",
+                "x", "=", "l", "fix64"
+            }, significant);
+
+            var fromProperties = new (string Name, int Value)[]
+            {
+                ("a", 0), ("b", 1), ("c", 2), ("d", 3), ("e", 4), ("f", 5),
+                ("g", 6), ("h", 7), ("i", 8), ("j", 9), ("k", 10), ("l", 11)
+            };
+
+            var startAssignments = new (string Target, string Source, Convertion.Type ToType)[]
+            {
+                ("m", "a", Convertion.Type.UINT8),
+                ("n", "b", Convertion.Type.UINT16),
+                ("o", "c", Convertion.Type.UINT32),
+                ("p", "d", Convertion.Type.UINT64),
+                ("q", "e", Convertion.Type.INT8),
+                ("r", "f", Convertion.Type.INT16),
+                ("s", "g", Convertion.Type.INT32),
+                ("t", "h", Convertion.Type.INT64),
+                ("u", "i", Convertion.Type.FLT32),
+                ("v", "j", Convertion.Type.FLT64),
+                ("w", "k", Convertion.Type.FIX32),
+                ("x", "l", Convertion.Type.FIX64)
+            };
+
+            var sb = new StringBuilder();
+            sb.AppendLine("// properties");
+            foreach (var (name, value) in fromProperties)
+            {
+                sb.AppendLine($"    auto {name} = {BuildConvertedAssignment(Convertion.Type.INT16, Convertion.Type.INT16, value.ToString())};");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("// start");
+            sb.AppendLine("int main(void)");
+            sb.AppendLine("{");
+            foreach (var (target, source, toType) in startAssignments)
+            {
+                var expr = BuildConvertedAssignment(Convertion.Type.INT16, toType, source);
+                sb.AppendLine($"    auto {target} = {expr};");
+            }
+            sb.AppendLine();
+            sb.AppendLine("    return 0;");
+            sb.AppendLine("}");
+
+            var expected =
+@"// properties
+    auto a = (int16) 0;
+    auto b = (int16) 1;
+    auto c = (int16) 2;
+    auto d = (int16) 3;
+    auto e = (int16) 4;
+    auto f = (int16) 5;
+    auto g = (int16) 6;
+    auto h = (int16) 7;
+    auto i = (int16) 8;
+    auto j = (int16) 9;
+    auto k = (int16) 10;
+    auto l = (int16) 11;
+
+// start
+int main(void)
+{
+    auto m = (uint8) a;
+    auto n = (uint16) b;
+    auto o = (uint32) c;
+    auto p = (uint64) d;
+    auto q = (int8) e;
+    auto r = (int16) f;
+    auto s = (int32) g;
+    auto t = (int64) h;
+    auto u = (flt32) i;
+    auto v = (flt64) j;
+    auto w = (fix32) k;
+    auto x = (fix64) l;
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(sb.ToString()).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ExplicitExample_UInt16_OutputText_AreConsistent()
+        {
+            const string pumaSource =
+@"properties
+    a = 0 uint16
+    b = 1 uint16
+    c = 2 uint16
+    d = 3 uint16
+    e = 4 uint16
+    f = 5 uint16
+    g = 6 uint16
+    h = 7 uint16
+    i = 8 uint16
+    j = 9 uint16
+    k = 10 uint16
+    l = 11 uint16
+
+start
+    m = a uint8
+    n = b uint16
+    o = c uint32
+    p = d uint64
+    q = e int8
+    r = f int16
+    s = g int32
+    t = h int64
+    u = i flt32
+    v = j flt64
+    w = k fix32
+    x = l fix64
+";
+
+            var lexer = new Puma.Lexer();
+            var tokens = lexer.Tokenize(pumaSource);
+            var significant = GetSignificantTokens(tokens).Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "0", "uint16",
+                "b", "=", "1", "uint16",
+                "c", "=", "2", "uint16",
+                "d", "=", "3", "uint16",
+                "e", "=", "4", "uint16",
+                "f", "=", "5", "uint16",
+                "g", "=", "6", "uint16",
+                "h", "=", "7", "uint16",
+                "i", "=", "8", "uint16",
+                "j", "=", "9", "uint16",
+                "k", "=", "10", "uint16",
+                "l", "=", "11", "uint16",
+                "start",
+                "m", "=", "a", "uint8",
+                "n", "=", "b", "uint16",
+                "o", "=", "c", "uint32",
+                "p", "=", "d", "uint64",
+                "q", "=", "e", "int8",
+                "r", "=", "f", "int16",
+                "s", "=", "g", "int32",
+                "t", "=", "h", "int64",
+                "u", "=", "i", "flt32",
+                "v", "=", "j", "flt64",
+                "w", "=", "k", "fix32",
+                "x", "=", "l", "fix64"
+            }, significant);
+
+            var fromProperties = new (string Name, int Value)[]
+            {
+                ("a", 0), ("b", 1), ("c", 2), ("d", 3), ("e", 4), ("f", 5),
+                ("g", 6), ("h", 7), ("i", 8), ("j", 9), ("k", 10), ("l", 11)
+            };
+
+            var startAssignments = new (string Target, string Source, Convertion.Type ToType)[]
+            {
+                ("m", "a", Convertion.Type.UINT8),
+                ("n", "b", Convertion.Type.UINT16),
+                ("o", "c", Convertion.Type.UINT32),
+                ("p", "d", Convertion.Type.UINT64),
+                ("q", "e", Convertion.Type.INT8),
+                ("r", "f", Convertion.Type.INT16),
+                ("s", "g", Convertion.Type.INT32),
+                ("t", "h", Convertion.Type.INT64),
+                ("u", "i", Convertion.Type.FLT32),
+                ("v", "j", Convertion.Type.FLT64),
+                ("w", "k", Convertion.Type.FIX32),
+                ("x", "l", Convertion.Type.FIX64)
+            };
+
+            var sb = new StringBuilder();
+            sb.AppendLine("// properties");
+            foreach (var (name, value) in fromProperties)
+            {
+                sb.AppendLine($"    auto {name} = {BuildConvertedAssignment(Convertion.Type.UINT16, Convertion.Type.UINT16, value.ToString())};");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("// start");
+            sb.AppendLine("int main(void)");
+            sb.AppendLine("{");
+            foreach (var (target, source, toType) in startAssignments)
+            {
+                var expr = BuildConvertedAssignment(Convertion.Type.UINT16, toType, source);
+                sb.AppendLine($"    auto {target} = {expr};");
+            }
+            sb.AppendLine();
+            sb.AppendLine("    return 0;");
+            sb.AppendLine("}");
+
+            var expected =
+@"// properties
+    auto a = (uint16) 0;
+    auto b = (uint16) 1;
+    auto c = (uint16) 2;
+    auto d = (uint16) 3;
+    auto e = (uint16) 4;
+    auto f = (uint16) 5;
+    auto g = (uint16) 6;
+    auto h = (uint16) 7;
+    auto i = (uint16) 8;
+    auto j = (uint16) 9;
+    auto k = (uint16) 10;
+    auto l = (uint16) 11;
+
+// start
+int main(void)
+{
+    auto m = (uint8) a;
+    auto n = (uint16) b;
+    auto o = (uint32) c;
+    auto p = (uint64) d;
+    auto q = (int8) e;
+    auto r = (int16) f;
+    auto s = (int32) g;
+    auto t = (int64) h;
+    auto u = (flt32) i;
+    auto v = (flt64) j;
+    auto w = (fix32) k;
+    auto x = (fix64) l;
 
     return 0;
 }
