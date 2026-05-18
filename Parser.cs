@@ -130,6 +130,7 @@ namespace Puma
         private Node? _currentFunctionNode;
         private List<Node> _currentFunctionBody = new();
         private bool _currentFunctionIsDelegate;
+        private int _pendingLeadingBlankLines;
         private readonly HashSet<string> _constantProperties = new(StringComparer.Ordinal);
         private readonly Stack<List<Node>> _statementTargetStack = new();
         private List<Node>? _pendingBlockTarget;
@@ -222,6 +223,7 @@ namespace Puma
             _currentFunctionNode = null;
             _currentFunctionBody = new List<Node>();
             _currentFunctionIsDelegate = false;
+            _pendingLeadingBlankLines = 0;
             _constantProperties.Clear();
             _statementTargetStack.Clear();
             _pendingBlockTarget = null;
@@ -384,7 +386,14 @@ namespace Puma
                             _ => _currentFileKind
                         };
                     }
-                    _currentSectionNode = new Node(next);
+                    var leadingBlankLines = ast.Count == 0
+                        ? _pendingLeadingBlankLines
+                        : Math.Max(0, _pendingLeadingBlankLines - 1);
+                    _currentSectionNode = new Node(next)
+                    {
+                        LeadingBlankLines = leadingBlankLines
+                    };
+                    _pendingLeadingBlankLines = 0;
                     ast.Add(_currentSectionNode);
                     return true;
                 }
@@ -1325,6 +1334,12 @@ namespace Puma
 
         private bool UpdateIndentation(LexerTokens token)
         {
+            if (token.Category == TokenCategory.EndOfLine)
+            {
+                _pendingLeadingBlankLines++;
+                return true;
+            }
+
             if (token.Category == TokenCategory.Indent || token.Category == TokenCategory.Dedent)
             {
                 if (int.TryParse(token.TokenText, out var indent))
@@ -1346,6 +1361,7 @@ namespace Puma
                 return true;
             }
 
+            _pendingLeadingBlankLines = 0;
             return false;
         }
 
@@ -1637,6 +1653,17 @@ namespace Puma
                 var expr = ParsePrimary();
                 while (true)
                 {
+                    if (expr != null
+                        && _index < _tokens.Count
+                        && (_tokens[_index].Category is TokenCategory.Keyword or TokenCategory.Identifier)
+                        && IsNumericTypeSuffix(_tokens[_index].TokenText))
+                    {
+                        var castType = _tokens[_index].TokenText;
+                        _index++;
+                        expr = new ExpressionNode { Kind = ExpressionKind.Cast, Value = castType, Left = expr };
+                        continue;
+                    }
+
                     if (MatchPunctuation("."))
                     {
                         if (MatchIdentifier(out var member))

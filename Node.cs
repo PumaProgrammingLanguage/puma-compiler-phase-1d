@@ -127,6 +127,7 @@ namespace Puma
         // For Section nodes
         public string? SectionParameters { get; set; }
         public List<ParameterInfo> SectionParameterList { get; } = new();
+        public int LeadingBlankLines { get; set; }
 
         // For FunctionCall nodes
         public string? FunctionName { get; set; }

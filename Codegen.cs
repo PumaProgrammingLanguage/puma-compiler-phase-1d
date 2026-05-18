@@ -441,14 +441,12 @@ namespace Puma
                 return;
             }
 
-            foreach (var node in globalProperties)
-            {
-                if (hasStartSection && globalProperties.Any(p => p.PropertyModifiers.Contains("constant")))
-                {
-                    sb.AppendLine("// properties");
-                }
+            var shouldEmitPropertiesHeaderWithStart = globalProperties.Any(p => p.PropertyModifiers.Contains("constant"))
+                || globalProperties.Any(p => !string.IsNullOrWhiteSpace(p.PropertyType));
 
-                break;
+            if (hasStartSection && globalProperties.Count > 0 && shouldEmitPropertiesHeaderWithStart)
+            {
+                sb.AppendLine("// properties");
             }
 
             foreach (var node in globalProperties)
@@ -747,7 +745,7 @@ namespace Puma
         {
             var (initIndex, initSection) = FindSection(ast, Section.Initialize);
             var (finalIndex, finalSection) = FindSection(ast, Section.Finalize);
-            var (startIndex, _) = FindSection(ast, Section.Start);
+            var (startIndex, startSection) = FindSection(ast, Section.Start);
             var globalPropertyNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
                 .Select(n => n.PropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
@@ -756,6 +754,14 @@ namespace Puma
             if (startIndex < 0)
             {
                 return;
+            }
+
+            if (startSection != null)
+            {
+                for (var i = 0; i < startSection.LeadingBlankLines; i++)
+                {
+                    sb.AppendLine();
+                }
             }
 
             sb.AppendLine("// start");
@@ -1259,7 +1265,7 @@ namespace Puma
                 ExpressionKind.Unary => string.Equals(node.Value, "not", StringComparison.Ordinal)
                     ? $"not {GenerateExpression(node.Left, null)}"
                     : $"{node.Value}{GenerateExpression(node.Left, null)}",
-                ExpressionKind.Cast => $"({node.Value}){GenerateExpression(node.Left, null)}",
+                ExpressionKind.Cast => $"({MapType(node.Value) ?? node.Value}) {GenerateExpression(node.Left, null)}",
                 ExpressionKind.Conditional => $"({GenerateExpression(node.Left, null)} ? {GenerateExpression(node.Right, null)} : {GenerateExpression(node.Arguments.FirstOrDefault(), null)})",
                 ExpressionKind.Binary => $"({GenerateExpression(node.Left, null)} {node.Value} {GenerateExpression(node.Right, null)})",
                 ExpressionKind.MemberAccess => $"{GenerateExpression(node.Left, null)}.{node.Value}",

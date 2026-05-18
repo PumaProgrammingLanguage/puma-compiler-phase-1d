@@ -68,19 +68,19 @@ start
 
             var expected =
 @"// properties
-    auto a = (uint8_t) 0;
-    auto b = (uint8_t) 1;
-    auto c = (uint8_t) 2;
-    auto d = (uint8_t) 3;
-    auto e = (uint8_t) 4;
-    auto f = (uint8_t) 5;
-    auto g = (uint8_t) 6;
-    auto h = (uint8_t) 7;
-    auto i = (uint8_t) 8;
-    auto j = (uint8_t) 9;
+auto a = (uint8_t)0;
+auto b = (uint8_t)1;
+auto c = (uint8_t)2;
+auto d = (uint8_t)3;
+auto e = (uint8_t)4;
+auto f = (uint8_t)5;
+auto g = (uint8_t)6;
+auto h = (uint8_t)7;
+auto i = (uint8_t)8;
+auto j = (uint8_t)9;
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -140,20 +140,20 @@ start
 
             var expected =
 @"// properties
-    auto a = (int32_t) 0;
-    auto b = (int32_t) 1;
-    auto c = (int32_t) 2;
-    auto d = (int32_t) 3;
-    auto e = (int32_t) 4;
-    auto f = (int32_t) 5;
-    auto g = (int32_t) 6;
-    auto h = (int32_t) 7;
-    auto i = (int32_t) 8;
-    auto j = (int32_t) 9;
+auto a = (int32_t)0;
+auto b = (int32_t)1;
+auto c = (int32_t)2;
+auto d = (int32_t)3;
+auto e = (int32_t)4;
+auto f = (int32_t)5;
+auto g = (int32_t)6;
+auto h = (int32_t)7;
+auto i = (int32_t)8;
+auto j = (int32_t)9;
 
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -213,20 +213,20 @@ start
 
             var expected =
 @"// properties
-    auto a = (int8_t) 0;
-    auto b = (int8_t) 1;
-    auto c = (int8_t) 2;
-    auto d = (int8_t) 3;
-    auto e = (int8_t) 4;
-    auto f = (int8_t) 5;
-    auto g = (int8_t) 6;
-    auto h = (int8_t) 7;
-    auto i = (int8_t) 8;
-    auto j = (int8_t) 9;
+auto a = (int8_t)0;
+auto b = (int8_t)1;
+auto c = (int8_t)2;
+auto d = (int8_t)3;
+auto e = (int8_t)4;
+auto f = (int8_t)5;
+auto g = (int8_t)6;
+auto h = (int8_t)7;
+auto i = (int8_t)8;
+auto j = (int8_t)9;
 
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -286,20 +286,20 @@ start
 
             var expected =
 @"// properties
-    auto a = (uint64_t) 0;
-    auto b = (uint64_t) 1;
-    auto c = (uint64_t) 2;
-    auto d = (uint64_t) 3;
-    auto e = (uint64_t) 4;
-    auto f = (uint64_t) 5;
-    auto g = (uint64_t) 6;
-    auto h = (uint64_t) 7;
-    auto i = (uint64_t) 8;
-    auto j = (uint64_t) 9;
+auto a = (uint64_t)0;
+auto b = (uint64_t)1;
+auto c = (uint64_t)2;
+auto d = (uint64_t)3;
+auto e = (uint64_t)4;
+auto f = (uint64_t)5;
+auto g = (uint64_t)6;
+auto h = (uint64_t)7;
+auto i = (uint64_t)8;
+auto j = (uint64_t)9;
 
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -359,20 +359,20 @@ start
 
             var expected =
 @"// properties
-    auto a = (uint32_t) 0;
-    auto b = (uint32_t) 1;
-    auto c = (uint32_t) 2;
-    auto d = (uint32_t) 3;
-    auto e = (uint32_t) 4;
-    auto f = (uint32_t) 5;
-    auto g = (uint32_t) 6;
-    auto h = (uint32_t) 7;
-    auto i = (uint32_t) 8;
-    auto j = (uint32_t) 9;
+auto a = (uint32_t)0;
+auto b = (uint32_t)1;
+auto c = (uint32_t)2;
+auto d = (uint32_t)3;
+auto e = (uint32_t)4;
+auto f = (uint32_t)5;
+auto g = (uint32_t)6;
+auto h = (uint32_t)7;
+auto i = (uint32_t)8;
+auto j = (uint32_t)9;
 
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -432,20 +432,20 @@ start
 
             var expected =
 @"// properties
-    auto a = (double) 0;
-    auto b = (double) 1;
-    auto c = (double) 2;
-    auto d = (double) 3;
-    auto e = (double) 4;
-    auto f = (double) 5;
-    auto g = (double) 6;
-    auto h = (double) 7;
-    auto i = (double) 8;
-    auto j = (double) 9;
+auto a = (double)0;
+auto b = (double)1;
+auto c = (double)2;
+auto d = (double)3;
+auto e = (double)4;
+auto f = (double)5;
+auto g = (double)6;
+auto h = (double)7;
+auto i = (double)8;
+auto j = (double)9;
 
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -505,20 +505,20 @@ start
 
             var expected =
 @"// properties
-    auto a = (float) 0;
-    auto b = (float) 1;
-    auto c = (float) 2;
-    auto d = (float) 3;
-    auto e = (float) 4;
-    auto f = (float) 5;
-    auto g = (float) 6;
-    auto h = (float) 7;
-    auto i = (float) 8;
-    auto j = (float) 9;
+auto a = (float)0;
+auto b = (float)1;
+auto c = (float)2;
+auto d = (float)3;
+auto e = (float)4;
+auto f = (float)5;
+auto g = (float)6;
+auto h = (float)7;
+auto i = (float)8;
+auto j = (float)9;
 
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -577,19 +577,19 @@ start
 
             var expected =
 @"// properties
-    auto a = (int64_t) 0;
-    auto b = (int64_t) 1;
-    auto c = (int64_t) 2;
-    auto d = (int64_t) 3;
-    auto e = (int64_t) 4;
-    auto f = (int64_t) 5;
-    auto g = (int64_t) 6;
-    auto h = (int64_t) 7;
-    auto i = (int64_t) 8;
-    auto j = (int64_t) 9;
+auto a = (int64_t)0;
+auto b = (int64_t)1;
+auto c = (int64_t)2;
+auto d = (int64_t)3;
+auto e = (int64_t)4;
+auto f = (int64_t)5;
+auto g = (int64_t)6;
+auto h = (int64_t)7;
+auto i = (int64_t)8;
+auto j = (int64_t)9;
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -648,19 +648,19 @@ start
 
             var expected =
 @"// properties
-    auto a = (int16_t) 0;
-    auto b = (int16_t) 1;
-    auto c = (int16_t) 2;
-    auto d = (int16_t) 3;
-    auto e = (int16_t) 4;
-    auto f = (int16_t) 5;
-    auto g = (int16_t) 6;
-    auto h = (int16_t) 7;
-    auto i = (int16_t) 8;
-    auto j = (int16_t) 9;
+auto a = (int16_t)0;
+auto b = (int16_t)1;
+auto c = (int16_t)2;
+auto d = (int16_t)3;
+auto e = (int16_t)4;
+auto f = (int16_t)5;
+auto g = (int16_t)6;
+auto h = (int16_t)7;
+auto i = (int16_t)8;
+auto j = (int16_t)9;
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
@@ -719,19 +719,19 @@ start
 
             var expected =
 @"// properties
-    auto a = (uint16_t) 0;
-    auto b = (uint16_t) 1;
-    auto c = (uint16_t) 2;
-    auto d = (uint16_t) 3;
-    auto e = (uint16_t) 4;
-    auto f = (uint16_t) 5;
-    auto g = (uint16_t) 6;
-    auto h = (uint16_t) 7;
-    auto i = (uint16_t) 8;
-    auto j = (uint16_t) 9;
+auto a = (uint16_t)0;
+auto b = (uint16_t)1;
+auto c = (uint16_t)2;
+auto d = (uint16_t)3;
+auto e = (uint16_t)4;
+auto f = (uint16_t)5;
+auto g = (uint16_t)6;
+auto h = (uint16_t)7;
+auto i = (uint16_t)8;
+auto j = (uint16_t)9;
 
 // start
-int main(void)
+int main()
 {
     auto m = (uint8_t) a;
     auto n = (uint16_t) b;
