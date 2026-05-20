@@ -40,7 +40,31 @@ namespace test
         [TestMethod]
         public void Sanity_NewUnitTestFile_IsIncluded()
         {
-            Assert.IsTrue(true);
+            const string src =
+@"start
+    a = 1
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto a = (int64_t)1;
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
         [TestMethod]
@@ -493,17 +517,31 @@ functions
             Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
 
             var generated = codegen.Generate(ast);
-            StringAssert.Contains(generated, "x = a;");
-            StringAssert.Contains(generated, "x /= b;");
-            StringAssert.Contains(generated, "x *= b;");
-            StringAssert.Contains(generated, "x %= b;");
-            StringAssert.Contains(generated, "x += b;");
-            StringAssert.Contains(generated, "x -= b;");
-            StringAssert.Contains(generated, "x <<= 1;");
-            StringAssert.Contains(generated, "x >>= 1;");
-            StringAssert.Contains(generated, "x &= b;");
-            StringAssert.Contains(generated, "x ^= b;");
-            StringAssert.Contains(generated, "x |= b;");
+            var expected =
+@"#include <stdint>
+
+// properties
+auto a = (int64_t)64;
+auto b = (int64_t)8;
+
+// functions
+void F(void)
+{
+    x = a;
+    x /= b;
+    x *= b;
+    x %= b;
+    x += b;
+    x -= b;
+    x <<= 1;
+    x >>= 1;
+    x &= b;
+    x ^= b;
+    x |= b;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
         [TestMethod]
@@ -608,10 +646,20 @@ start
 
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
+            var expected =
+@"#include <cstdint>
+#include <""System/IO"">
+#include <""a/b/h"">
 
-            StringAssert.Contains(generated, "#include");
-            StringAssert.Contains(generated, "int main()");
-            StringAssert.Contains(generated, "auto x = (int64_t)1;");
+// start
+int main()
+{
+    auto x = (int64_t)1;
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
         [TestMethod]
@@ -641,9 +689,20 @@ start
 
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
+            var expected =
+@"// start
+int main()
+{
+    if (obj != null && typeof(obj) == typeof(Printable))
+    {
+        WriteLn(""Obj is printable!"");
+        WriteLn(obj.ToString());
+    }
+    return 0;
+}
+";
 
-            StringAssert.Contains(generated, "if (obj != null && typeof(obj) == typeof(Printable))");
-            StringAssert.Contains(generated, "WriteLn");
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
 
@@ -684,9 +743,20 @@ functions
             Assert.AreEqual(3, fn.FunctionBody.Count);
 
             var generated = codegen.Generate(ast);
-            StringAssert.Contains(generated, "arr = Array(items,2)");
-            StringAssert.Contains(generated, "x = arr[i];");
-            StringAssert.Contains(generated, "x = arr[(i + 1)];");
+            var expected =
+@"// properties
+auto arr = Array(items,2);
+
+// functions
+void F(void)
+{
+    i = 0;
+    x = arr[i];
+    x = arr[(i + 1)];
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
         [TestMethod]

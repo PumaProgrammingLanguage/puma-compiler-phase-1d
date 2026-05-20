@@ -41,6 +41,7 @@ namespace test
         {
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
             var tokens = lexer.Tokenize(src);
             try
             {
@@ -57,9 +58,13 @@ namespace test
         {
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
             Assert.IsTrue(ast.Count > 0, $"Expected non-empty AST. Source:\n{src}");
+
+            var generated = codegen.Generate(ast);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(generated), $"Expected non-empty generated output. Source:\n{src}");
         }
 
         private static void AssertLexerHasUnknownToken(string src)
@@ -604,6 +609,7 @@ void H(void)
 
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
             var significantTokens = GetSignificantTokens(tokens);
@@ -773,6 +779,7 @@ void H(void)
 
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
 
             var tokens = lexer.Tokenize(src);
             var significantTokens = GetSignificantTokens(tokens);
@@ -788,6 +795,17 @@ void H(void)
             var ast = parser.Parse(tokens);
             var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
             Assert.AreEqual(0, function.FunctionParameterList.Count);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"// functions
+int F(void)
+{
+    return 1;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
         [TestMethod]
@@ -901,6 +919,21 @@ start
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
 
+            var expected =
+@"#include <cstdint>
+
+// properties
+auto p = (int64_t)1;
+
+// start
+int main()
+{
+    auto q = (int64_t)2;
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
             Assert.IsFalse(generated.Contains("{0}", StringComparison.Ordinal));
             Assert.IsFalse(generated.Contains(" = ;", StringComparison.Ordinal));
         }
