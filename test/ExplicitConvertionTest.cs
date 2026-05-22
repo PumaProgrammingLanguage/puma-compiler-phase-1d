@@ -4,7 +4,7 @@ using Puma;
 namespace test
 {
     [TestClass]
-    public class ConvertionTest
+    public class ExplicitConvertionTest
     {
         private static string Normalize(string s) =>
             s.Replace("\r\n", "\n").Replace("\r", "\n");
