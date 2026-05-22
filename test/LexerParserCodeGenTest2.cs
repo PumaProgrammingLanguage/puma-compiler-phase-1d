@@ -896,6 +896,17 @@ void F(void)
             var codegen = new Puma.Codegen();
             var generated = codegen.Generate(ast);
 
+            var expected =
+@"mysteryType p = {0};
+
+// start
+int main()
+{
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
             StringAssert.Contains(generated, "mysteryType p = {0};");
             StringAssert.Contains(generated, "int main()");
         }
