@@ -84,7 +84,9 @@ start
             EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.FLT64);
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (uint8_t)0;
 auto b = (uint8_t)1;
 auto c = (uint8_t)2;
@@ -116,7 +118,6 @@ int main()
     s = g;
     t = h;
     u = i;
-
     return 0;
 }
 ";
@@ -167,7 +168,9 @@ start
             EnsureImplicit(Convertion.Type.INT8, Convertion.Type.FLT64);
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (int8_t)0;
 auto b = (int8_t)1;
 auto c = (int8_t)2;
@@ -190,7 +193,446 @@ int main()
     p = d;
     q = e;
     r = f;
+    return 0;
+}
+";
 
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_UInt16_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 uint16
+    b = 1 uint16
+    c = 2 uint16
+    d = 3 uint16
+    e = 4 uint16
+    f = 5 uint16
+    g = 6 uint16
+
+start
+    m = 0 uint16
+    n = 0 uint32
+    o = 0 uint64
+    p = 0 int32
+    q = 0 int64
+    r = 0 flt32
+    s = 0 flt64
+    m = a
+    n = b
+    o = c
+    p = d
+    q = e
+    r = f
+    s = g
+";
+
+            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.UINT16);
+            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.UINT32);
+            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.UINT64);
+            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.INT32);
+            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.INT64);
+            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.FLT32);
+            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.FLT64);
+
+            var expected =
+@"#include <cstdint>
+
+// properties
+auto a = (uint16_t)0;
+auto b = (uint16_t)1;
+auto c = (uint16_t)2;
+auto d = (uint16_t)3;
+auto e = (uint16_t)4;
+auto f = (uint16_t)5;
+auto g = (uint16_t)6;
+
+// start
+int main()
+{
+    auto m = (uint16_t)0;
+    auto n = (uint32_t)0;
+    auto o = (uint64_t)0;
+    auto p = (int32_t)0;
+    auto q = (int64_t)0;
+    auto r = (float)0;
+    auto s = (double)0;
+    m = a;
+    n = b;
+    o = c;
+    p = d;
+    q = e;
+    r = f;
+    s = g;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_Int16_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 int16
+    b = 1 int16
+    c = 2 int16
+    d = 3 int16
+    e = 4 int16
+
+start
+    m = 0 int16
+    n = 0 int32
+    o = 0 int64
+    p = 0 flt32
+    q = 0 flt64
+    m = a
+    n = b
+    o = c
+    p = d
+    q = e
+";
+
+            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.INT16);
+            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.INT32);
+            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.INT64);
+            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.FLT32);
+            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.FLT64);
+
+            var expected =
+@"#include <cstdint>
+
+// properties
+auto a = (int16_t)0;
+auto b = (int16_t)1;
+auto c = (int16_t)2;
+auto d = (int16_t)3;
+auto e = (int16_t)4;
+
+// start
+int main()
+{
+    auto m = (int16_t)0;
+    auto n = (int32_t)0;
+    auto o = (int64_t)0;
+    auto p = (float)0;
+    auto q = (double)0;
+    m = a;
+    n = b;
+    o = c;
+    p = d;
+    q = e;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_UInt32_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 uint32
+    b = 1 uint32
+    c = 2 uint32
+    d = 3 uint32
+
+start
+    m = 0 uint32
+    n = 0 uint64
+    o = 0 int64
+    p = 0 flt64
+    m = a
+    n = b
+    o = c
+    p = d
+";
+
+            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.UINT32);
+            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.UINT64);
+            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.INT64);
+            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.FLT64);
+
+            var expected =
+@"#include <cstdint>
+
+// properties
+auto a = (uint32_t)0;
+auto b = (uint32_t)1;
+auto c = (uint32_t)2;
+auto d = (uint32_t)3;
+
+// start
+int main()
+{
+    auto m = (uint32_t)0;
+    auto n = (uint64_t)0;
+    auto o = (int64_t)0;
+    auto p = (double)0;
+    m = a;
+    n = b;
+    o = c;
+    p = d;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_Int32_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 int32
+    b = 1 int32
+    c = 2 int32
+
+start
+    m = 0 int32
+    n = 0 int64
+    o = 0 flt64
+    m = a
+    n = b
+    o = c
+";
+
+            EnsureImplicit(Convertion.Type.INT32, Convertion.Type.INT32);
+            EnsureImplicit(Convertion.Type.INT32, Convertion.Type.INT64);
+            EnsureImplicit(Convertion.Type.INT32, Convertion.Type.FLT64);
+
+            var expected =
+@"#include <cstdint>
+
+// properties
+auto a = (int32_t)0;
+auto b = (int32_t)1;
+auto c = (int32_t)2;
+
+// start
+int main()
+{
+    auto m = (int32_t)0;
+    auto n = (int64_t)0;
+    auto o = (double)0;
+    m = a;
+    n = b;
+    o = c;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_UInt64_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 uint64
+    b = 1 uint64
+
+start
+    m = 0 uint64
+    n = 0 uint64
+    m = a
+    n = b
+";
+
+            EnsureImplicit(Convertion.Type.UINT64, Convertion.Type.UINT64);
+
+            var expected =
+@"#include <cstdint>
+
+// properties
+auto a = (uint64_t)0;
+auto b = (uint64_t)1;
+
+// start
+int main()
+{
+    auto m = (uint64_t)0;
+    auto n = (uint64_t)0;
+    m = a;
+    n = b;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_Int64_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 int64
+    b = 1 int64
+
+start
+    m = 0 int64
+    n = 0 int64
+    m = a
+    n = b
+";
+
+            EnsureImplicit(Convertion.Type.INT64, Convertion.Type.INT64);
+
+            var expected =
+@"#include <cstdint>
+
+// properties
+auto a = (int64_t)0;
+auto b = (int64_t)1;
+
+// start
+int main()
+{
+    auto m = (int64_t)0;
+    auto n = (int64_t)0;
+    m = a;
+    n = b;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_Flt32_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 flt32
+    b = 1 flt32
+
+start
+    m = 0 flt32
+    n = 0 flt64
+    m = a
+    n = b
+";
+
+            EnsureImplicit(Convertion.Type.FLT32, Convertion.Type.FLT32);
+            EnsureImplicit(Convertion.Type.FLT32, Convertion.Type.FLT64);
+
+            var expected =
+@"// properties
+auto a = (float)0;
+auto b = (float)1;
+
+// start
+int main()
+{
+    auto m = (float)0;
+    auto n = (double)0;
+    m = a;
+    n = b;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitExample_Flt64_OutputText_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 0 flt64
+
+start
+    m = 0 flt64
+    m = a
+";
+
+            EnsureImplicit(Convertion.Type.FLT64, Convertion.Type.FLT64);
+
+            var expected =
+@"// properties
+auto a = (double)0;
+
+// start
+int main()
+{
+    auto m = (double)0;
+    m = a;
     return 0;
 }
 ";
