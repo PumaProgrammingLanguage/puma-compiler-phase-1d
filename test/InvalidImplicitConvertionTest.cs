@@ -6,31 +6,6 @@ namespace test
     [TestClass]
     public class InvalidImplicitConvertionTest
     {
-        private static void EnsureImplicit(Convertion.Type fromType, Convertion.Type toType)
-        {
-            if (!Convertion.IsImplicit(fromType, toType))
-            {
-                throw new InvalidOperationException($"Implicit conversion is not valid: {fromType} -> {toType}");
-            }
-        }
-
-        private static Convertion.Type MapPumaType(string pumaType) => pumaType switch
-        {
-            "uint8" => Convertion.Type.UINT8,
-            "uint16" => Convertion.Type.UINT16,
-            "uint32" => Convertion.Type.UINT32,
-            "uint64" or "uint" => Convertion.Type.UINT64,
-            "int8" => Convertion.Type.INT8,
-            "int16" => Convertion.Type.INT16,
-            "int32" => Convertion.Type.INT32,
-            "int64" or "int" => Convertion.Type.INT64,
-            "flt32" => Convertion.Type.FLT32,
-            "flt64" or "flt" => Convertion.Type.FLT64,
-            "fix32" => Convertion.Type.FIX32,
-            "fix64" or "fix" => Convertion.Type.FIX64,
-            _ => throw new InvalidOperationException($"Unsupported Puma type '{pumaType}'.")
-        };
-
         private static string ToPumaType(Convertion.Type type) => type switch
         {
             Convertion.Type.UINT8 => "uint8",
@@ -48,54 +23,24 @@ namespace test
             _ => throw new InvalidOperationException($"Unsupported conversion type '{type}'.")
         };
 
-        private static string BuildInvalidImplicitAssignmentSource(Convertion.Type fromType, Convertion.Type toType)
+        private static string BuildInvalidImplicitAssignmentSource(Convertion.Type sourceType, Convertion.Type targetType)
         {
-            var sourceType = ToPumaType(fromType);
-            var targetType = ToPumaType(toType);
+            var sourceTypeName = ToPumaType(sourceType);
+            var targetTypeName = ToPumaType(targetType);
             return
 $@"properties
-    source = 0 {sourceType}
-    target = 0 {targetType}
+    source = 0 {sourceTypeName}
+    target = 0 {targetTypeName}
 
 start
     target = source
 ";
         }
 
-        private static void ValidateImplicitAssignments(List<Node> ast)
-        {
-            var declaredTypes = ast
-                .Where(n => n.Kind == NodeKind.PropertyDeclaration
-                    && !string.IsNullOrWhiteSpace(n.PropertyName)
-                    && !string.IsNullOrWhiteSpace(n.PropertyType))
-                .ToDictionary(n => n.PropertyName!, n => MapPumaType(n.PropertyType!), StringComparer.Ordinal);
-
-            foreach (var assignment in ast.Where(n => n.Kind == NodeKind.AssignmentStatement && n.AssignmentOperator == "="))
-            {
-                if (string.IsNullOrWhiteSpace(assignment.AssignmentLeft)
-                    || string.IsNullOrWhiteSpace(assignment.AssignmentRight))
-                {
-                    continue;
-                }
-
-                if (!declaredTypes.TryGetValue(assignment.AssignmentLeft!, out var toType))
-                {
-                    continue;
-                }
-
-                if (!declaredTypes.TryGetValue(assignment.AssignmentRight!, out var fromType))
-                {
-                    continue;
-                }
-
-                EnsureImplicit(fromType, toType);
-            }
-        }
-
         [TestMethod]
         public void Convertion_InvalidImplicitAssignments_FromSource_AreRejected()
         {
-            var cases = new List<(string Source, string MessagePart)>();
+            var cases = new List<(string Source, string SourceType, string TargetType)>();
             var max = Enum.GetValues<Convertion.Type>().Length;
             for (var from = 0; from < max; from++)
             {
@@ -110,25 +55,80 @@ start
 
                     cases.Add((
                         BuildInvalidImplicitAssignmentSource(fromType, toType),
-                        $"{fromType} -> {toType}"));
+                        ToPumaType(fromType),
+                        ToPumaType(toType)));
                 }
             }
 
-            foreach (var (src, messagePart) in cases)
+            foreach (var (src, sourceType, targetType) in cases)
             {
                 var lexer = new Puma.Lexer();
                 var parser = new Puma.Parser();
-                var codegen = new Puma.Codegen();
 
                 var tokens = lexer.Tokenize(src);
-                var ast = parser.Parse(tokens);
-                var generated = codegen.Generate(ast);
-
-                Assert.IsFalse(string.IsNullOrWhiteSpace(generated));
-
-                var ex = Assert.ThrowsException<InvalidOperationException>(() => ValidateImplicitAssignments(ast));
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
                 StringAssert.Contains(ex.Message, "Implicit conversion is not valid");
-                StringAssert.Contains(ex.Message, messagePart);
+
+                if (TryMapConvertionType(sourceType, out var fromType)
+                    && TryMapConvertionType(targetType, out var toType))
+                {
+                    StringAssert.Contains(ex.Message, $"{fromType} -> {toType}");
+                }
+            }
+        }
+
+        private static bool TryMapConvertionType(string? typeText, out Convertion.Type type)
+        {
+            type = default;
+            if (string.IsNullOrWhiteSpace(typeText))
+            {
+                return false;
+            }
+
+            switch (typeText.Trim())
+            {
+                case "uint8":
+                    type = Convertion.Type.UINT8;
+                    return true;
+                case "uint16":
+                    type = Convertion.Type.UINT16;
+                    return true;
+                case "uint32":
+                    type = Convertion.Type.UINT32;
+                    return true;
+                case "uint":
+                case "uint64":
+                    type = Convertion.Type.UINT64;
+                    return true;
+                case "int8":
+                    type = Convertion.Type.INT8;
+                    return true;
+                case "int16":
+                    type = Convertion.Type.INT16;
+                    return true;
+                case "int":
+                case "int32":
+                    type = Convertion.Type.INT32;
+                    return true;
+                case "int64":
+                    type = Convertion.Type.INT64;
+                    return true;
+                case "flt32":
+                    type = Convertion.Type.FLT32;
+                    return true;
+                case "flt":
+                case "flt64":
+                    type = Convertion.Type.FLT64;
+                    return true;
+                case "fix32":
+                    type = Convertion.Type.FIX32;
+                    return true;
+                case "fix":
+                case "fix64":
+                    type = Convertion.Type.FIX64;
+                    return true;
+                default:
+                    return false;
             }
         }
     }

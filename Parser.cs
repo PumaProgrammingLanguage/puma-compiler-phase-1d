@@ -163,6 +163,87 @@ namespace Puma
             "fix", "fix64", "fix32"
         };
 
+        private static bool TryMapConvertionType(string? typeText, out Convertion.Type type)
+        {
+            type = default;
+            if (string.IsNullOrWhiteSpace(typeText))
+            {
+                return false;
+            }
+
+            switch (typeText.Trim())
+            {
+                case "uint8":
+                    type = Convertion.Type.UINT8;
+                    return true;
+                case "uint16":
+                    type = Convertion.Type.UINT16;
+                    return true;
+                case "uint32":
+                    type = Convertion.Type.UINT32;
+                    return true;
+                case "uint":
+                case "uint64":
+                    type = Convertion.Type.UINT64;
+                    return true;
+                case "int8":
+                    type = Convertion.Type.INT8;
+                    return true;
+                case "int16":
+                    type = Convertion.Type.INT16;
+                    return true;
+                case "int":
+                case "int32":
+                    type = Convertion.Type.INT32;
+                    return true;
+                case "int64":
+                    type = Convertion.Type.INT64;
+                    return true;
+                case "flt32":
+                    type = Convertion.Type.FLT32;
+                    return true;
+                case "flt":
+                case "flt64":
+                    type = Convertion.Type.FLT64;
+                    return true;
+                case "fix32":
+                    type = Convertion.Type.FIX32;
+                    return true;
+                case "fix":
+                case "fix64":
+                    type = Convertion.Type.FIX64;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void ValidateImplicitPropertyAssignment(string left, string right)
+        {
+            var leftProperty = ast.LastOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
+                && string.Equals(n.PropertyName, left, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(n.PropertyType));
+            var rightProperty = ast.LastOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
+                && string.Equals(n.PropertyName, right, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(n.PropertyType));
+
+            if (leftProperty == null || rightProperty == null)
+            {
+                return;
+            }
+
+            if (!TryMapConvertionType(rightProperty.PropertyType, out var fromType)
+                || !TryMapConvertionType(leftProperty.PropertyType, out var toType))
+            {
+                return;
+            }
+
+            if (!Convertion.IsImplicit(fromType, toType))
+            {
+                throw new InvalidOperationException($"Implicit conversion is not valid: {fromType} -> {toType}");
+            }
+        }
+
         private Section CurrentSection = Section.None;
         private LexerTokens? token = new LexerTokens();
         private Node? rootNode = new Node();
@@ -2040,6 +2121,15 @@ namespace Puma
             if (assignmentOperator == "=" && _constantProperties.Contains(left))
             {
                 throw new InvalidOperationException($"Cannot assign to constant property '{left}'.");
+            }
+
+            if (assignmentOperator == "="
+                && !string.IsNullOrWhiteSpace(left)
+                && !string.IsNullOrWhiteSpace(right)
+                && leftExpression is ExpressionNode { Kind: ExpressionKind.Identifier }
+                && rightExpression is ExpressionNode { Kind: ExpressionKind.Identifier })
+            {
+                ValidateImplicitPropertyAssignment(left, right);
             }
 
             if ((string.IsNullOrWhiteSpace(left) && leftExpression == null)

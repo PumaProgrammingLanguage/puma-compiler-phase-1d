@@ -9,34 +9,6 @@ namespace test
         private static string Normalize(string s) =>
             s.Replace("\r\n", "\n").Replace("\r", "\n");
 
-        private static void EnsureImplicit(Convertion.Type fromType, Convertion.Type toType)
-        {
-            if (!Convertion.IsImplicit(fromType, toType))
-            {
-                throw new InvalidOperationException($"Implicit conversion is not valid: {fromType} -> {toType}");
-            }
-        }
-
-        [TestMethod]
-        public void ConvertionTable_AllImplicitEntries_AreImplicit()
-        {
-            var max = Enum.GetValues<Convertion.Type>().Length;
-            for (var from = 0; from < max; from++)
-            {
-                for (var to = 0; to < max; to++)
-                {
-                    var fromType = (Convertion.Type)from;
-                    var toType = (Convertion.Type)to;
-                    if (Convertion.GetConversionType(fromType, toType) == 'I')
-                    {
-                        Assert.IsTrue(
-                            Convertion.IsImplicit(fromType, toType),
-                            $"Expected implicit conversion for {fromType} -> {toType}.");
-                    }
-                }
-            }
-        }
-
         [TestMethod]
         public void Convertion_ImplicitExample_UInt8_OutputText_AreConsistent()
         {
@@ -72,16 +44,6 @@ start
     t = h
     u = i
 ";
-
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.UINT8);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.UINT16);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.UINT32);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.UINT64);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.INT16);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.INT32);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.INT64);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.FLT32);
-            EnsureImplicit(Convertion.Type.UINT8, Convertion.Type.FLT64);
 
             var expected =
 @"#include <cstdint>
@@ -160,13 +122,6 @@ start
     r = f
 ";
 
-            EnsureImplicit(Convertion.Type.INT8, Convertion.Type.INT8);
-            EnsureImplicit(Convertion.Type.INT8, Convertion.Type.INT16);
-            EnsureImplicit(Convertion.Type.INT8, Convertion.Type.INT32);
-            EnsureImplicit(Convertion.Type.INT8, Convertion.Type.INT64);
-            EnsureImplicit(Convertion.Type.INT8, Convertion.Type.FLT32);
-            EnsureImplicit(Convertion.Type.INT8, Convertion.Type.FLT64);
-
             var expected =
 @"#include <cstdint>
 
@@ -238,14 +193,6 @@ start
     s = g
 ";
 
-            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.UINT16);
-            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.UINT32);
-            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.UINT64);
-            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.INT32);
-            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.INT64);
-            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.FLT32);
-            EnsureImplicit(Convertion.Type.UINT16, Convertion.Type.FLT64);
-
             var expected =
 @"#include <cstdint>
 
@@ -314,12 +261,6 @@ start
     q = e
 ";
 
-            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.INT16);
-            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.INT32);
-            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.INT64);
-            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.FLT32);
-            EnsureImplicit(Convertion.Type.INT16, Convertion.Type.FLT64);
-
             var expected =
 @"#include <cstdint>
 
@@ -379,11 +320,6 @@ start
     p = d
 ";
 
-            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.UINT32);
-            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.UINT64);
-            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.INT64);
-            EnsureImplicit(Convertion.Type.UINT32, Convertion.Type.FLT64);
-
             var expected =
 @"#include <cstdint>
 
@@ -437,10 +373,6 @@ start
     o = c
 ";
 
-            EnsureImplicit(Convertion.Type.INT32, Convertion.Type.INT32);
-            EnsureImplicit(Convertion.Type.INT32, Convertion.Type.INT64);
-            EnsureImplicit(Convertion.Type.INT32, Convertion.Type.FLT64);
-
             var expected =
 @"#include <cstdint>
 
@@ -488,8 +420,6 @@ start
     n = b
 ";
 
-            EnsureImplicit(Convertion.Type.UINT64, Convertion.Type.UINT64);
-
             var expected =
 @"#include <cstdint>
 
@@ -533,8 +463,6 @@ start
     m = a
     n = b
 ";
-
-            EnsureImplicit(Convertion.Type.INT64, Convertion.Type.INT64);
 
             var expected =
 @"#include <cstdint>
@@ -580,9 +508,6 @@ start
     n = b
 ";
 
-            EnsureImplicit(Convertion.Type.FLT32, Convertion.Type.FLT32);
-            EnsureImplicit(Convertion.Type.FLT32, Convertion.Type.FLT64);
-
             var expected =
 @"// properties
 auto a = (float)0;
@@ -621,8 +546,6 @@ start
     m = 0 flt64
     m = a
 ";
-
-            EnsureImplicit(Convertion.Type.FLT64, Convertion.Type.FLT64);
 
             var expected =
 @"// properties
