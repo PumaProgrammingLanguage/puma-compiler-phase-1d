@@ -494,6 +494,74 @@ int main()
         }
 
         [TestMethod]
+        public void Convertion_ImplicitBoundary_IntegerWidths_OutputText_AreConsistent()
+        {
+            const string src =
+@"start
+    u8Min = 0 uint8
+    u8Max = 255 uint8
+    u16Min = 0 uint16
+    u16Max = 65535 uint16
+    u32Min = 0 uint32
+    u32Max = 4294967295 uint32
+    u64Min = 0 uint64
+    u64Max = 18446744073709551615 uint64
+    i8Min = 0 int8
+    i8Max = 127 int8
+    i16Min = 0 int16
+    i16Max = 32767 int16
+    i32Min = 0 int32
+    i32Max = 2147483647 int32
+    i64Min = 0 int64
+    i64Max = 9223372036854775807 int64
+    i8Min = -128
+    i16Min = -32768
+    i32Min = -2147483648
+    i64Min = -9223372036854775808
+";
+
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto u8Min = (uint8_t)0;
+    auto u8Max = (uint8_t)255;
+    auto u16Min = (uint16_t)0;
+    auto u16Max = (uint16_t)65535;
+    auto u32Min = (uint32_t)0;
+    auto u32Max = (uint32_t)4294967295;
+    auto u64Min = (uint64_t)0;
+    auto u64Max = (uint64_t)18446744073709551615;
+    auto i8Min = (int8_t)0;
+    auto i8Max = (int8_t)127;
+    auto i16Min = (int16_t)0;
+    auto i16Max = (int16_t)32767;
+    auto i32Min = (int32_t)0;
+    auto i32Max = (int32_t)2147483647;
+    auto i64Min = (int64_t)0;
+    auto i64Max = (int64_t)9223372036854775807;
+    i8Min = -128;
+    i16Min = -32768;
+    i32Min = -2147483648;
+    i64Min = -9223372036854775808;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void Convertion_ImplicitExample_Flt32_OutputText_AreConsistent()
         {
             const string src =
@@ -556,6 +624,49 @@ int main()
 {
     auto m = (double)0;
     m = a;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Convertion_ImplicitBoundary_FloatingWidths_OutputText_AreConsistent()
+        {
+            const string src =
+@"start
+    f32Min = 1.17549435e-38 flt32
+    f32Max = 3.4028235e+38 flt32
+    f64Min = 2.2250738585072014e-308 flt64
+    f64Max = 1.7976931348623157e+308 flt64
+    g32 = 0 flt32
+    g64 = 0 flt64
+    g32 = f32Max
+    g64 = f64Max
+";
+
+            var expected =
+@"// start
+int main()
+{
+    auto f32Min = 1.17549435e-38;
+    auto f32Max = 3.4028235e+38;
+    auto f64Min = 2.2250738585072014e-308;
+    auto f64Max = 1.7976931348623157e+308;
+    auto g32 = (float)0;
+    auto g64 = (double)0;
+    g32 = f32Max;
+    g64 = f64Max;
+
     return 0;
 }
 ";
