@@ -195,6 +195,57 @@ $@"start
             }
         }
 
+        [TestMethod]
+        public void Convertion_InvalidImplicitAssignments_ErrorMessage_IsConsistent_AcrossSections()
+        {
+            const string startSource =
+@"properties
+    source = 0 uint16
+    target = 0 int16
+
+start
+    target = source
+";
+
+            const string initializeSource =
+@"properties
+    source = 0 uint16
+    target = 0 int16
+
+initialize
+    target = source
+";
+
+            const string functionsSource =
+@"properties
+    source = 0 uint16
+    target = 0 int16
+
+functions
+    F()
+        target = source
+";
+
+            var sectionCases = new[]
+            {
+                (Section: "start", Source: startSource),
+                (Section: "initialize", Source: initializeSource),
+                (Section: "functions", Source: functionsSource)
+            };
+
+            var expectedMessage = "Implicit conversion is not valid: UINT16 -> INT16";
+
+            foreach (var (section, src) in sectionCases)
+            {
+                var lexer = new Puma.Lexer();
+                var parser = new Puma.Parser();
+                var tokens = lexer.Tokenize(src);
+
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+                Assert.AreEqual(expectedMessage, ex.Message, $"Unexpected message in '{section}' section.");
+            }
+        }
+
         private static bool TryMapConvertionType(string? typeText, out Convertion.Type type)
         {
             type = default;

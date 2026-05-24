@@ -681,5 +681,51 @@ int main()
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
+
+        [TestMethod]
+        public void Convertion_MixedExpression_NumericTypes_OutputText_AreConsistent()
+        {
+            const string src =
+@"start
+    u16 = 10 uint16
+    i32 = 20 int32
+    f64 = 30 flt64
+    sum1 = 0 int32
+    sum2 = 0 flt64
+    sum3 = 0 flt64
+    sum1 = u16 + i32
+    sum2 = u16 + f64
+    sum3 = i32 + f64
+";
+
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto u16 = (uint16_t)10;
+    auto i32 = (int32_t)20;
+    auto f64 = (double)30;
+    auto sum1 = (int32_t)0;
+    auto sum2 = (double)0;
+    auto sum3 = (double)0;
+    sum1 = u16 + i32;
+    sum2 = u16 + f64;
+    sum3 = i32 + f64;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
     }
 }
