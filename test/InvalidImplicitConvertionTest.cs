@@ -23,7 +23,7 @@ namespace test
             _ => throw new InvalidOperationException($"Unsupported conversion type '{type}'.")
         };
 
-        private static string BuildInvalidImplicitAssignmentSource(Convertion.Type sourceType, Convertion.Type targetType)
+        private static string BuildInvalidImplicitAssignmentSourcePropertyProperty(Convertion.Type sourceType, Convertion.Type targetType)
         {
             var sourceTypeName = ToPumaType(sourceType);
             var targetTypeName = ToPumaType(targetType);
@@ -33,6 +33,84 @@ $@"properties
     target = 0 {targetTypeName}
 
 start
+    target = source
+";
+        }
+
+        private static string BuildInvalidImplicitReturnSource(Convertion.Type sourceType, Convertion.Type targetType)
+        {
+            var sourceTypeName = ToPumaType(sourceType);
+            var targetTypeName = ToPumaType(targetType);
+            return
+$@"functions
+    F() {targetTypeName}
+        source = 0 {sourceTypeName}
+        return source
+";
+        }
+
+        private static string BuildInvalidImplicitFunctionCallArgumentSource(Convertion.Type sourceType, Convertion.Type targetType)
+        {
+            var sourceTypeName = ToPumaType(sourceType);
+            var targetTypeName = ToPumaType(targetType);
+            return
+$@"functions
+    Consume(value {targetTypeName})
+    Caller()
+        source = 0 {sourceTypeName}
+        Consume(source)
+";
+        }
+
+        private static string BuildInvalidImplicitConditionalReturnSource(Convertion.Type sourceType, Convertion.Type targetType)
+        {
+            var sourceTypeName = ToPumaType(sourceType);
+            var targetTypeName = ToPumaType(targetType);
+            return
+$@"functions
+    F() {targetTypeName}
+        source = 1 {sourceTypeName}
+        target = 0 {targetTypeName}
+        return source if source > 0 else target
+";
+        }
+
+        private static string BuildInvalidImplicitAssignmentSourcePropertyLocal(Convertion.Type sourceType, Convertion.Type targetType)
+        {
+            var sourceTypeName = ToPumaType(sourceType);
+            var targetTypeName = ToPumaType(targetType);
+            return
+$@"properties
+    source = 0 {sourceTypeName}
+
+start
+    target = 0 {targetTypeName}
+    target = source
+";
+        }
+
+        private static string BuildInvalidImplicitAssignmentSourceLocalProperty(Convertion.Type sourceType, Convertion.Type targetType)
+        {
+            var sourceTypeName = ToPumaType(sourceType);
+            var targetTypeName = ToPumaType(targetType);
+            return
+$@"properties
+    target = 0 {targetTypeName}
+
+start
+    source = 0 {sourceTypeName}
+    target = source
+";
+        }
+
+        private static string BuildInvalidImplicitAssignmentSourceLocalLocal(Convertion.Type sourceType, Convertion.Type targetType)
+        {
+            var sourceTypeName = ToPumaType(sourceType);
+            var targetTypeName = ToPumaType(targetType);
+            return
+$@"start
+    source = 0 {sourceTypeName}
+    target = 0 {targetTypeName}
     target = source
 ";
         }
@@ -54,7 +132,22 @@ start
                     }
 
                     cases.Add((
-                        BuildInvalidImplicitAssignmentSource(fromType, toType),
+                        BuildInvalidImplicitAssignmentSourcePropertyProperty(fromType, toType),
+                        ToPumaType(fromType),
+                        ToPumaType(toType)));
+
+                    cases.Add((
+                        BuildInvalidImplicitAssignmentSourcePropertyLocal(fromType, toType),
+                        ToPumaType(fromType),
+                        ToPumaType(toType)));
+
+                    cases.Add((
+                        BuildInvalidImplicitAssignmentSourceLocalProperty(fromType, toType),
+                        ToPumaType(fromType),
+                        ToPumaType(toType)));
+
+                    cases.Add((
+                        BuildInvalidImplicitAssignmentSourceLocalLocal(fromType, toType),
                         ToPumaType(fromType),
                         ToPumaType(toType)));
                 }
@@ -74,6 +167,31 @@ start
                 {
                     StringAssert.Contains(ex.Message, $"{fromType} -> {toType}");
                 }
+            }
+        }
+
+        [TestMethod]
+        public void Convertion_InvalidImplicitConversions_InNonAssignmentContexts_AreRejected()
+        {
+            var sourceType = Convertion.Type.UINT16;
+            var targetType = Convertion.Type.INT16;
+            Assert.AreEqual('E', Convertion.GetConversionType(sourceType, targetType));
+
+            var cases = new[]
+            {
+                BuildInvalidImplicitReturnSource(sourceType, targetType),
+                BuildInvalidImplicitFunctionCallArgumentSource(sourceType, targetType),
+                BuildInvalidImplicitConditionalReturnSource(sourceType, targetType)
+            };
+
+            foreach (var src in cases)
+            {
+                var lexer = new Puma.Lexer();
+                var parser = new Puma.Parser();
+                var tokens = lexer.Tokenize(src);
+
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+                StringAssert.Contains(ex.Message, "Implicit conversion is not valid");
             }
         }
 

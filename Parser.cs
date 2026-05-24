@@ -131,6 +131,7 @@ namespace Puma
         private List<Node> _currentFunctionBody = new();
         private bool _currentFunctionIsDelegate;
         private int _pendingLeadingBlankLines;
+        private readonly Dictionary<string, Convertion.Type> _inferredIdentifierTypes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _constantProperties = new(StringComparer.Ordinal);
         private readonly Stack<List<Node>> _statementTargetStack = new();
         private List<Node>? _pendingBlockTarget;
@@ -220,20 +221,8 @@ namespace Puma
 
         private void ValidateImplicitPropertyAssignment(string left, string right)
         {
-            var leftProperty = ast.LastOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, left, StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(n.PropertyType));
-            var rightProperty = ast.LastOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, right, StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(n.PropertyType));
-
-            if (leftProperty == null || rightProperty == null)
-            {
-                return;
-            }
-
-            if (!TryMapConvertionType(rightProperty.PropertyType, out var fromType)
-                || !TryMapConvertionType(leftProperty.PropertyType, out var toType))
+            if (!TryGetKnownIdentifierType(right, out var fromType)
+                || !TryGetKnownIdentifierType(left, out var toType))
             {
                 return;
             }
@@ -241,6 +230,96 @@ namespace Puma
             if (!Convertion.IsImplicit(fromType, toType))
             {
                 throw new InvalidOperationException($"Implicit conversion is not valid: {fromType} -> {toType}");
+            }
+        }
+
+        private bool TryGetKnownIdentifierType(string identifier, out Convertion.Type type)
+        {
+            type = default;
+            if (string.IsNullOrWhiteSpace(identifier))
+            {
+                return false;
+            }
+
+            var property = ast.LastOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
+                && string.Equals(n.PropertyName, identifier, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(n.PropertyType));
+            if (property != null && TryMapConvertionType(property.PropertyType, out type))
+            {
+                return true;
+            }
+
+            return _inferredIdentifierTypes.TryGetValue(identifier, out type);
+        }
+
+        private void ValidateImplicitConversion(Convertion.Type fromType, Convertion.Type toType)
+        {
+            if (!Convertion.IsImplicit(fromType, toType))
+            {
+                throw new InvalidOperationException($"Implicit conversion is not valid: {fromType} -> {toType}");
+            }
+        }
+
+        private void ValidateImplicitExpressionConversion(ExpressionNode? expression, Convertion.Type toType)
+        {
+            if (expression == null)
+            {
+                return;
+            }
+
+            if (expression.Kind == ExpressionKind.Identifier
+                && !string.IsNullOrWhiteSpace(expression.Value)
+                && TryGetKnownIdentifierType(expression.Value, out var fromType))
+            {
+                ValidateImplicitConversion(fromType, toType);
+                return;
+            }
+
+            if (expression.Kind == ExpressionKind.Conditional)
+            {
+                ValidateImplicitExpressionConversion(expression.Right, toType);
+                foreach (var argument in expression.Arguments)
+                {
+                    ValidateImplicitExpressionConversion(argument, toType);
+                }
+            }
+        }
+
+        private Node? GetFunctionDeclarationForCall(string functionName)
+        {
+            if (_currentFunctionNode != null
+                && string.Equals(_currentFunctionNode.FunctionDeclarationName, functionName, StringComparison.Ordinal))
+            {
+                return _currentFunctionNode;
+            }
+
+            return ast.LastOrDefault(n => n.Kind == NodeKind.FunctionDeclaration
+                && string.Equals(n.FunctionDeclarationName, functionName, StringComparison.Ordinal));
+        }
+
+        private void ValidateImplicitFunctionCallArguments(string functionName, ExpressionNode? callExpression)
+        {
+            if (callExpression?.Kind != ExpressionKind.Call)
+            {
+                return;
+            }
+
+            var declaration = GetFunctionDeclarationForCall(functionName);
+            if (declaration == null)
+            {
+                return;
+            }
+
+            var max = Math.Min(callExpression.Arguments.Count, declaration.FunctionParameterList.Count);
+            for (var i = 0; i < max; i++)
+            {
+                var parameter = declaration.FunctionParameterList[i];
+                if (!TryMapConvertionType(parameter.Type, out var toType))
+                {
+                    continue;
+                }
+
+                ValidateImplicitExpressionConversion(callExpression.Arguments[i], toType);
             }
         }
 
@@ -305,6 +384,7 @@ namespace Puma
             _currentFunctionBody = new List<Node>();
             _currentFunctionIsDelegate = false;
             _pendingLeadingBlankLines = 0;
+            _inferredIdentifierTypes.Clear();
             _constantProperties.Clear();
             _statementTargetStack.Clear();
             _pendingBlockTarget = null;
@@ -2118,6 +2198,14 @@ namespace Puma
             var leftExpression = ParseExpression(leftTokens);
             var rightExpression = ParseExpression(rightTokens);
 
+            if (assignmentOperator == "="
+                && !string.IsNullOrWhiteSpace(left)
+                && TryExtractNumericLiteralWithSuffix(rightTokens, out _, out var inferredSuffix)
+                && TryMapConvertionType(inferredSuffix, out var inferredType))
+            {
+                _inferredIdentifierTypes[left] = inferredType;
+            }
+
             if (assignmentOperator == "=" && _constantProperties.Contains(left))
             {
                 throw new InvalidOperationException($"Cannot assign to constant property '{left}'.");
@@ -2409,6 +2497,7 @@ namespace Puma
             }
 
             var callExpression = ParseExpression(tokens);
+            ValidateImplicitFunctionCallArguments(name, callExpression);
             var callNode = Node.CreateFunctionCall(name, args, callExpression);
             callNode.StatementExpression = callExpression;
             target.Add(callNode);
@@ -2680,6 +2769,13 @@ namespace Puma
             var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
             var node = Node.CreateStatement(NodeKind.ReturnStatement, value);
             node.StatementExpression = ParseExpression(valueTokens);
+
+            if (_currentFunctionNode != null
+                && TryMapConvertionType(_currentFunctionNode.FunctionDeclarationReturnType, out var returnType))
+            {
+                ValidateImplicitExpressionConversion(node.StatementExpression, returnType);
+            }
+
             target.Add(node);
             return true;
         }
