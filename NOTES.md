@@ -9,17 +9,17 @@ Recent updates
 - Added floating boundary-value compiler-module test coverage with precision-sensitive flt32/flt64 exponent literals and codegen output assertions.
 - Added regression coverage that verifies the invalid implicit conversion error message is consistent across start, initialize, and functions sections.
 - Added mixed-expression numeric conversion coverage for binary operations across uint16, int32, and flt64 with full generated-output assertions.
+- Added three constant-mutation diagnostics tests for `start`, `initialize`, and `functions`, verifying consistent parser errors for constant property reassignment.
+- Added `start` vs `initialize` coverage: module initialize-only output is validated with no `main`, and parser now has regression coverage for rejecting files that declare both sections.
+- Added stable diagnostics regression coverage for section parsing errors with exact-message assertions (duplicate sections and invalid section ordering cases).
+- Added typed function return validation coverage for invalid implicit return conversions from flt64 to int32 using literal, identifier, and conditional return expressions; parser now rejects typed literal return mismatches.
 
 1) Unit test TODO list
 
-1. Add parser/codegen tests that verify module section behavior for `start` vs `initialize` (including the rule that only one is allowed and that `main` is not emitted when `start` is absent).
-2. Add diagnostics regression tests for duplicate/invalid section ordering messages to ensure stable and actionable compiler errors.
-3. Add compiler-module tests for typed function return validation coverage with literals, identifiers, and conditional expressions across numeric types.
-4. Add compiler-module tests for function-call argument validation coverage with mixed argument expressions and typed parameters.
-5. Add parser/codegen tests for default parameter values in function declarations and generated call-site defaults.
-6. Add parser/codegen tests for `constant` property mutation diagnostics across `start`, `initialize`, and `functions`.
-7. Add lexer/parser/codegen tests for numeric literal tokenization edge cases (signed literals, exponent forms, base prefixes, and suffix combinations).
-8. Add parser/codegen tests for `match/when`, `error/catch`, and `yield` statement expression handling and generated output consistency.
+1. Add compiler-module tests for function-call argument validation coverage with mixed argument expressions and typed parameters.
+2. Add parser/codegen tests for default parameter values in function declarations and generated call-site defaults.
+3. Add lexer/parser/codegen tests for numeric literal tokenization edge cases (signed literals, exponent forms, base prefixes, and suffix combinations).
+4. Add parser/codegen tests for `match/when`, `error/catch`, and `yield` statement expression handling and generated output consistency.
 
 2) Separate postponed/special-feature TODO list
 

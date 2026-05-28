@@ -248,7 +248,7 @@ namespace Puma
             var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Replace("\r", "\n", StringComparison.Ordinal)
                 .Split('\n');
-            return string.Join("\n", lines.Select(l => $"    {l}"));
+            return string.Join("\n", lines.Select(l => string.IsNullOrEmpty(l) ? string.Empty : $"    {l}"));
         }
 
         private static int GetIncludePriority(string include)

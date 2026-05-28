@@ -108,6 +108,80 @@ int main()
         }
 
         [TestMethod]
+        public void ModuleInitializeOnly_NoMainGenerated_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"module
+    MyModule
+
+properties
+    a = 1
+
+initialize
+    a = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "module", "MyModule",
+                "properties",
+                "a", "=", "1",
+                "initialize",
+                "a", "=", "2"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+namespace MyModule
+{
+    // properties
+    auto a = (int64_t)1;
+
+    // initialize
+    void initialize(void)
+    {
+        a = 2;
+    }
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void ModuleWithStartAndInitialize_Parser_ThrowsCompilerError()
+        {
+            const string src =
+@"module
+    MyModule
+
+start
+    a = 1
+
+initialize
+    a = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Only one of 'start' or 'initialize' sections may appear in a file.");
+        }
+
+        [TestMethod]
         public void PropertiesAndInitialize_NoMainGenerated_LexerParserCodegen_AreConsistent()
         {
             const string src =

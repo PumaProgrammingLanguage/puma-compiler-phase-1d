@@ -237,6 +237,67 @@ start
         }
 
         [TestMethod]
+        public void PropertiesStart_ConstantMutationDiagnostic_InStart_IsConsistent()
+        {
+            const string src =
+@"properties
+    MAX_RADIUS = 5.0 constant
+
+start
+    MAX_RADIUS = 10
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to constant property");
+            StringAssert.Contains(ex.Message, "MAX_RADIUS");
+        }
+
+        [TestMethod]
+        public void PropertiesInitialize_ConstantMutationDiagnostic_InInitialize_IsConsistent()
+        {
+            const string src =
+@"properties
+    MAX_RADIUS = 5.0 constant
+
+initialize
+    MAX_RADIUS = 10
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to constant property");
+            StringAssert.Contains(ex.Message, "MAX_RADIUS");
+        }
+
+        [TestMethod]
+        public void PropertiesFunctions_ConstantMutationDiagnostic_InFunctions_IsConsistent()
+        {
+            const string src =
+@"properties
+    MAX_RADIUS = 5.0 constant
+
+functions
+    Update()
+        MAX_RADIUS = 10
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to constant property");
+            StringAssert.Contains(ex.Message, "MAX_RADIUS");
+        }
+
+        [TestMethod]
         public void PropertiesStart_ReadwriteByDefault_Reassignment_LexerParserCodegen_AreConsistent()
         {
             const string src =

@@ -728,6 +728,33 @@ void H(void)
         }
 
         [TestMethod]
+        public void ParserSectionDiagnostics_DuplicateAndOrderMessages_AreStable()
+        {
+            var cases = new (string Source, string ExpectedMessage)[]
+            {
+                (
+                    "properties\n    a = 1\nproperties\n    b = 2\n",
+                    "Duplicate section 'properties'. Remove the extra 'properties' section."),
+                (
+                    "start\n    a = 1\nproperties\n    b = 2\n",
+                    "Section 'properties' is out of order after 'start'. Fix: move 'properties' to match this order (all optional): use, type/trait/module, enums, records, properties, start/initialize, finalize, functions."),
+                (
+                    "initialize\n    a = 1\nstart\n    b = 2\n",
+                    "Only one of 'start' or 'initialize' sections may appear in a file.")
+            };
+
+            foreach (var (source, expectedMessage) in cases)
+            {
+                var lexer = new Puma.Lexer();
+                var parser = new Puma.Parser();
+                var tokens = lexer.Tokenize(source);
+
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+                Assert.AreEqual(expectedMessage, ex.Message);
+            }
+        }
+
+        [TestMethod]
         public void ParserErrorMessages_AreAvoided_WithValidInputs()
         {
             var validCases = new[]

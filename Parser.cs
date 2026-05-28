@@ -260,7 +260,59 @@ namespace Puma
             }
         }
 
-        private void ValidateImplicitExpressionConversion(ExpressionNode? expression, Convertion.Type toType)
+        private static bool TryGetTypedLiteralConvertionType(string? expressionText, out Convertion.Type type)
+        {
+            type = default;
+            if (string.IsNullOrWhiteSpace(expressionText))
+            {
+                return false;
+            }
+
+            var text = expressionText.Trim();
+            var signOffset = (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal)) ? 1 : 0;
+            var index = signOffset;
+            var dotSeen = false;
+
+            while (index < text.Length)
+            {
+                var ch = text[index];
+                if (char.IsDigit(ch))
+                {
+                    index++;
+                    continue;
+                }
+
+                if (ch == '.' && !dotSeen)
+                {
+                    dotSeen = true;
+                    index++;
+                    continue;
+                }
+
+                if ((ch == 'e' || ch == 'E') && index + 1 < text.Length)
+                {
+                    index++;
+                    if (index < text.Length && (text[index] == '+' || text[index] == '-'))
+                    {
+                        index++;
+                    }
+
+                    while (index < text.Length && char.IsDigit(text[index]))
+                    {
+                        index++;
+                    }
+
+                    continue;
+                }
+
+                break;
+            }
+
+            var suffix = text[index..];
+            return TryMapConvertionType(suffix, out type);
+        }
+
+        private void ValidateImplicitExpressionConversion(ExpressionNode? expression, Convertion.Type toType, string? expressionText = null)
         {
             if (expression == null)
             {
@@ -270,6 +322,13 @@ namespace Puma
             if (expression.Kind == ExpressionKind.Identifier
                 && !string.IsNullOrWhiteSpace(expression.Value)
                 && TryGetKnownIdentifierType(expression.Value, out var fromType))
+            {
+                ValidateImplicitConversion(fromType, toType);
+                return;
+            }
+
+            if (expression.Kind == ExpressionKind.Literal
+                && TryGetTypedLiteralConvertionType(expressionText, out fromType))
             {
                 ValidateImplicitConversion(fromType, toType);
                 return;
@@ -2773,7 +2832,7 @@ namespace Puma
             if (_currentFunctionNode != null
                 && TryMapConvertionType(_currentFunctionNode.FunctionDeclarationReturnType, out var returnType))
             {
-                ValidateImplicitExpressionConversion(node.StatementExpression, returnType);
+                ValidateImplicitExpressionConversion(node.StatementExpression, returnType, value);
             }
 
             target.Add(node);
