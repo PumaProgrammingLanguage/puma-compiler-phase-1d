@@ -152,6 +152,60 @@ int Add(int64_t a, int64_t b)
         }
 
         [TestMethod]
+        public void Functions_MixedArgumentExpressions_WithTypedParameters_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"functions
+    Consume(a int32, b int32, c int32)
+    Caller()
+        x = 1 int16
+        y = 2 int16
+        z = 3 int16
+        Consume(x + y, x if x > 0 else y, z)
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "functions",
+                "Consume", "(", "a", "int32", ",", "b", "int32", ",", "c", "int32", ")",
+                "Caller", "(", ")",
+                "x", "=", "1", "int16",
+                "y", "=", "2", "int16",
+                "z", "=", "3", "int16",
+                "Consume", "(", "x", "+", "y", ",", "x", "if", "x", ">", "0", "else", "y", ",", "z", ")"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+// functions
+void Consume(int32_t a, int32_t b, int32_t c)
+{
+}
+
+void Caller(void)
+{
+    x = 1;
+    y = 2;
+    z = 3;
+    Consume((x + y), ((x > 0) ? x : y), z);
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesFunctions_ArithmeticLogicalBitwise_LexerParserCodegen_AreConsistent()
         {
             const string src =
@@ -870,6 +924,62 @@ int F(void)
 void F(void)
 {
     x = 1;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Functions_DefaultParameterValues_AndCallSiteDefaults_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"functions
+    LogValues(a int, b int = 10, c int = 20)
+    Caller()
+        LogValues(1)
+        LogValues(1, 2)
+        LogValues(1, 2, 3)
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "functions",
+                "LogValues", "(", "a", "int", ",", "b", "int", "=", "10", ",", "c", "int", "=", "20", ")",
+                "Caller", "(", ")",
+                "LogValues", "(", "1", ")",
+                "LogValues", "(", "1", ",", "2", ")",
+                "LogValues", "(", "1", ",", "2", ",", "3", ")"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var logValues = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "LogValues");
+            Assert.AreEqual(3, logValues.FunctionParameterList.Count);
+            Assert.AreEqual("10", logValues.FunctionParameterList[1].DefaultValue);
+            Assert.AreEqual("20", logValues.FunctionParameterList[2].DefaultValue);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+// functions
+void LogValues(int64_t a, int64_t b, int64_t c)
+{
+}
+
+void Caller(void)
+{
+    LogValues(1, 10, 20);
+    LogValues(1, 2, 20);
+    LogValues(1, 2, 3);
 }
 ";
 

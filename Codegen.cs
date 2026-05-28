@@ -680,7 +680,7 @@ namespace Puma
                     : string.Join(", ", node.FunctionParameterList.Select(FormatFunctionSignatureParameter));
                 sb.AppendLine($"{returnType} {node.FunctionDeclarationName}({parameters})");
                 sb.AppendLine("{");
-                EmitStatementsWithStringLocalDeclarations(node.FunctionBody, sb, "    ");
+                EmitStatementsWithStringLocalDeclarations(node.FunctionBody, sb, "    ", ast);
                 sb.AppendLine("}");
                 sb.AppendLine();
             }
@@ -907,7 +907,7 @@ namespace Puma
             }
         }
 
-        private static void EmitStatementsWithStringLocalDeclarations(List<Node> statements, StringBuilder sb, string indent)
+        private static void EmitStatementsWithStringLocalDeclarations(List<Node> statements, StringBuilder sb, string indent, List<Node>? ast)
         {
             var declared = new HashSet<string>(StringComparer.Ordinal);
             foreach (var statement in statements)
@@ -926,8 +926,34 @@ namespace Puma
                     continue;
                 }
 
-                EmitStatements(new List<Node> { statement }, sb, indent);
+                EmitStatements(new List<Node> { statement }, sb, indent, ast);
             }
+        }
+
+        private static string BuildCallWithDefaultArguments(string functionName, ExpressionNode callExpressionNode, List<Node>? ast)
+        {
+            if (ast == null)
+            {
+                return $"{functionName}({string.Join(", ", callExpressionNode.Arguments.Select(a => GenerateExpression(a, null)))})";
+            }
+
+            var declaration = ast.FirstOrDefault(n => n.Kind == NodeKind.FunctionDeclaration
+                && string.Equals(n.FunctionDeclarationName, functionName, StringComparison.Ordinal));
+            if (declaration == null)
+            {
+                return $"{functionName}({string.Join(", ", callExpressionNode.Arguments.Select(a => GenerateExpression(a, null)))})";
+            }
+
+            var arguments = callExpressionNode.Arguments
+                .Select(a => GenerateExpression(a, null))
+                .ToList();
+
+            for (var i = arguments.Count; i < declaration.FunctionParameterList.Count; i++)
+            {
+                arguments.Add(FormatDefaultArgument(declaration.FunctionParameterList[i]));
+            }
+
+            return $"{functionName}({string.Join(", ", arguments)})";
         }
 
         private static void EmitTraitInitializeStatements(List<Node> statements, StringBuilder sb, string indent)
@@ -1146,6 +1172,14 @@ namespace Puma
                             var callExpression = GenerateExpression(callExpressionNode, null);
                             if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
                             {
+                                var functionName = GenerateExpression(callExpressionNode.Left, null);
+                                if (!string.IsNullOrWhiteSpace(functionName)
+                                    && IsSimpleIdentifier(functionName)
+                                    && callExpressionNode.Arguments.Count >= 0)
+                                {
+                                    callExpression = BuildCallWithDefaultArguments(functionName, callExpressionNode, ast);
+                                }
+
                                 sb.AppendLine($"{indent}{callExpression};");
                             }
                             else

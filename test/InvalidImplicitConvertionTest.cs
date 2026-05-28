@@ -289,6 +289,52 @@ functions
             }
         }
 
+        [TestMethod]
+        public void Convertion_InvalidImplicitFunctionCallArguments_AreRejected()
+        {
+            const string literalSource =
+@"functions
+    Consume(value int32)
+    Caller()
+        Consume(1.5 flt64)
+";
+
+            const string identifierSource =
+@"functions
+    Consume(value int32)
+    Caller()
+        source = 1.5 flt64
+        Consume(source)
+";
+
+            const string conditionalSource =
+@"functions
+    Consume(value int32)
+    Caller()
+        source = 1.5 flt64
+        target = 1 int32
+        Consume(source if source > 0 else target)
+";
+
+            var cases = new[]
+            {
+                literalSource,
+                identifierSource,
+                conditionalSource
+            };
+
+            foreach (var src in cases)
+            {
+                var lexer = new Puma.Lexer();
+                var parser = new Puma.Parser();
+                var tokens = lexer.Tokenize(src);
+
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+                StringAssert.Contains(ex.Message, "Implicit conversion is not valid");
+                StringAssert.Contains(ex.Message, "FLT64 -> INT32");
+            }
+        }
+
         private static bool TryMapConvertionType(string? typeText, out Convertion.Type type)
         {
             type = default;

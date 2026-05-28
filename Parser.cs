@@ -356,7 +356,57 @@ namespace Puma
                 && string.Equals(n.FunctionDeclarationName, functionName, StringComparison.Ordinal));
         }
 
-        private void ValidateImplicitFunctionCallArguments(string functionName, ExpressionNode? callExpression)
+        private static List<string> SplitCallArgumentTexts(List<LexerTokens> argumentTokens)
+        {
+            var result = new List<string>();
+            var current = new List<LexerTokens>();
+            var parenDepth = 0;
+            var bracketDepth = 0;
+
+            foreach (var token in argumentTokens)
+            {
+                if (token.Category == TokenCategory.Delimiter)
+                {
+                    if (token.TokenText == "(")
+                    {
+                        parenDepth++;
+                    }
+                    else if (token.TokenText == ")" && parenDepth > 0)
+                    {
+                        parenDepth--;
+                    }
+                    else if (token.TokenText == "[")
+                    {
+                        bracketDepth++;
+                    }
+                    else if (token.TokenText == "]" && bracketDepth > 0)
+                    {
+                        bracketDepth--;
+                    }
+                }
+
+                if (token.Category == TokenCategory.Punctuation
+                    && token.TokenText == ","
+                    && parenDepth == 0
+                    && bracketDepth == 0)
+                {
+                    result.Add(BuildQualifiedName(current));
+                    current.Clear();
+                    continue;
+                }
+
+                current.Add(token);
+            }
+
+            if (current.Count > 0)
+            {
+                result.Add(BuildQualifiedName(current));
+            }
+
+            return result;
+        }
+
+        private void ValidateImplicitFunctionCallArguments(string functionName, ExpressionNode? callExpression, List<LexerTokens> argumentTokens)
         {
             if (callExpression?.Kind != ExpressionKind.Call)
             {
@@ -369,7 +419,8 @@ namespace Puma
                 return;
             }
 
-            var max = Math.Min(callExpression.Arguments.Count, declaration.FunctionParameterList.Count);
+            var argumentTexts = SplitCallArgumentTexts(argumentTokens);
+            var max = Math.Min(Math.Min(callExpression.Arguments.Count, declaration.FunctionParameterList.Count), argumentTexts.Count);
             for (var i = 0; i < max; i++)
             {
                 var parameter = declaration.FunctionParameterList[i];
@@ -378,7 +429,7 @@ namespace Puma
                     continue;
                 }
 
-                ValidateImplicitExpressionConversion(callExpression.Arguments[i], toType);
+                ValidateImplicitExpressionConversion(callExpression.Arguments[i], toType, argumentTexts[i]);
             }
         }
 
@@ -2556,7 +2607,7 @@ namespace Puma
             }
 
             var callExpression = ParseExpression(tokens);
-            ValidateImplicitFunctionCallArguments(name, callExpression);
+            ValidateImplicitFunctionCallArguments(name, callExpression, argsTokens);
             var callNode = Node.CreateFunctionCall(name, args, callExpression);
             callNode.StatementExpression = callExpression;
             target.Add(callNode);
