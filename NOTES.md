@@ -15,11 +15,12 @@ Recent updates
 - Added typed function return validation coverage for invalid implicit return conversions from flt64 to int32 using literal, identifier, and conditional return expressions; parser now rejects typed literal return mismatches.
 - Added function-call argument validation coverage with mixed argument expressions and typed parameters, including parser rejection tests for invalid implicit flt64-to-int32 call arguments (literal, identifier, conditional).
 - Added parser/codegen coverage for function parameter default values with exact generated call-site default argument expansion, and implemented call-site emission of missing trailing default arguments.
+- Added numeric literal edge-case coverage with exact generated C/C++ expectations (signed decimals, exponent forms, hex/bin/octal prefixes with typed suffixes), and fixed local typed-literal parsing in codegen to preserve those forms.
+- Added parser/codegen regression coverage for `match/when`, `error/catch`, and `yield` expression handling with exact generated C/C++ output assertions.
 
 1) Unit test TODO list
 
-1. Add lexer/parser/codegen tests for numeric literal tokenization edge cases (signed literals, exponent forms, base prefixes, and suffix combinations).
-2. Add parser/codegen tests for `match/when`, `error/catch`, and `yield` statement expression handling and generated output consistency.
+
 
 2) Separate postponed/special-feature TODO list
 

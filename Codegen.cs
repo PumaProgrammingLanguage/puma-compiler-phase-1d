@@ -1739,37 +1739,116 @@ namespace Puma
                 return true;
             }
 
-            var index = 0;
-            var dotSeen = false;
-            while (index < text.Length)
+            var signLength = 0;
+            if (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal))
             {
-                var ch = text[index];
-                if (char.IsDigit(ch))
-                {
-                    index++;
-                    continue;
-                }
-
-                if (ch == '.' && !dotSeen)
-                {
-                    dotSeen = true;
-                    index++;
-                    continue;
-                }
-
-                break;
+                signLength = 1;
             }
 
-            if (index == 0)
+            var index = signLength;
+            var dotSeen = false;
+            var exponentSeen = false;
+            var hasDigits = false;
+
+            if (index + 1 < text.Length
+                && text[index] == '0'
+                && (text[index + 1] == 'x' || text[index + 1] == 'X'))
+            {
+                index += 2;
+                var hexStart = index;
+                while (index < text.Length && Uri.IsHexDigit(text[index]))
+                {
+                    index++;
+                }
+
+                hasDigits = index > hexStart;
+            }
+            else if (index + 1 < text.Length
+                && text[index] == '0'
+                && (text[index + 1] == 'b' || text[index + 1] == 'B'))
+            {
+                index += 2;
+                var binStart = index;
+                while (index < text.Length && (text[index] == '0' || text[index] == '1'))
+                {
+                    index++;
+                }
+
+                hasDigits = index > binStart;
+            }
+            else if (index + 1 < text.Length
+                && text[index] == '0'
+                && (text[index + 1] == 'o' || text[index + 1] == 'O'))
+            {
+                index += 2;
+                var octStart = index;
+                while (index < text.Length && text[index] >= '0' && text[index] <= '7')
+                {
+                    index++;
+                }
+
+                hasDigits = index > octStart;
+            }
+            else
+            {
+                while (index < text.Length)
+                {
+                    var ch = text[index];
+                    if (char.IsDigit(ch))
+                    {
+                        hasDigits = true;
+                        index++;
+                        continue;
+                    }
+
+                    if (ch == '.' && !dotSeen && !exponentSeen)
+                    {
+                        dotSeen = true;
+                        index++;
+                        continue;
+                    }
+
+                    if ((ch == 'e' || ch == 'E') && !exponentSeen && hasDigits)
+                    {
+                        var expIndex = index + 1;
+                        if (expIndex < text.Length && (text[expIndex] == '+' || text[expIndex] == '-'))
+                        {
+                            expIndex++;
+                        }
+
+                        var expDigitsStart = expIndex;
+                        while (expIndex < text.Length && char.IsDigit(text[expIndex]))
+                        {
+                            expIndex++;
+                        }
+
+                        if (expIndex > expDigitsStart)
+                        {
+                            exponentSeen = true;
+                            index = expIndex;
+                            continue;
+                        }
+                    }
+
+                    break;
+                }
+            }
+
+            if (!hasDigits)
             {
                 return false;
             }
 
             literalValue = text[..index];
             var suffix = text[index..];
+            if (exponentSeen)
+            {
+                return false;
+            }
+
             if (string.IsNullOrWhiteSpace(suffix))
             {
-                typeName = dotSeen ? "double" : "int64_t";
+                typeName = (dotSeen || exponentSeen) ? "double" : "int64_t";
                 return true;
             }
 

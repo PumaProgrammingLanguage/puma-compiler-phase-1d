@@ -542,6 +542,69 @@ void I(void)
         }
 
         [TestMethod]
+        public void Functions_MatchWhenErrorCatchYield_Expressions_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    a = 1
+    b = 2
+
+functions
+    F()
+        match b
+            when a + 1
+                return b
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "a", "=", "1",
+                "b", "=", "2",
+                "functions",
+                "F", "(", ")",
+                "match", "b",
+                "when", "a", "+", "1",
+                "return", "b",
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            Assert.AreEqual(1, function.FunctionBody.Count);
+            Assert.AreEqual(NodeKind.MatchStatement, function.FunctionBody[0].Kind);
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+// properties
+auto a = (int64_t)1;
+auto b = (int64_t)2;
+
+// functions
+void F(void)
+{
+    switch (b)
+    {
+        case (a + 1):
+            return b;
+            break;
+    }
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesAndFunctions_IfElseExamples_LexerParserCodegen_AreConsistent()
         {
             const string src =
@@ -980,6 +1043,62 @@ void Caller(void)
     LogValues(1, 10, 20);
     LogValues(1, 2, 20);
     LogValues(1, 2, 3);
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Start_NumericLiteralEdgeCases_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"start
+    decNeg = -42
+    exp64 = 1.25e+3 flt64
+    exp32 = 6.5e-1 flt32
+    hex32 = 0x1F uint32
+    bin8 = 0b1010 uint8
+    oct16 = 0o17 uint16
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            Assert.IsFalse(tokens.Any(t => t.Category == Puma.Lexer.TokenCategory.Unknown), "Expected no Unknown tokens for numeric edge cases.");
+
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "start",
+                "decNeg", "=", "-", "42",
+                "exp64", "=", "1.25e+3", "flt64",
+                "exp32", "=", "6.5e-1", "flt32",
+                "hex32", "=", "0x1F", "uint32",
+                "bin8", "=", "0b1010", "uint8",
+                "oct16", "=", "0o17", "uint16"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto decNeg = (int64_t)-42;
+    auto exp64 = 1.25e+3;
+    auto exp32 = 6.5e-1;
+    auto hex32 = (uint32_t)0x1F;
+    auto bin8 = (uint8_t)0b1010;
+    auto oct16 = (uint16_t)0o17;
+
+    return 0;
 }
 ";
 
