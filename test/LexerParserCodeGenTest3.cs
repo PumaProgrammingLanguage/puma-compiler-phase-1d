@@ -724,6 +724,152 @@ int main()
         }
 
         [TestMethod]
+        public void TypeShape_ObjectDefinition_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"type
+    Shape is object
+
+properties
+    x = 1
+    y = 2
+
+functions
+    GetX() int
+        return x
+
+    GetY() int
+        return y
+";
+
+            var expected =
+@"#include <stdint>
+
+class Shape : public object
+{
+    // properties
+    protected:
+    auto x = (int64_t)1;
+    auto y = (int64_t)2;
+
+    // functions
+    public:
+    int64_t GetX()
+    {
+        return x;
+    }
+    int64_t GetY()
+    {
+        return y;
+    }
+};
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void ObjectReference_NonOptionalUsage_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    a = Shape()
+    b = Shape()
+
+start
+    m = a.GetX()
+    n = b.GetY()
+";
+
+            var expected =
+@"#include ""PumaObjectSourceFile.h""
+
+auto a = new Shape();
+auto b = new Shape();
+
+// start
+int main()
+{
+    auto m = a.GetX();
+    auto n = b.GetY();
+
+    delete a;
+    delete b;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void ObjectReference_OptionalAndNonOptionalUsage_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    a = Shape()
+    b = Shape() optional
+
+start
+    m = a.GetX()
+    n = b.GetY()
+
+    b = none
+";
+
+            var expected =
+@"#include ""PumaObjectSourceFile.h""
+
+auto a = new Shape();
+auto b = new Shape();
+
+// start
+int main()
+{
+    auto m = a.GetX();
+    auto n = b.GetY();
+    b = null;
+
+    delete a;
+    delete n;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void Start_HasTraitStatement_LexerParserCodegen_AreConsistent()
         {
             const string src =

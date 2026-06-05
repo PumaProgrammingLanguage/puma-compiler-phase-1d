@@ -167,7 +167,13 @@ namespace Puma
             {
                 if (node.UseIsFilePath && !string.IsNullOrWhiteSpace(node.UseTarget))
                 {
-                    includes.Add($"\"{node.UseTarget}\"");
+                    var includeTarget = node.UseTarget;
+                    if (includeTarget.EndsWith(".puma", StringComparison.OrdinalIgnoreCase))
+                    {
+                        includeTarget = includeTarget[..^5] + ".h";
+                    }
+
+                    includes.Add($"\"{includeTarget}\"");
                 }
                 else if (!string.IsNullOrWhiteSpace(node.UseTarget))
                 {
@@ -456,7 +462,11 @@ namespace Puma
                 var shouldUseAuto = IsBooleanPropertyValue(node.PropertyValue)
                     || IsStringPropertyValue(node.PropertyValue)
                     || RequiresFixedWidthIntegerCast(node.PropertyValue, node.PropertyType)
-                    || double.TryParse(trimmed, out _);
+                    || double.TryParse(trimmed, out _)
+                    || (!string.IsNullOrWhiteSpace(trimmed)
+                        && (trimmed.Contains('(')
+                            || trimmed.Contains('.')
+                            || trimmed.Contains("::", StringComparison.Ordinal)));
 
                 if (shouldUseAuto)
                 {
@@ -519,6 +529,11 @@ namespace Puma
                 return ToPumaStringLiteral(NormalizeAutoStringLiteral(literal));
             }
 
+            if (LooksLikeObjectConstructorCall(text))
+            {
+                return $"new {text}";
+            }
+
             var sign = string.Empty;
             var startIndex = 0;
             if (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal))
@@ -573,6 +588,40 @@ namespace Puma
             };
 
             return $"({castType}){numeric}";
+        }
+
+        private static bool LooksLikeObjectConstructorCall(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            var trimmed = text.Trim();
+            if (trimmed.StartsWith("new ", StringComparison.Ordinal)
+                || !trimmed.EndsWith(")", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var openIndex = trimmed.IndexOf('(');
+            if (openIndex <= 0)
+            {
+                return false;
+            }
+
+            var ctorName = trimmed[..openIndex].Trim();
+            if (ctorName.Length == 0)
+            {
+                return false;
+            }
+
+            if (ctorName is "List" or "Range" or "Array")
+            {
+                return false;
+            }
+
+            return char.IsUpper(ctorName[0]);
         }
 
         private static bool RequiresFixedWidthIntegerCast(string? value, string? declaredType)
@@ -778,9 +827,19 @@ namespace Puma
             var bufferedStatements = new List<Node>();
             var emittedExpressionBasedLocalDeclaration = false;
             var emittedPropertyTypedAssignment = false;
+            var heapAllocatedGlobalProperties = ast
+                .Where(n => n.Kind == NodeKind.PropertyDeclaration
+                    && !string.IsNullOrWhiteSpace(n.PropertyName)
+                    && LooksLikeObjectConstructorCall(n.PropertyValue?.Trim() ?? string.Empty))
+                .Select(n => n.PropertyName!)
+                .ToList();
+            var propertiesAssignedToNone = new HashSet<string>(StringComparer.Ordinal);
+            var transferredOwnershipLocals = new Dictionary<string, string>(StringComparer.Ordinal);
 
             foreach (var statement in statements)
             {
+                TrackOwnershipTransfer(statement, heapAllocatedGlobalProperties, globalNames, propertiesAssignedToNone, transferredOwnershipLocals);
+
                 if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    ", out var usedExpressionFallback, out var usedPropertyTypedAssignment))
                 {
                     emittedExpressionBasedLocalDeclaration |= usedExpressionFallback;
@@ -810,6 +869,20 @@ namespace Puma
             {
                 sb.AppendLine($"    finalize({FormatArguments(finalSection.SectionParameterList)});");
             }
+
+            foreach (var propertyName in heapAllocatedGlobalProperties)
+            {
+                if (propertiesAssignedToNone.Contains(propertyName)
+                    && transferredOwnershipLocals.TryGetValue(propertyName, out var localOwner)
+                    && !string.IsNullOrWhiteSpace(localOwner))
+                {
+                    sb.AppendLine($"    delete {localOwner};");
+                    continue;
+                }
+
+                sb.AppendLine($"    delete {propertyName};");
+            }
+
             sb.AppendLine("    return 0;");
             sb.AppendLine("}");
             sb.AppendLine();
@@ -1294,7 +1367,9 @@ namespace Puma
 
             return node.Kind switch
             {
-                ExpressionKind.Identifier => node.Value ?? string.Empty,
+                ExpressionKind.Identifier => string.Equals(node.Value, "none", StringComparison.OrdinalIgnoreCase)
+                    ? "null"
+                    : node.Value ?? string.Empty,
                 ExpressionKind.Literal => node.Value ?? string.Empty,
                 ExpressionKind.Unary => string.Equals(node.Value, "not", StringComparison.Ordinal)
                     ? $"not {GenerateExpression(node.Left, null)}"
@@ -1383,6 +1458,59 @@ namespace Puma
 
             return node.FunctionParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase))
                 || node.DelegateParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static void TrackOwnershipTransfer(
+            Node statement,
+            List<string> heapAllocatedGlobalProperties,
+            HashSet<string?> globalNames,
+            HashSet<string> propertiesAssignedToNone,
+            Dictionary<string, string> transferredOwnershipLocals)
+        {
+            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentOperator != "=")
+            {
+                return;
+            }
+
+            var leftName = statement.AssignmentLeft?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(leftName)
+                && heapAllocatedGlobalProperties.Contains(leftName)
+                && IsNoneExpression(statement.AssignmentRightExpression, statement.AssignmentRight))
+            {
+                propertiesAssignedToNone.Add(leftName);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(leftName)
+                || !IsSimpleIdentifier(leftName)
+                || globalNames.Contains(leftName)
+                || statement.AssignmentRightExpression?.Kind != ExpressionKind.Call)
+            {
+                return;
+            }
+
+            var callTarget = statement.AssignmentRightExpression.Left;
+            if (callTarget?.Kind != ExpressionKind.MemberAccess || callTarget.Left?.Kind != ExpressionKind.Identifier)
+            {
+                return;
+            }
+
+            var sourceName = callTarget.Left.Value ?? string.Empty;
+            if (heapAllocatedGlobalProperties.Contains(sourceName))
+            {
+                transferredOwnershipLocals[sourceName] = leftName;
+            }
+        }
+
+        private static bool IsNoneExpression(ExpressionNode? expression, string? fallback)
+        {
+            if (expression?.Kind == ExpressionKind.Identifier
+                && string.Equals(expression.Value, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return string.Equals(fallback?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool UsesTypedPropertyReassignmentMode(List<Node> ast)
