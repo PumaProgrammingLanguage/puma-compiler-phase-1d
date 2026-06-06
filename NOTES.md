@@ -17,6 +17,9 @@ Recent updates
 - Added parser/codegen coverage for function parameter default values with exact generated call-site default argument expansion, and implemented call-site emission of missing trailing default arguments.
 - Added numeric literal edge-case coverage with exact generated C/C++ expectations (signed decimals, exponent forms, hex/bin/octal prefixes with typed suffixes), and fixed local typed-literal parsing in codegen to preserve those forms.
 - Added parser/codegen regression coverage for `match/when`, `error/catch`, and `yield` expression handling with exact generated C/C++ output assertions.
+- Added ownership-model object/reference compiler-module tests for co-owner transition on reassignment to `none`, borrower non-deletion behavior, `own` transfer parsing, and return ownership handoff cleanup in outer scope.
+- Added parser validation that rejects assigning `none` to non-optional properties, with explicit error-message assertions.
+- Updated lexer/parser/codegen to support `own` keyword parsing in expressions and function modifiers, plus ownership-aware delete emission for transferred/returned owners.
 
 1) Unit test TODO list
 
@@ -25,7 +28,7 @@ Recent updates
 2) Separate postponed/special-feature TODO list
 
 1. Add parser/codegen tests for `readonly` property mutation diagnostics across `start`, `initialize`, and `functions`.
-2. Add parser/codegen tests for `optional` properties and optional local variables (declaration, assignment, null checks, and generated output consistency).
+2. Add additional parser/codegen tests for remaining `optional` scenarios (optional local variables, null checks, and broader generated output consistency).
 3. Add postponed tests for `fix32` conversions once custom C++ fixed-point classes are implemented.
 4. Add postponed tests for `fix64` conversions once custom C++ fixed-point classes are implemented.
 5. Add postponed tests for `forall` and container-focused scenarios.
