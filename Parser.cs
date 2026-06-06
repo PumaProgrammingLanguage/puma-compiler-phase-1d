@@ -155,7 +155,7 @@ namespace Puma
         };
         private static readonly HashSet<string> FunctionModifiers = new(StringComparer.Ordinal)
         {
-            "public", "private"
+            "public", "private", "own"
         };
         private static readonly HashSet<string> NumericCastSuffixes = new(StringComparer.Ordinal)
         {
@@ -1905,6 +1905,12 @@ namespace Puma
                     }
                 }
                 _index = castStart;
+
+                if (MatchKeyword("own"))
+                {
+                    var operand = ParseUnary();
+                    return operand;
+                }
 
                 if (MatchOperator("++") || MatchOperator("--") || MatchOperator("-") || MatchOperator("+") || MatchOperator("!") || MatchOperator("~") || MatchKeyword("not"))
                 {

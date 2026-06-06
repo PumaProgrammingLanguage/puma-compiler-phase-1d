@@ -106,7 +106,7 @@ namespace Puma
             "uint16", "uint8", "uint", "flt128", "flt64", "flt32", "flt", "fix128", "fix64", "fix32", "fix",
             "char", "str", "fstr", "vstr", "bool", "true", "false", "hex", "oct", "bin", "implicit", "explicit",
             "operator", "get", "set", "with", "self", "if", "else", "and", "or", "not", "for", "in", "while",
-            "repeat", "forall", "break", "continue", "match", "when", "error", "catch", "multithread",
+            "repeat", "forall", "break", "continue", "match", "when", "error", "catch", "own", "multithread",
             "multiprocess"
         };
 
@@ -863,7 +863,7 @@ namespace Puma
                     or "uint16" or "uint8" or "uint" or "flt128" or "flt64" or "flt32" or "flt" or "fix128" or "fix64" or "fix32" or "fix"
                     or "char" or "str" or "fstr" or "vstr" or "bool" or "true" or "false" or "hex" or "oct" or "bin" or "implicit" or "explicit"
                     or "operator" or "get" or "set" or "with" or "self" or "if" or "else" or "and" or "or" or "not" or "for" or "in" or "while"
-                    or "repeat" or "forall" or "break" or "continue" or "match" or "when" or "error" or "catch" or "multithread"
+                    or "repeat" or "forall" or "break" or "continue" or "match" or "when" or "error" or "catch" or "own" or "multithread"
                     or "multiprocess" => true,
                 _ => false
             };

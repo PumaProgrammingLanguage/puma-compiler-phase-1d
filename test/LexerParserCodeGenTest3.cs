@@ -897,6 +897,175 @@ start
         }
 
         [TestMethod]
+        public void ObjectReference_CoOwnerReassignmentToNone_LastCoOwnerDeleted_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    b = Shape() optional
+
+start
+    n = b.GetY()
+    b = none
+";
+
+            var expected =
+@"#include ""PumaObjectSourceFile.h""
+
+auto b = new Shape();
+
+// start
+int main()
+{
+    auto n = b.GetY();
+    b = null;
+
+    delete n;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void ObjectReference_BorrowerOnlyInnerScope_NotDeleted_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    a = Shape()
+
+start
+    m = a.GetX()
+";
+
+            var expected =
+@"#include ""PumaObjectSourceFile.h""
+
+auto a = new Shape();
+
+// start
+int main()
+{
+    auto m = a.GetX();
+
+    delete a;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void ObjectReference_OwnKeywordTransfer_ParsesAndDeletesNewOwner_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    b = Shape() optional
+
+start
+    n = own b
+    b = none
+";
+
+            var expected =
+@"#include ""PumaObjectSourceFile.h""
+
+auto b = new Shape();
+
+// start
+int main()
+{
+    auto n = b;
+    b = null;
+
+    delete n;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void ObjectReference_ReturnOwnershipHandoff_OuterVariableDeleted_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+start
+    a = MakeShape()
+
+functions
+    MakeShape() Shape own
+        return Shape()
+";
+
+            var expected =
+@"#include ""PumaObjectSourceFile.h""
+
+// functions
+Shape MakeShape(void)
+{
+    return Shape();
+}
+
+// start
+int main()
+{
+    auto a = MakeShape();
+
+    delete a;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void Start_HasTraitStatement_LexerParserCodegen_AreConsistent()
         {
             const string src =

@@ -833,12 +833,20 @@ namespace Puma
                     && LooksLikeObjectConstructorCall(n.PropertyValue?.Trim() ?? string.Empty))
                 .Select(n => n.PropertyName!)
                 .ToList();
+            var functionsReturningConstructedObject = ast
+                .Where(n => n.Kind == NodeKind.FunctionDeclaration
+                    && n.FunctionBody.Any(s => s.Kind == NodeKind.ReturnStatement
+                        && LooksLikeObjectConstructorCall(GenerateExpression(s.StatementExpression, s.StatementValue)?.Trim() ?? string.Empty)))
+                .Select(n => n.FunctionDeclarationName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.Ordinal);
             var propertiesAssignedToNone = new HashSet<string>(StringComparer.Ordinal);
             var transferredOwnershipLocals = new Dictionary<string, string>(StringComparer.Ordinal);
+            var ownedLocalsToDelete = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var statement in statements)
             {
-                TrackOwnershipTransfer(statement, heapAllocatedGlobalProperties, globalNames, propertiesAssignedToNone, transferredOwnershipLocals);
+                TrackOwnershipTransfer(statement, heapAllocatedGlobalProperties, globalNames, propertiesAssignedToNone, transferredOwnershipLocals, functionsReturningConstructedObject, ownedLocalsToDelete);
 
                 if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    ", out var usedExpressionFallback, out var usedPropertyTypedAssignment))
                 {
@@ -877,10 +885,16 @@ namespace Puma
                     && !string.IsNullOrWhiteSpace(localOwner))
                 {
                     sb.AppendLine($"    delete {localOwner};");
+                    ownedLocalsToDelete.Remove(localOwner);
                     continue;
                 }
 
                 sb.AppendLine($"    delete {propertyName};");
+            }
+
+            foreach (var localOwner in ownedLocalsToDelete)
+            {
+                sb.AppendLine($"    delete {localOwner};");
             }
 
             sb.AppendLine("    return 0;");
@@ -1465,7 +1479,9 @@ namespace Puma
             List<string> heapAllocatedGlobalProperties,
             HashSet<string?> globalNames,
             HashSet<string> propertiesAssignedToNone,
-            Dictionary<string, string> transferredOwnershipLocals)
+            Dictionary<string, string> transferredOwnershipLocals,
+            HashSet<string> functionsReturningConstructedObject,
+            HashSet<string> ownedLocalsToDelete)
         {
             if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentOperator != "=")
             {
@@ -1483,9 +1499,36 @@ namespace Puma
 
             if (string.IsNullOrWhiteSpace(leftName)
                 || !IsSimpleIdentifier(leftName)
-                || globalNames.Contains(leftName)
-                || statement.AssignmentRightExpression?.Kind != ExpressionKind.Call)
+                || globalNames.Contains(leftName))
             {
+                return;
+            }
+
+            if (statement.AssignmentRightExpression?.Kind == ExpressionKind.Identifier)
+            {
+                var source = statement.AssignmentRightExpression.Value ?? string.Empty;
+                if (heapAllocatedGlobalProperties.Contains(source))
+                {
+                    transferredOwnershipLocals[source] = leftName;
+                    ownedLocalsToDelete.Add(leftName);
+                }
+
+                return;
+            }
+
+            if (statement.AssignmentRightExpression?.Kind != ExpressionKind.Call)
+            {
+                return;
+            }
+
+            if (statement.AssignmentRightExpression.Left?.Kind == ExpressionKind.Identifier)
+            {
+                var functionName = statement.AssignmentRightExpression.Left.Value ?? string.Empty;
+                if (functionsReturningConstructedObject.Contains(functionName))
+                {
+                    ownedLocalsToDelete.Add(leftName);
+                }
+
                 return;
             }
 
