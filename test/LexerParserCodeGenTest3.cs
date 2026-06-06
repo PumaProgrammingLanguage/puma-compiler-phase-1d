@@ -870,6 +870,33 @@ int main()
         }
 
         [TestMethod]
+        public void ObjectReference_NonOptionalPropertyAssignedNone_ParserError()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    a = Shape()
+    b = Shape() optional
+
+start
+    m = a.GetX()
+    n = b.GetY()
+
+    a = none
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+
+            var tokens = lexer.Tokenize(src);
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign none to non-optional property");
+            StringAssert.Contains(ex.Message, "a");
+        }
+
+        [TestMethod]
         public void Start_HasTraitStatement_LexerParserCodegen_AreConsistent()
         {
             const string src =

@@ -133,6 +133,7 @@ namespace Puma
         private int _pendingLeadingBlankLines;
         private readonly Dictionary<string, Convertion.Type> _inferredIdentifierTypes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _constantProperties = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _optionalProperties = new(StringComparer.Ordinal);
         private readonly Stack<List<Node>> _statementTargetStack = new();
         private List<Node>? _pendingBlockTarget;
         private Node? _typeOrTraitNode;
@@ -2156,6 +2157,10 @@ namespace Puma
                 {
                     var node = Node.CreatePropertyDeclaration(name, value, propertyType, modifiers);
                     ast.Add(node);
+                    if (modifiers.Contains("optional"))
+                    {
+                        _optionalProperties.Add(name);
+                    }
                     if (modifiers.Contains("constant"))
                     {
                         _constantProperties.Add(name);
@@ -2323,6 +2328,14 @@ namespace Puma
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
+                && IsNoneAssignment(rightExpression, right)
+                && IsKnownNonOptionalProperty(left))
+            {
+                throw new InvalidOperationException($"Cannot assign none to non-optional property '{left}'.");
+            }
+
+            if (assignmentOperator == "="
+                && !string.IsNullOrWhiteSpace(left)
                 && !string.IsNullOrWhiteSpace(right)
                 && leftExpression is ExpressionNode { Kind: ExpressionKind.Identifier }
                 && rightExpression is ExpressionNode { Kind: ExpressionKind.Identifier })
@@ -2341,6 +2354,28 @@ namespace Puma
             node.AssignmentRightExpression = rightExpression;
             target.Add(node);
             return true;
+        }
+
+        private static bool IsNoneAssignment(ExpressionNode? rightExpression, string? right)
+        {
+            if (rightExpression?.Kind == ExpressionKind.Identifier
+                && string.Equals(rightExpression.Value, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return string.Equals(right?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsKnownNonOptionalProperty(string name)
+        {
+            if (_optionalProperties.Contains(name))
+            {
+                return false;
+            }
+
+            return ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
+                && string.Equals(n.PropertyName, name, StringComparison.Ordinal));
         }
 
         private bool TryParseIncrementDecrementStatement(List<LexerTokens> tokens, List<Node> target)
