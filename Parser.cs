@@ -2313,6 +2313,12 @@ namespace Puma
 
             var leftTokens = tokens.Take(assignmentIndex).ToList();
             var rightTokens = tokens.Skip(assignmentIndex + 1).ToList();
+            while (rightTokens.Count > 0
+                && rightTokens[^1].Category is TokenCategory.Keyword or TokenCategory.Identifier
+                && PropertyModifiers.Contains(rightTokens[^1].TokenText))
+            {
+                rightTokens.RemoveAt(rightTokens.Count - 1);
+            }
             var assignmentOperator = tokens[assignmentIndex].TokenText;
             var left = BuildQualifiedName(leftTokens);
             var right = BuildQualifiedName(rightTokens);

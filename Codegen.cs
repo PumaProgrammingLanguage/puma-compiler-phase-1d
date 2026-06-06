@@ -1335,7 +1335,7 @@ namespace Puma
                             break;
                         }
                     case NodeKind.HasStatement:
-                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasExpression, node.HasCondition)} != nullptr)");
+                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasExpression, node.HasCondition)} != null)");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
@@ -1524,6 +1524,13 @@ namespace Puma
             if (statement.AssignmentRightExpression.Left?.Kind == ExpressionKind.Identifier)
             {
                 var functionName = statement.AssignmentRightExpression.Left.Value ?? string.Empty;
+                var callText = GenerateExpression(statement.AssignmentRightExpression, statement.AssignmentRight) ?? string.Empty;
+                if (LooksLikeObjectConstructorCall(callText))
+                {
+                    ownedLocalsToDelete.Add(leftName);
+                    return;
+                }
+
                 if (functionsReturningConstructedObject.Contains(functionName))
                 {
                     ownedLocalsToDelete.Add(leftName);

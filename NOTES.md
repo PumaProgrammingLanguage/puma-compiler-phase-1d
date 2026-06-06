@@ -20,6 +20,8 @@ Recent updates
 - Added ownership-model object/reference compiler-module tests for co-owner transition on reassignment to `none`, borrower non-deletion behavior, `own` transfer parsing, and return ownership handoff cleanup in outer scope.
 - Added parser validation that rejects assigning `none` to non-optional properties, with explicit error-message assertions.
 - Updated lexer/parser/codegen to support `own` keyword parsing in expressions and function modifiers, plus ownership-aware delete emission for transferred/returned owners.
+- Completed remaining optional-scenario coverage by adding parser/codegen tests for optional local assignment (`optional` + `none` mapping) and null-check output consistency in `has` statements.
+- Updated parser/codegen to support trailing `optional` on local assignments and emit `null` in `has`-statement checks for consistent generated output expectations.
 
 1) Unit test TODO list
 
@@ -28,11 +30,10 @@ Recent updates
 2) Separate postponed/special-feature TODO list
 
 1. Add parser/codegen tests for `readonly` property mutation diagnostics across `start`, `initialize`, and `functions`.
-2. Add additional parser/codegen tests for remaining `optional` scenarios (optional local variables, null checks, and broader generated output consistency).
-3. Add postponed tests for `fix32` conversions once custom C++ fixed-point classes are implemented.
-4. Add postponed tests for `fix64` conversions once custom C++ fixed-point classes are implemented.
-5. Add postponed tests for `forall` and container-focused scenarios.
-6. Add postponed tests for `override` behavior.
-7. Add postponed tests for range operator `..` scenarios.
-8. Add postponed tests for boxing/unboxing scenarios.
+2. Add postponed tests for `fix32` conversions once custom C++ fixed-point classes are implemented.
+3. Add postponed tests for `fix64` conversions once custom C++ fixed-point classes are implemented.
+4. Add postponed tests for `forall` and container-focused scenarios.
+5. Add postponed tests for `override` behavior.
+6. Add postponed tests for range operator `..` scenarios.
+7. Add postponed tests for boxing/unboxing scenarios.
 
