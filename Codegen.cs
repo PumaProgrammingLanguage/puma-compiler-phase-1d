@@ -447,7 +447,7 @@ namespace Puma
                 return;
             }
 
-            var shouldEmitPropertiesHeaderWithStart = globalProperties.Any(p => p.PropertyModifiers.Contains("constant"))
+            var shouldEmitPropertiesHeaderWithStart = globalProperties.Any(p => p.PropertyModifiers.Contains("const"))
                 || globalProperties.Any(p => !string.IsNullOrWhiteSpace(p.PropertyType));
 
             if (hasStartSection && globalProperties.Count > 0 && shouldEmitPropertiesHeaderWithStart)
@@ -457,7 +457,7 @@ namespace Puma
 
             foreach (var node in globalProperties)
             {
-                var modifiers = node.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
+                var modifiers = node.PropertyModifiers.Contains("const") ? "const " : string.Empty;
                 var trimmed = node.PropertyValue?.Trim() ?? string.Empty;
                 var shouldUseAuto = IsBooleanPropertyValue(node.PropertyValue)
                     || IsStringPropertyValue(node.PropertyValue)

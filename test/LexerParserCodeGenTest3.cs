@@ -218,8 +218,8 @@ void F(void)
         {
             const string src =
 @"properties
-    PI = 3.14159 constant
-    MAX_RADIUS = 5.0 constant
+    PI = 3.14159 const
+    MAX_RADIUS = 5.0 const
 
 start
     MAX_RADIUS = 10
@@ -241,7 +241,7 @@ start
         {
             const string src =
 @"properties
-    MAX_RADIUS = 5.0 constant
+    MAX_RADIUS = 5.0 const
 
 start
     MAX_RADIUS = 10
@@ -261,7 +261,7 @@ start
         {
             const string src =
 @"properties
-    MAX_RADIUS = 5.0 constant
+    MAX_RADIUS = 5.0 const
 
 initialize
     MAX_RADIUS = 10
@@ -281,7 +281,7 @@ initialize
         {
             const string src =
 @"properties
-    MAX_RADIUS = 5.0 constant
+    MAX_RADIUS = 5.0 const
 
 functions
     Update()
@@ -295,6 +295,366 @@ functions
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
             StringAssert.Contains(ex.Message, "Cannot assign to constant property");
             StringAssert.Contains(ex.Message, "MAX_RADIUS");
+        }
+
+        [TestMethod]
+        public void PropertiesStart_ReadonlyMutationDiagnostic_InStart_IsConsistent()
+        {
+            const string src =
+@"properties
+    profile = Shape() readonly
+
+start
+    profile = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly property");
+            StringAssert.Contains(ex.Message, "profile");
+        }
+
+        [TestMethod]
+        public void PropertiesInitialize_ReadonlyMutationDiagnostic_InInitialize_IsConsistent()
+        {
+            const string src =
+@"properties
+    profile = Shape() readonly
+
+initialize
+    profile = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly property");
+            StringAssert.Contains(ex.Message, "profile");
+        }
+
+        [TestMethod]
+        public void PropertiesFunctions_ReadonlyMutationDiagnostic_InFunctions_IsConsistent()
+        {
+            const string src =
+@"properties
+    profile = Shape() readonly
+
+functions
+    Update()
+        profile = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly property");
+            StringAssert.Contains(ex.Message, "profile");
+        }
+
+        [TestMethod]
+        public void Start_ReadwriteLocalVariable_Reassignment_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"start
+    count = 1 readwrite
+    count = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto count = (int64_t)1;
+    count = 2;
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void PropertiesStart_ReadwriteProperty_ReassignmentAndModifierParsed_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    total = 1 readwrite
+
+start
+    total = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var property = ast.Single(n => n.Kind == NodeKind.PropertyDeclaration && n.PropertyName == "total");
+            CollectionAssert.Contains(property.PropertyModifiers, "readwrite");
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <cstdint>
+
+auto total = (int64_t)1;
+
+// start
+int main()
+{
+    total = (int64_t)2;
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Functions_ReadwriteParameter_MutationAndModifierParsed_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"functions
+    Increment(value int readwrite) int
+        value = value + 1
+        return value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Increment");
+            CollectionAssert.Contains(function.FunctionParameterList[0].Modifiers, "readwrite");
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+// functions
+int Increment(int64_t value)
+{
+    value = value + 1;
+    return value;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Functions_ConstParameter_ModifierParsed_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"functions
+    Echo(value int const) int
+        return value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Echo");
+            CollectionAssert.Contains(function.FunctionParameterList[0].Modifiers, "const");
+
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <stdint>
+
+// functions
+int Echo(int64_t value)
+{
+    return value;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Functions_ConstParameter_Mutation_ThrowsParserError()
+        {
+            const string src =
+@"functions
+    Increment(value int const) int
+        value = value + 1
+        return value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to constant parameter");
+            StringAssert.Contains(ex.Message, "value");
+        }
+
+        [TestMethod]
+        public void Start_ReadonlyLocalMutationDiagnostic_IsConsistent()
+        {
+            const string src =
+@"start
+    value = 1 readonly
+    value = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "value");
+        }
+
+        [TestMethod]
+        public void Initialize_ReadonlyLocalMutationDiagnostic_IsConsistent()
+        {
+            const string src =
+@"initialize
+    value = 1 readonly
+    value = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "value");
+        }
+
+        [TestMethod]
+        public void Functions_ReadonlyLocalMutationDiagnostic_IsConsistent()
+        {
+            const string src =
+@"functions
+    Update()
+        value = 1 readonly
+        value = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "value");
+        }
+
+        [TestMethod]
+        public void Functions_ReadonlyParameterMutationDiagnostic_IsConsistent()
+        {
+            const string src =
+@"functions
+    Update(value int readonly)
+        value = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly parameter");
+            StringAssert.Contains(ex.Message, "value");
+        }
+
+        [TestMethod]
+        public void Functions_ReadwriteParameterMutation_IsAllowed()
+        {
+            const string src =
+@"functions
+    Update(value int readwrite) int
+        value = 2
+        return value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ast = parser.Parse(tokens);
+            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Update");
+            CollectionAssert.Contains(function.FunctionParameterList[0].Modifiers, "readwrite");
+        }
+
+        [TestMethod]
+        public void Start_VarDefaultLocalRebinding_IsAllowed()
+        {
+            const string src =
+@"start
+    count = 1
+    count = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto count = (int64_t)1;
+    count = 2;
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void PropertiesStart_ConstPropertyRebinding_IsRejected()
+        {
+            const string src =
+@"properties
+    max = 1 const
+
+start
+    max = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to constant property");
+            StringAssert.Contains(ex.Message, "max");
         }
 
         [TestMethod]
@@ -462,8 +822,8 @@ class DemoType : public object
         {
             const string src =
 @"properties
-    PI = 3.14159 constant
-    MAX_RADIUS = 5.0 constant
+    PI = 3.14159 const
+    MAX_RADIUS = 5.0 const
 
 start
     r = MAX_RADIUS
@@ -480,8 +840,8 @@ start
             CollectionAssert.AreEqual(new[]
             {
                 "properties",
-                "PI", "=", "3.14159", "constant",
-                "MAX_RADIUS", "=", "5.0", "constant",
+                "PI", "=", "3.14159", "const",
+                "MAX_RADIUS", "=", "5.0", "const",
                 "start",
                 "r", "=", "MAX_RADIUS",
                 "area", "=", "PI", "*", "(", "r", "*", "r", ")"

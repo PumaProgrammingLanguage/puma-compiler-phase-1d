@@ -23,20 +23,24 @@ Recent updates
 - Completed remaining optional-scenario coverage by adding parser/codegen tests for optional local assignment (`optional` + `none` mapping) and null-check output consistency in `has` statements.
 - Updated parser/codegen to support trailing `optional` on local assignments and emit `null` in `has`-statement checks for consistent generated output expectations.
 - Documented Puma mutability/constant semantics for upcoming coverage: readonly/readwrite affect reference mutability, var/const affect binding, var is default, readonly propagation rules apply on assignment, and readwrite-source assignment defaults the target to readonly unless explicitly cast.
+- Added readonly mutation diagnostics coverage for properties in `start`, `initialize`, and `functions`, and added readwrite coverage tests for local variables, properties, and parameters.
+- Added const-parameter coverage: parser now recognizes `const` modifiers and rejects mutation of const parameters with a parser error message.
+- Standardized const keyword usage in tests/compiler paths (`constant` -> `const`) and updated codegen const-property emission checks to match Puma syntax.
+- Added readonly local/parameter mutation diagnostics coverage: readonly local reassignment is now rejected across `start`, `initialize`, and `functions`, and readonly parameter mutation is rejected in `functions`.
+- Added `var`/`const` rebinding coverage: var-default local rebinding and readwrite-parameter mutation are explicitly allowed, while const-property rebinding is rejected.
 
 1) Unit test TODO list
+1. Add remaining parser/codegen tests for `var`/`const` rebinding semantics across parameters and additional property scenarios (var default, const protection).
+2. Add parser/codegen tests for assignment propagation rules (`readonly` propagation, `readwrite` source forcing readonly target unless cast, explicit cast exceptions).
 
 
 
-2) Separate postponed/special-feature TODO list
+2) Separate special-feature TODO list - On hold until core language features are implemented
 
-1. Add parser/codegen tests for `readonly`/`readwrite` mutation diagnostics across locals, properties, and parameters in `start`, `initialize`, and `functions`.
-2. Add parser/codegen tests for `var`/`const` rebinding semantics across locals, properties, and parameters (var default, const protection).
-3. Add parser/codegen tests for assignment propagation rules (`readonly` propagation, `readwrite` source forcing readonly target unless cast, explicit cast exceptions).
-4. Add postponed tests for `fix32` conversions once custom C++ fixed-point classes are implemented.
-5. Add postponed tests for `fix64` conversions once custom C++ fixed-point classes are implemented.
-6. Add postponed tests for `forall` and container-focused scenarios.
-7. Add postponed tests for `override` behavior.
-8. Add postponed tests for range operator `..` scenarios.
-9. Add postponed tests for boxing/unboxing scenarios.
+1. Add postponed tests for `fix32` conversions once custom C++ fixed-point classes are implemented.
+2. Add postponed tests for `fix64` conversions once custom C++ fixed-point classes are implemented.
+3. Add postponed tests for `forall` and container-focused scenarios.
+4. Add postponed tests for `override` behavior.
+5. Add postponed tests for range operator `..` scenarios.
+6. Add postponed tests for boxing/unboxing scenarios.
 
