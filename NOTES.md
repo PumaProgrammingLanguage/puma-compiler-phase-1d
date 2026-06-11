@@ -28,10 +28,13 @@ Recent updates
 - Standardized const keyword usage in tests/compiler paths (`constant` -> `const`) and updated codegen const-property emission checks to match Puma syntax.
 - Added readonly local/parameter mutation diagnostics coverage: readonly local reassignment is now rejected across `start`, `initialize`, and `functions`, and readonly parameter mutation is rejected in `functions`.
 - Added `var`/`const` rebinding coverage: var-default local rebinding and readwrite-parameter mutation are explicitly allowed, while const-property rebinding is rejected.
+- Expanded `var`/`const` rebinding coverage: var-default parameter rebinding is allowed, and a local variable initialized from a const property remains var and rebindable.
+- Added assignment-propagation coverage: assignments from readonly/readwrite sources default targets to readonly (mutation rejected), and explicit `readwrite` target modifier allows reassignment.
+- Expanded assignment-propagation coverage across parameters/properties: readonly parameter/property sources propagate readonly to local targets, and readwrite property sources support explicit `readwrite` target override for mutation.
+- Added advanced assignment-propagation edge-case coverage: readonly propagation chains remain readonly across multiple hops, explicit `readonly` target modifier is enforced, and readwrite->readonly cast transitions reject subsequent mutation.
 
 1) Unit test TODO list
-1. Add remaining parser/codegen tests for `var`/`const` rebinding semantics across parameters and additional property scenarios (var default, const protection).
-2. Add parser/codegen tests for assignment propagation rules (`readonly` propagation, `readwrite` source forcing readonly target unless cast, explicit cast exceptions).
+1. Add remaining parser/codegen tests for advanced assignment propagation/cast forms across function parameter/property combinations and section variants.
 
 
 

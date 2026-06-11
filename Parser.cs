@@ -135,8 +135,11 @@ namespace Puma
         private readonly HashSet<string> _constantProperties = new(StringComparer.Ordinal);
         private readonly HashSet<string> _optionalProperties = new(StringComparer.Ordinal);
         private readonly HashSet<string> _readonlyProperties = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _readwriteProperties = new(StringComparer.Ordinal);
         private readonly Stack<HashSet<string>> _readonlyLocalScopes = new();
+        private readonly Stack<HashSet<string>> _readwriteLocalScopes = new();
         private readonly Stack<HashSet<string>> _readonlyParameterScopes = new();
+        private readonly Stack<HashSet<string>> _readwriteParameterScopes = new();
         private readonly Stack<List<Node>> _statementTargetStack = new();
         private List<Node>? _pendingBlockTarget;
         private Node? _typeOrTraitNode;
@@ -2191,6 +2194,10 @@ namespace Puma
                     {
                         _readonlyProperties.Add(name);
                     }
+                    if (modifiers.Contains("readwrite"))
+                    {
+                        _readwriteProperties.Add(name);
+                    }
                     if (modifiers.Contains("const"))
                     {
                         _constantProperties.Add(name);
@@ -2346,6 +2353,7 @@ namespace Puma
             }
 
             EnsureReadonlyLocalScope();
+            EnsureReadwriteLocalScope();
             var assignmentOperator = tokens[assignmentIndex].TokenText;
             var left = BuildQualifiedName(leftTokens);
             var right = BuildQualifiedName(rightTokens);
@@ -2418,13 +2426,38 @@ namespace Puma
                 && !string.IsNullOrWhiteSpace(left)
                 && IsSimpleIdentifier(left)
                 && !IsKnownReadonlyLocal(left)
+                && !IsKnownReadwriteLocal(left)
                 && !IsKnownReadonlyParameter(left)
+                && !IsKnownReadwriteParameter(left)
                 && !IsKnownProperty(left)
-                && originalRightTokens.Count > 0
-                && originalRightTokens[^1].Category is TokenCategory.Keyword or TokenCategory.Identifier
-                && string.Equals(originalRightTokens[^1].TokenText, "readonly", StringComparison.Ordinal))
+                && originalRightTokens.Count > 0)
             {
-                _readonlyLocalScopes.Peek().Add(left);
+                var trailingModifier = (originalRightTokens[^1].Category is TokenCategory.Keyword or TokenCategory.Identifier)
+                    ? originalRightTokens[^1].TokenText
+                    : string.Empty;
+
+                if (string.Equals(trailingModifier, "readonly", StringComparison.Ordinal))
+                {
+                    _readonlyLocalScopes.Peek().Add(left);
+                    _readwriteLocalScopes.Peek().Remove(left);
+                }
+                else if (string.Equals(trailingModifier, "readwrite", StringComparison.Ordinal))
+                {
+                    _readwriteLocalScopes.Peek().Add(left);
+                    _readonlyLocalScopes.Peek().Remove(left);
+                }
+                else if (rightExpression?.Kind == ExpressionKind.Identifier
+                    && !string.IsNullOrWhiteSpace(rightExpression.Value)
+                    && (IsKnownReadonlyLocal(rightExpression.Value)
+                        || IsKnownReadonlyParameter(rightExpression.Value)
+                        || IsKnownReadonlyProperty(rightExpression.Value)
+                        || IsKnownReadwriteLocal(rightExpression.Value)
+                        || IsKnownReadwriteParameter(rightExpression.Value)
+                        || IsKnownReadwriteProperty(rightExpression.Value)))
+                {
+                    _readonlyLocalScopes.Peek().Add(left);
+                    _readwriteLocalScopes.Peek().Remove(left);
+                }
             }
 
             return true;
@@ -2483,6 +2516,14 @@ namespace Puma
             }
         }
 
+        private void EnsureReadwriteLocalScope()
+        {
+            if (_readwriteLocalScopes.Count == 0)
+            {
+                _readwriteLocalScopes.Push(new HashSet<string>(StringComparer.Ordinal));
+            }
+        }
+
         private bool IsKnownConstantParameter(string name)
         {
             if (string.IsNullOrWhiteSpace(name) || _currentFunctionNode == null)
@@ -2505,6 +2546,16 @@ namespace Puma
             return _readonlyParameterScopes.Peek().Contains(name);
         }
 
+        private bool IsKnownReadwriteParameter(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || _readwriteParameterScopes.Count == 0)
+            {
+                return false;
+            }
+
+            return _readwriteParameterScopes.Peek().Contains(name);
+        }
+
         private bool IsKnownReadonlyLocal(string name)
         {
             if (string.IsNullOrWhiteSpace(name) || _readonlyLocalScopes.Count == 0)
@@ -2513,6 +2564,26 @@ namespace Puma
             }
 
             return _readonlyLocalScopes.Peek().Contains(name);
+        }
+
+        private bool IsKnownReadwriteLocal(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || _readwriteLocalScopes.Count == 0)
+            {
+                return false;
+            }
+
+            return _readwriteLocalScopes.Peek().Contains(name);
+        }
+
+        private bool IsKnownReadonlyProperty(string name)
+        {
+            return !string.IsNullOrWhiteSpace(name) && _readonlyProperties.Contains(name);
+        }
+
+        private bool IsKnownReadwriteProperty(string name)
+        {
+            return !string.IsNullOrWhiteSpace(name) && _readwriteProperties.Contains(name);
         }
 
         private bool IsKnownProperty(string name)

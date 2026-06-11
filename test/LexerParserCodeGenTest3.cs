@@ -606,6 +606,38 @@ int Echo(int64_t value)
         }
 
         [TestMethod]
+        public void Functions_VarDefaultParameterRebinding_IsAllowed()
+        {
+            const string src =
+@"functions
+    Update(value int) int
+        value = 2
+        return value
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <stdint>
+
+// functions
+int Update(int64_t value)
+{
+    value = 2;
+    return value;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void Start_VarDefaultLocalRebinding_IsAllowed()
         {
             const string src =
@@ -655,6 +687,255 @@ start
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
             StringAssert.Contains(ex.Message, "Cannot assign to constant property");
             StringAssert.Contains(ex.Message, "max");
+        }
+
+        [TestMethod]
+        public void PropertiesStart_ConstSourceToVarLocal_RebindingIsAllowed_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    max = 1 const
+
+start
+    local = max
+    local = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <cstdint>
+
+// properties
+const auto max = (int64_t)1;
+
+// start
+int main()
+{
+    auto local = max;
+    local = 2;
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Start_ReadonlySourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"start
+    source = 1 readonly
+    target = source
+    target = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Start_ReadwriteSourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"start
+    source = 1 readwrite
+    target = source
+    target = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Start_ReadwriteSourceAssignment_WithReadwriteCastAllowsMutation()
+        {
+            const string src =
+@"start
+    source = 1 readwrite
+    target = source readwrite
+    target = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto source = (int64_t)1;
+    auto target = source;
+    target = 2;
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Functions_ReadonlyParameterSourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"functions
+    Update(source int readonly)
+        target = source
+        target = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void PropertiesStart_ReadonlyPropertySourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"properties
+    source = 1 readonly
+
+start
+    target = source
+    target = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void PropertiesStart_ReadwritePropertySourceAssignment_WithReadwriteCastAllowsMutation()
+        {
+            const string src =
+@"properties
+    source = 1 readwrite
+
+start
+    target = source readwrite
+    target = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <cstdint>
+
+auto source = (int64_t)1;
+
+// start
+int main()
+{
+    auto target = source;
+    target = 2;
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Start_ReadonlyPropagationChain_SecondTargetMutationRejected()
+        {
+            const string src =
+@"start
+    a = 1 readonly
+    b = a
+    c = b
+    c = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "c");
+        }
+
+        [TestMethod]
+        public void Start_ReadwriteSource_ReadonlyCastStillRejectsMutation()
+        {
+            const string src =
+@"start
+    source = 1 readwrite
+    target = source readonly
+    target = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Start_ReadwriteCastThenReadonlyCast_SecondTargetMutationRejected()
+        {
+            const string src =
+@"start
+    source = 1 readwrite
+    rw = source readwrite
+    ro = rw readonly
+    ro = 2
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "ro");
         }
 
         [TestMethod]
