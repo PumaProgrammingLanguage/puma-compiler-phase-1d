@@ -140,6 +140,8 @@ namespace Puma
         private readonly Stack<HashSet<string>> _readwriteLocalScopes = new();
         private readonly Stack<HashSet<string>> _readonlyParameterScopes = new();
         private readonly Stack<HashSet<string>> _readwriteParameterScopes = new();
+        private readonly HashSet<string> _readonlySectionParameters = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _readwriteSectionParameters = new(StringComparer.Ordinal);
         private readonly Stack<List<Node>> _statementTargetStack = new();
         private List<Node>? _pendingBlockTarget;
         private Node? _typeOrTraitNode;
@@ -503,6 +505,15 @@ namespace Puma
             _pendingLeadingBlankLines = 0;
             _inferredIdentifierTypes.Clear();
             _constantProperties.Clear();
+            _optionalProperties.Clear();
+            _readonlyProperties.Clear();
+            _readwriteProperties.Clear();
+            _readonlyLocalScopes.Clear();
+            _readwriteLocalScopes.Clear();
+            _readonlyParameterScopes.Clear();
+            _readwriteParameterScopes.Clear();
+            _readonlySectionParameters.Clear();
+            _readwriteSectionParameters.Clear();
             _statementTargetStack.Clear();
             _pendingBlockTarget = null;
             _typeOrTraitNode = null;
@@ -2538,22 +2549,48 @@ namespace Puma
 
         private bool IsKnownReadonlyParameter(string name)
         {
-            if (string.IsNullOrWhiteSpace(name) || _readonlyParameterScopes.Count == 0)
+            if (string.IsNullOrWhiteSpace(name))
             {
                 return false;
             }
 
-            return _readonlyParameterScopes.Peek().Contains(name);
+            if (_currentFunctionNode != null
+                && _currentFunctionNode.FunctionParameterList.Any(p =>
+                    string.Equals(p.Name, name, StringComparison.Ordinal)
+                    && p.Modifiers.Contains("readonly")))
+            {
+                return true;
+            }
+
+            if (_readonlyParameterScopes.Count > 0 && _readonlyParameterScopes.Peek().Contains(name))
+            {
+                return true;
+            }
+
+            return _readonlySectionParameters.Contains(name);
         }
 
         private bool IsKnownReadwriteParameter(string name)
         {
-            if (string.IsNullOrWhiteSpace(name) || _readwriteParameterScopes.Count == 0)
+            if (string.IsNullOrWhiteSpace(name))
             {
                 return false;
             }
 
-            return _readwriteParameterScopes.Peek().Contains(name);
+            if (_currentFunctionNode != null
+                && _currentFunctionNode.FunctionParameterList.Any(p =>
+                    string.Equals(p.Name, name, StringComparison.Ordinal)
+                    && p.Modifiers.Contains("readwrite")))
+            {
+                return true;
+            }
+
+            if (_readwriteParameterScopes.Count > 0 && _readwriteParameterScopes.Peek().Contains(name))
+            {
+                return true;
+            }
+
+            return _readwriteSectionParameters.Contains(name);
         }
 
         private bool IsKnownReadonlyLocal(string name)
@@ -3118,6 +3155,21 @@ namespace Puma
             {
                 _currentSectionNode.SectionParameterList.Clear();
                 _currentSectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
+
+                _readonlySectionParameters.Clear();
+                _readwriteSectionParameters.Clear();
+                foreach (var parameter in _currentSectionNode.SectionParameterList)
+                {
+                    if (!string.IsNullOrWhiteSpace(parameter.Name) && parameter.Modifiers.Contains("readonly"))
+                    {
+                        _readonlySectionParameters.Add(parameter.Name);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(parameter.Name) && parameter.Modifiers.Contains("readwrite"))
+                    {
+                        _readwriteSectionParameters.Add(parameter.Name);
+                    }
+                }
             }
             return true;
         }

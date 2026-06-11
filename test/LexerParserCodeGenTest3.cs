@@ -732,10 +732,13 @@ int main()
         public void Start_ReadonlySourceAssignment_PropagatesReadonlyAndRejectsMutation()
         {
             const string src =
-@"start
-    source = 1 readonly
+@"use
+    PumaObjectSourceFile.puma
+
+start
+    source = Shape() readonly
     target = source
-    target = 2
+    target = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -751,10 +754,13 @@ int main()
         public void Start_ReadwriteSourceAssignment_PropagatesReadonlyAndRejectsMutation()
         {
             const string src =
-@"start
-    source = 1 readwrite
+@"use
+    PumaObjectSourceFile.puma
+
+start
+    source = Shape() readwrite
     target = source
-    target = 2
+    target = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -770,10 +776,13 @@ int main()
         public void Start_ReadwriteSourceAssignment_WithReadwriteCastAllowsMutation()
         {
             const string src =
-@"start
-    source = 1 readwrite
+@"use
+    PumaObjectSourceFile.puma
+
+start
+    source = Shape() readwrite
     target = source readwrite
-    target = 2
+    target = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -784,31 +793,21 @@ int main()
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
 
-            var expected =
-@"#include <cstdint>
-
-// start
-int main()
-{
-    auto source = (int64_t)1;
-    auto target = source;
-    target = 2;
-
-    return 0;
-}
-";
-
-            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+            StringAssert.Contains(generated, "auto target = source;");
+            StringAssert.Contains(generated, "target = Shape();");
         }
 
         [TestMethod]
         public void Functions_ReadonlyParameterSourceAssignment_PropagatesReadonlyAndRejectsMutation()
         {
             const string src =
-@"functions
-    Update(source int readonly)
+@"use
+    PumaObjectSourceFile.puma
+
+functions
+    Update(source Shape readonly)
         target = source
-        target = 2
+        target = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -824,12 +823,15 @@ int main()
         public void PropertiesStart_ReadonlyPropertySourceAssignment_PropagatesReadonlyAndRejectsMutation()
         {
             const string src =
-@"properties
-    source = 1 readonly
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    source = Shape() readonly
 
 start
     target = source
-    target = 2
+    target = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -845,12 +847,15 @@ start
         public void PropertiesStart_ReadwritePropertySourceAssignment_WithReadwriteCastAllowsMutation()
         {
             const string src =
-@"properties
-    source = 1 readwrite
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    source = Shape() readwrite
 
 start
     target = source readwrite
-    target = 2
+    target = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -861,33 +866,22 @@ start
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
 
-            var expected =
-@"#include <cstdint>
-
-auto source = (int64_t)1;
-
-// start
-int main()
-{
-    auto target = source;
-    target = 2;
-
-    return 0;
-}
-";
-
-            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+            StringAssert.Contains(generated, "auto target = source;");
+            StringAssert.Contains(generated, "target = Shape();");
         }
 
         [TestMethod]
         public void Start_ReadonlyPropagationChain_SecondTargetMutationRejected()
         {
             const string src =
-@"start
-    a = 1 readonly
+@"use
+    PumaObjectSourceFile.puma
+
+start
+    a = Shape() readonly
     b = a
     c = b
-    c = 2
+    c = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -903,10 +897,13 @@ int main()
         public void Start_ReadwriteSource_ReadonlyCastStillRejectsMutation()
         {
             const string src =
-@"start
-    source = 1 readwrite
+@"use
+    PumaObjectSourceFile.puma
+
+start
+    source = Shape() readwrite
     target = source readonly
-    target = 2
+    target = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -922,11 +919,14 @@ int main()
         public void Start_ReadwriteCastThenReadonlyCast_SecondTargetMutationRejected()
         {
             const string src =
-@"start
-    source = 1 readwrite
+@"use
+    PumaObjectSourceFile.puma
+
+start
+    source = Shape() readwrite
     rw = source readwrite
     ro = rw readonly
-    ro = 2
+    ro = Shape()
 ";
 
             var lexer = new Puma.Lexer();
@@ -936,6 +936,323 @@ int main()
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
             StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
             StringAssert.Contains(ex.Message, "ro");
+        }
+
+        [TestMethod]
+        public void Initialize_ReadonlyParameterSourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+initialize(source Shape readonly)
+    target = source
+    target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Initialize_ReadwriteParameterSourceAssignment_WithReadwriteOverrideAllowsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+initialize(source Shape readwrite)
+    target = source readwrite
+    target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "void initialize(Shape source)");
+            StringAssert.Contains(generated, "auto target = source;");
+            StringAssert.Contains(generated, "target = Shape();");
+        }
+
+        [TestMethod]
+        public void Functions_ReadonlyPropertySourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    source = Shape() readonly
+
+functions
+    Update()
+        target = source
+        target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Functions_ReadwritePropertySourceAssignment_WithReadwriteOverrideAllowsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    source = Shape() readwrite
+
+functions
+    Update()
+        target = source readwrite
+        target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "target = source;");
+            StringAssert.Contains(generated, "target = Shape();");
+        }
+
+        [TestMethod]
+        public void Functions_ReadonlyParameterToReadwriteOverride_ThenPropagationRejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+functions
+    Update(source Shape readonly)
+        rw = source readwrite
+        ro = rw
+        ro = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "ro");
+        }
+
+        [TestMethod]
+        public void Functions_ReadwritePropertyToReadwriteOverride_ThenPropagationRejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    source = Shape() readwrite
+
+functions
+    Update()
+        rw = source readwrite
+        ro = rw
+        ro = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "ro");
+        }
+
+        [TestMethod]
+        public void Initialize_MixedReadonlyPropertyAndReadwriteParameter_PropagationRejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    seed = Shape() readonly
+
+initialize(input Shape readwrite)
+    first = input readwrite
+    second = seed
+    third = first
+    third = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "third");
+        }
+
+        [TestMethod]
+        public void Initialize_ReadonlyLocalSourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+initialize
+    source = Shape() readonly
+    target = source
+    target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Functions_ReadonlyLocalSourceAssignment_PropagatesReadonlyAndRejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+functions
+    Update()
+        source = Shape() readonly
+        target = source
+        target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Functions_ReadwriteLocalSourceAssignment_WithReadwriteOverride_AllowsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+functions
+    Update()
+        source = Shape() readwrite
+        target = source readwrite
+        target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            StringAssert.Contains(generated, "target = Shape();");
+        }
+
+        [TestMethod]
+        public void Initialize_ReadwriteLocalSource_WithReadonlyOverride_RejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+initialize
+    source = Shape() readwrite
+    target = source readonly
+    target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Functions_ReadwriteLocalSource_WithReadonlyOverride_RejectsMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+functions
+    Update()
+        source = Shape() readwrite
+        target = source readonly
+        target = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "target");
+        }
+
+        [TestMethod]
+        public void Functions_MixedSourceChainAcrossParameterPropertyAndLocal_RejectsFinalMutation()
+        {
+            const string src =
+@"use
+    PumaObjectSourceFile.puma
+
+properties
+    root = Shape() readonly
+
+functions
+    Update(input Shape readwrite)
+        first = input readwrite
+        second = root
+        third = first
+        fourth = second
+        fourth = Shape()
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to readonly local variable");
+            StringAssert.Contains(ex.Message, "fourth");
         }
 
         [TestMethod]

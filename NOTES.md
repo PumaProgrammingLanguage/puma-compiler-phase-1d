@@ -32,9 +32,15 @@ Recent updates
 - Added assignment-propagation coverage: assignments from readonly/readwrite sources default targets to readonly (mutation rejected), and explicit `readwrite` target modifier allows reassignment.
 - Expanded assignment-propagation coverage across parameters/properties: readonly parameter/property sources propagate readonly to local targets, and readwrite property sources support explicit `readwrite` target override for mutation.
 - Added advanced assignment-propagation edge-case coverage: readonly propagation chains remain readonly across multiple hops, explicit `readonly` target modifier is enforced, and readwrite->readonly cast transitions reject subsequent mutation.
+- Extended propagation support to section parameters: `initialize` readonly/readwrite parameters now participate in propagation checks; added section/function property-source override coverage and aligned generated output expectations.
+- Added mixed-source and multi-step override coverage: function/property readwrite-overridden locals still propagate readonly on subsequent assignment, and initialize mixed readonly/readwrite source chains now assert readonly mutation rejection.
+- Added initialize/functions local-source propagation coverage: readonly local->local assignment now rejects target mutation, and functions readwrite local-source override (`target = source readwrite`) is explicitly validated as mutable.
+- Added final override/precedence coverage: explicit `readonly` target override from readwrite local sources now rejects mutation in `initialize`/`functions`, and mixed local/parameter/property chains enforce readonly at the terminal assignment.
+- Converted readonly/readwrite propagation tests from value-type literals to object/reference (`Shape`) scenarios, fixed function-body indentation in readonly-parameter propagation coverage, and validated the targeted propagation suite (18/18 passing).
 
 1) Unit test TODO list
-1. Add remaining parser/codegen tests for advanced assignment propagation/cast forms across function parameter/property combinations and section variants.
+1. Assignment-propagation coverage is complete for current readonly/readwrite object/reference scenarios.
+2. Proceed with postponed/special-feature items when implementation prerequisites are available.
 
 
 
