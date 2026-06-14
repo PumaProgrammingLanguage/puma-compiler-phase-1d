@@ -37,6 +37,270 @@ namespace test
                 .ToList();
         }
 
+        [TestMethod]
+        public void StartExample_CharacterLiterals_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"start
+    first = 'A'
+    newline = '\n'
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "start",
+                "first", "=", "'A'",
+                "newline", "=", "'\\n'"
+            }, significant);
+
+            Assert.AreEqual(Puma.Lexer.TokenCategory.CharLiteral, significantTokens[3].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.CharLiteral, significantTokens[6].Category);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            var expected =
+@"#include <Character.hpp>
+
+// start
+int main()
+{
+    auto first = Character('A');
+    auto newline = Character('\n');
+
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void FunctionsExample_CharParameter_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"functions
+    DoNothing(c char)
+        return
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "functions",
+                "DoNothing", "(", "c", "char", ")",
+                "return"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <Character.hpp>
+
+// functions
+void DoNothing(Puma::Type::Character c)
+{
+    return;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Lexer_CharacterEscapes_HexAndUnicode_AreTokenizedWithoutUnknown()
+        {
+            const string src =
+@"start
+    a = '\x41'
+    b = '\u0041'
+    c = '\U00000041'
+";
+
+            var lexer = new Puma.Lexer();
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+
+            Assert.IsFalse(significantTokens.Any(t => t.Category == Puma.Lexer.TokenCategory.Unknown));
+            Assert.IsTrue(significantTokens.Any(t => t.TokenText == "'\\x41'" && t.Category == Puma.Lexer.TokenCategory.CharLiteral));
+            Assert.IsTrue(significantTokens.Any(t => t.TokenText == "'\\u0041'" && t.Category == Puma.Lexer.TokenCategory.CharLiteral));
+            Assert.IsTrue(significantTokens.Any(t => t.TokenText == "'\\U00000041'" && t.Category == Puma.Lexer.TokenCategory.CharLiteral));
+        }
+
+        [TestMethod]
+        public void Lexer_CharacterEscape_WithInvalidUnicodeHex_IsUnknown()
+        {
+            const string src =
+@"start
+    c = '\u00G1'
+";
+
+            AssertLexerHasUnknownToken(src);
+        }
+
+        [TestMethod]
+        public void PropertiesExample_CharacterLiterals_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    first = 'A'
+    newline = '\n'
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "first", "=", "'A'",
+                "newline", "=", "'\\n'"
+            }, significant);
+
+            Assert.AreEqual(Puma.Lexer.TokenCategory.CharLiteral, significantTokens[3].Category);
+            Assert.AreEqual(Puma.Lexer.TokenCategory.CharLiteral, significantTokens[6].Category);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <Character.hpp>
+
+// properties
+auto first = Character('A');
+auto newline = Character('\n');
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void InitializeExample_CharacterAssignment_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    current = 'A'
+
+initialize
+    current = '\n'
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "properties",
+                "current", "=", "'A'",
+                "initialize",
+                "current", "=", "'\\n'"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <Character.hpp>
+
+// properties
+auto current = Character('A');
+
+// initialize
+void initialize(void)
+{
+    current = Character('\n');
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Functions_CharacterConditionalAndAssignmentFlow_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"functions
+    Pick(a char, b char) char
+        result = a if a == b else b
+        mirror = result
+        return mirror
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var significant = significantTokens.Select(t => t.TokenText).ToArray();
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "functions",
+                "Pick", "(", "a", "char", ",", "b", "char", ")", "char",
+                "result", "=", "a", "if", "a", "==", "b", "else", "b",
+                "mirror", "=", "result",
+                "return", "mirror"
+            }, significant);
+
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <Character.hpp>
+
+// functions
+char Pick(Puma::Type::Character a, Puma::Type::Character b)
+{
+    auto result = ((a == b) ? a : b);
+    auto mirror = result;
+    return mirror;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Functions_ConstCharacterParameterMutation_Parser_ThrowsCompilerError()
+        {
+            const string src =
+@"functions
+    Mutate(c char const)
+        c = 'Z'
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var tokens = lexer.Tokenize(src);
+
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+            StringAssert.Contains(ex.Message, "Cannot assign to constant parameter");
+            StringAssert.Contains(ex.Message, "c");
+        }
+
         private static void AssertParserError(string src, string expectedMessagePart)
         {
             var lexer = new Puma.Lexer();

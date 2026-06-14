@@ -75,6 +75,20 @@ namespace Puma
                 includes.Add("<String.hpp>");
             }
 
+            var needsCharacter = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
+                && n.AssignmentOperator == "="
+                && IsCharacterLiteralText(n.AssignmentRight))
+                || ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
+                    && (IsCharacterLiteralText(n.PropertyValue)
+                        || string.Equals(n.PropertyType, "char", StringComparison.OrdinalIgnoreCase)))
+                || allNodes.Any(n => n.FunctionParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase))
+                    || n.SectionParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase))
+                    || n.DelegateParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)));
+            if (needsCharacter)
+            {
+                includes.Add("<Character.hpp>");
+            }
+
             var needsStdBoolForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
                 .SelectMany(n => n.RecordMembers)
                 .Any(m =>
@@ -509,6 +523,19 @@ namespace Puma
                 || value.StartsWith("\"", StringComparison.Ordinal);
         }
 
+        private static bool IsCharacterLiteralText(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var text = value.Trim();
+            return text.Length >= 3
+                && text.StartsWith("'", StringComparison.Ordinal)
+                && text.EndsWith("'", StringComparison.Ordinal);
+        }
+
         private static string FormatAutoPropertyInitializer(string? value, string? declaredType)
         {
             var text = value?.Trim() ?? string.Empty;
@@ -527,6 +554,11 @@ namespace Puma
             {
                 var literal = string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : text;
                 return ToPumaStringLiteral(NormalizeAutoStringLiteral(literal));
+            }
+
+            if (IsCharacterLiteralText(text))
+            {
+                return $"Character({text})";
             }
 
             if (LooksLikeObjectConstructorCall(text))
@@ -702,6 +734,11 @@ namespace Puma
 
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
         {
+            var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
+                .Select(n => n.PropertyName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.Ordinal);
+
             foreach (var node in ast.Where(n => n.Kind == NodeKind.DelegateDeclaration))
             {
                 var parameters = string.Join(", ", node.DelegateParameterList.Select(FormatParameter));
@@ -729,7 +766,14 @@ namespace Puma
                     : string.Join(", ", node.FunctionParameterList.Select(FormatFunctionSignatureParameter));
                 sb.AppendLine($"{returnType} {node.FunctionDeclarationName}({parameters})");
                 sb.AppendLine("{");
-                EmitStatementsWithStringLocalDeclarations(node.FunctionBody, sb, "    ", ast);
+                if (string.Equals(node.FunctionDeclarationReturnType, "char", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitStatementsWithLocalDeclarations(node.FunctionBody, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
+                }
+                else
+                {
+                    EmitStatementsWithStringLocalDeclarations(node.FunctionBody, sb, "    ", ast);
+                }
                 sb.AppendLine("}");
                 sb.AppendLine();
             }
@@ -1208,6 +1252,13 @@ namespace Puma
                                 rightExpression = ToPumaStringLiteral(rightExpression);
                             }
 
+                            if (node.AssignmentOperator == "="
+                                && node.AssignmentRightExpression?.Kind == ExpressionKind.Literal
+                                && IsCharacterLiteralText(rightExpression))
+                            {
+                                rightExpression = $"Character({rightExpression})";
+                            }
+
                             var emittedTypedPropertyLiteral = false;
                             if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Literal)
                             {
@@ -1351,8 +1402,19 @@ namespace Puma
                             break;
                         }
                     case NodeKind.ReturnStatement:
-                        sb.AppendLine($"{indent}return {UnwrapOutermostParentheses(GenerateExpression(node.StatementExpression, node.StatementValue))};");
-                        break;
+                        {
+                            var returnExpression = UnwrapOutermostParentheses(GenerateExpression(node.StatementExpression, node.StatementValue));
+                            if (string.IsNullOrWhiteSpace(returnExpression))
+                            {
+                                sb.AppendLine($"{indent}return;");
+                            }
+                            else
+                            {
+                                sb.AppendLine($"{indent}return {returnExpression};");
+                            }
+
+                            break;
+                        }
                     case NodeKind.YieldStatement:
                         sb.AppendLine($"{indent}/* yield {GenerateExpression(node.StatementExpression, node.StatementValue)} */");
                         break;
@@ -1835,15 +1897,23 @@ namespace Puma
             if (expressionFallback)
             {
                 usedExpressionFallback = true;
-                var normalized = UnwrapOutermostParentheses(value);
+                var normalized = statement.AssignmentRightExpression?.Kind == ExpressionKind.Conditional
+                    ? value
+                    : UnwrapOutermostParentheses(value);
                 sb.AppendLine($"{indent}auto {leftName} = {normalized};");
                 localNames.Add(leftName);
                 return true;
             }
 
+            if (typeName == "Puma::Type::Character")
+            {
+                usedExpressionFallback = true;
+            }
+
             var initializer = typeName switch
             {
                 "Puma::Type::String" => ToPumaStringLiteral(value),
+                "Puma::Type::Character" => $"Character({value})",
                 "bool" => value,
                 _ => $"({typeName}){value}"
             };
@@ -1914,6 +1984,13 @@ namespace Puma
             {
                 typeName = "Puma::Type::String";
                 literalValue = "\"\"";
+                return true;
+            }
+
+            if (IsCharacterLiteralText(text))
+            {
+                typeName = "Puma::Type::Character";
+                literalValue = text;
                 return true;
             }
 

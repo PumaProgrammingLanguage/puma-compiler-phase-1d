@@ -16,6 +16,12 @@ namespace Type
 		packedValues.secondHalf = 0;
 	}
 
+	// Constructs a String from UTF‑8 string literal (null-terminated C-string).
+	String::String(const char* utf8) noexcept
+		: String(reinterpret_cast<const uint8_t*>(utf8), static_cast<uint32_t>(strlen(utf8)))
+	{
+	}
+
 	// Constructs a String from raw UTF‑8 bytes and explicit length in bytes.
 	String::String(const char* utf8, size_t dataSize) noexcept
 		: String(reinterpret_cast<const uint8_t*>(utf8), static_cast<uint32_t>(dataSize))

@@ -58,7 +58,7 @@ namespace Type
     String Character::ToString() const noexcept
     {
         const uint8_t charSize = GetCharSize(codeUnits[0]); // 1..4
-        return String(codeUnits, charSize);
+        return String(&codeUnits[0], (uint32_t)charSize);
     }
 
     const uint8_t* Character::ToUTF8() const noexcept

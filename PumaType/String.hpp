@@ -24,7 +24,9 @@ namespace Type
         String() noexcept;
 		// Copy constructor - creates a new String with the same content as the source. Can transfer ownership.
         String(String& source, bool moveOwner = false) noexcept;
-		// Constructs a String from the raw UTF‑8 bytes and explicit length in bytes.
+        // Constructs a String from UTF‑8 string literal (null-terminated C-string).
+        String(const char* utf8) noexcept;
+        // Constructs a String from the raw UTF‑8 bytes and explicit length in bytes.
         String(const uint8_t* utf8, uint32_t dataSize) noexcept;
 		// Constructs a String from the raw UTF‑8 bytes and explicit length in bytes.
         String(const char* utf8, size_t dataSize) noexcept;

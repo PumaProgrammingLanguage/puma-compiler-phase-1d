@@ -39,8 +39,6 @@ Recent updates
 - Converted readonly/readwrite propagation tests from value-type literals to object/reference (`Shape`) scenarios, fixed function-body indentation in readonly-parameter propagation coverage, and validated the targeted propagation suite (18/18 passing).
 
 1) Unit test TODO list
-1. Assignment-propagation coverage is complete for current readonly/readwrite object/reference scenarios.
-2. Proceed with postponed/special-feature items when implementation prerequisites are available.
 
 
 
