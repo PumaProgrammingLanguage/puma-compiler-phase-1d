@@ -127,6 +127,107 @@ namespace Type
 		return *this;
 	}
 
+	// Less-than operator for ordering of a UTF-8 string based on lexicographical order of the UTF-8 bytes.
+	bool operator<(const String& source) noexcept
+	{
+		const uint32_t thisLength = Length();
+		const uint32_t sourceLength = source.Length();
+		const uint32_t minLength = (thisLength < sourceLength) ? thisLength : sourceLength;
+		const StringIterator thisIter = this.First();
+		const StringIterator sourceIter = source.First();
+
+		while (thisIter.IsValid() && sourceIter.IsValid() && minLength > 0)
+		{
+			const uint8_t thisByte = *thisIter;
+			const uint8_t sourceByte = *sourceIter;
+			if (thisByte < sourceByte)
+			{
+				return true; // This string is less than the source string.
+			}
+			else if (thisByte > sourceByte)
+			{
+				return false; // This string is greater than the source string.
+			}
+			// bytes are equal. continue comparing the next character.
+			thisIter.Next();
+			sourceIter.Next();
+		}
+		// If all bytes are equal up to the length of the shorter string, then the shorter string is considered less.
+		return (thisLength < sourceLength);
+	}
+
+	// Greater-than operator for ordering
+	bool operator>(const String& source) noexcept
+	{
+		const uint32_t thisLength = Length();
+		const uint32_t sourceLength = source.Length();
+		const uint32_t minLength = (thisLength < sourceLength) ? thisLength : sourceLength;
+		const StringIterator thisIter = this.First();
+		const StringIterator sourceIter = source.First();
+		while (thisIter.IsValid() && sourceIter.IsValid() && minLength > 0)
+		{
+			const uint8_t thisByte = *thisIter;
+			const uint8_t sourceByte = *sourceIter;
+			if (thisByte > sourceByte)
+			{
+				return true; // This string is greater than the source string.
+			}
+			else if (thisByte < sourceByte)
+			{
+				return false; // This string is less than the source string.
+			}
+			// bytes are equal. continue comparing the next character.
+			thisIter.Next();
+			sourceIter.Next();
+		}
+		// If all bytes are equal up to the length of the shorter string, then the longer string is considered greater.
+		return (thisLength > sourceLength);
+	}
+
+
+	// Equality
+	bool operator==(const String& source) noexcept
+	{
+		const uint32_t thisLength = Length();
+		const uint32_t sourceLength = source.Length();
+		if (thisLength != sourceLength)
+		{
+			return false; // Strings of different lengths cannot be equal.
+		}
+		const StringIterator thisIter = this.First();
+		const StringIterator sourceIter = source.First();
+		while (thisIter.IsValid() && sourceIter.IsValid())
+		{
+			const uint8_t thisByte = *thisIter;
+			const uint8_t sourceByte = *sourceIter;
+			if (thisByte != sourceByte)
+			{
+				return false; // Found a byte that differs, so strings are not equal.
+			}
+			thisIter.Next();
+			sourceIter.Next();
+		}
+		return true; // All bytes are equal and lengths are the same, so strings are equal.
+	}
+
+	// Inequality
+	bool operator!=(const String& source) noexcept
+	{
+		return !(*this == source);
+	}
+
+	// Less-than-or-equal operator for ordering
+	bool operator<=(const String& source) noexcept
+	{
+		return !(*this > source);
+	}
+
+	// Greater-than-or-equal operator for ordering
+	bool operator>=(const String& source) noexcept
+	{
+		return !(*this < source);
+	}
+
 	bool String::isShort() const noexcept
 	{
 		// A short string is identified by the LONG_FLAG bit not set (SHORT_FLAG) in the tag.
@@ -182,7 +283,7 @@ namespace Type
 		for (uint32_t i = 0; i < strSize; )
 		{
 			const uint8_t c = ptr[i];
-     const uint8_t charSize = Character::GetCharSize(c);
+			const uint8_t charSize = Character::GetCharSize(c);
 			i += charSize;
 			++charCount;
 		}

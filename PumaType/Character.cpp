@@ -21,17 +21,17 @@ namespace Type
     }
 
     Character::Character() noexcept
-        : packedValue(0U)
+        : codePoint(0U)
     {
     }
 
     Character::Character(const Character& source) noexcept
-        : packedValue(source.packedValue)
+        : codePoint(source.codePoint)
     {
     }
 
     Character::Character(const uint8_t* utf8) noexcept
-    : packedValue(0U)
+    : codePoint(0U)
     {
         if (utf8 == nullptr)
         {
@@ -50,9 +50,41 @@ namespace Type
     {
         if (this != &source)
         {
-            packedValue = source.packedValue;
+            codePoint = source.codePoint;
         }
         return *this;
+    }
+
+    // Less-than operator for ordering (e.g., for sorting)
+    bool operator<(const Character& other) const noexcept
+	{
+	    // Compare whole character
+		return codePoint < other.codePoint;
+	}
+    // Greater-than operator for ordering
+    bool operator>(const Character& other) const noexcept
+    {
+		return codePoint > other.codePoint;
+    }
+    // Equality
+    bool operator==(const Character& other) const noexcept
+    {
+        return codePoint == other.codePoint;
+    }
+    // Inequality
+    bool operator!=(const Character& other) const noexcept
+    {
+        return codePoint != other.codePoint;
+    }
+    // Less-than-or-equal operator for ordering
+    bool operator<=(const Character& other) const noexcept
+    {
+        return codePoint <= other.codePoint;
+    }
+    // Greater-than-or-equal operator for ordering
+    bool operator>=(const Character& other) const noexcept
+    {
+        return codePoint >= other.codePoint;
     }
 
     String Character::ToString() const noexcept
@@ -71,9 +103,9 @@ namespace Type
         return UTF8CharSizeLookup[codeUnits[0] >> 3];
     }
 
-    const uint8_t Character::GetCharSize(const uint8_t c) noexcept
+    const uint8_t Character::GetCharSize(const uint8_t firstCodeUnit) noexcept
     {
-        return UTF8CharSizeLookup[c >> 3];
+        return UTF8CharSizeLookup[firstCodeUnit >> 3];
     }
 } // namespace Type
 } // namespace Puma

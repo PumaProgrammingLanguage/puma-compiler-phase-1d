@@ -35,7 +35,21 @@ namespace Type
 
 		// Assignment - does not transfer ownership.
         String& operator=(const String& source) noexcept;
-		// Get a copy of this string (copy constructor semantics).
+
+        // Less-than operator for ordering (e.g., for sorting)
+        bool operator<(const String& source) noexcept;
+		// Less-than-or-equal operator for ordering
+		bool operator<=(const String& source) noexcept;
+		// Equality
+		bool operator==(const String& source) noexcept;
+		// Inequality
+		bool operator!=(const String& source) noexcept;
+		// Greater-than-or-equal operator for ordering
+		bool operator>=(const String& source) noexcept;
+		// Greater-than operator for ordering
+		bool operator>(const String& source) noexcept;
+        
+        // Get a copy of this string (copy constructor semantics).
         String ToString() noexcept;
         // Returns a pointer to a null terminated copy of the string.
         // The caller is responsible for deleting the returned buffer.

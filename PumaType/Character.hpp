@@ -24,6 +24,19 @@ namespace Type
         // Assignment
         Character& operator=(const Character& source) noexcept;
 
+		// Less-than operator for ordering (e.g., for sorting)
+		bool operator<(const Character& other) const noexcept;
+		// Less-than-or-equal operator for ordering
+		bool operator<=(const Character& other) const noexcept;
+        // Equality
+        bool operator==(const Character& other) const noexcept;
+		// Inequality
+		bool operator!=(const Character& other) const noexcept;
+		// Greater-than-or-equal operator for ordering
+		bool operator>=(const Character& other) const noexcept;
+		// Greater-than operator for ordering
+		bool operator>(const Character& other) const noexcept;
+
         // Convert this UTF-8 character into a Puma String.
         String ToString() const noexcept;
 
@@ -33,15 +46,15 @@ namespace Type
         // Returns the number of bytes in the UTF‑8 code unit sequence stored in this Character.
         const uint8_t GetCharSize() const noexcept;
 
-        // Returns the number of bytes in the UTF‑8 code unit sequence starting with 'c'.
+        // Returns the number of bytes in the UTF‑8 code unit sequence starting with 'firstCodeUnit'.
         // Invalid leading bytes and continuation bytes return 1.
-        static const uint8_t GetCharSize(const uint8_t c)  noexcept;
+        static const uint8_t GetCharSize(const uint8_t firstCodeUnit)  noexcept;
 
     private:
         // Raw 4-byte representation (e.g., UTF-8 bytes)
         uint8_t  codeUnits[4];
         // Packed 32-bit representation of the same 4 bytes
-        uint32_t packedValue;
+        uint32_t codePoint;
     };
 } // namespace Type
 } // namespace Puma
