@@ -137,10 +137,10 @@ namespace Puma
 
             // TODO: check if the last character is an end of line marker
             // if last character is not an end of line marker, add one
-            //if (!_eol.Contains(source[-1..]))
-            //{
-            //    source += "\n";
-            //}
+            if (!_eol.Contains(source[^1..]))
+            {
+                source += "\n";
+            }
 
             var sourceArray = source.ToCharArray();
             var lastCharInString = sourceArray.Length - 1;
@@ -474,7 +474,7 @@ namespace Puma
 
             if (currentChar == '\'')
             {
-                    // found the end of the character
+                // found the end of the character
                 currentToken += currentChar;
                 var category = invalidCharEscape ? TokenCategory.Unknown : currentTokenType;
                 tokens.Add(new LexerTokens() { TokenText = currentToken, Category = category });
@@ -485,7 +485,7 @@ namespace Puma
             }
             else
             {
-                    // character continues
+                // character continues
                 currentToken += currentChar;
             }
         }
@@ -715,7 +715,7 @@ namespace Puma
             }
             else if (currentChar == '\'')
             {
-                    // found start of a character
+                // found start of a character
                 currentToken = currentChar.ToString();
                 currentTokenType = TokenCategory.CharLiteral;
             }

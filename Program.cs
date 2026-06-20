@@ -93,6 +93,14 @@ namespace Puma
                     Console.WriteLine(cCode);
                 }
 
+                if (EmitC)
+                {
+                    // If the emit-c flag is set, write the generated code to a .cpp file and return.
+                    File.WriteAllText(cppSourceFileName, cCode);
+                    Console.WriteLine($"Generated C++ code written to {cppSourceFileName}");
+                    return;
+                }
+
                 // Always write the generated C++ code to a .cpp file.
                 File.WriteAllText(cppSourceFileName, cCode);
 
@@ -118,7 +126,7 @@ namespace Puma
             }
             catch (InvalidOperationException ex)
             {
-                Console.Error.WriteLine($"Puma parse error: {ex.Message}");
+                Console.Error.WriteLine($"Puma build error: {ex.Message}");
             }
         }
 
@@ -216,17 +224,21 @@ namespace Puma
                 Console.WriteLine(stdout);
             }
 
-            if (process.ExitCode != 0)
+            if (!string.IsNullOrWhiteSpace(stderr))
             {
-                Console.Error.WriteLine("clang++ failed:");
-                if (!string.IsNullOrWhiteSpace(stderr))
+                if (process.ExitCode < 0)
                 {
-                    Console.Error.WriteLine(stderr);
+                    Console.Error.WriteLine("clang++ error:");
                 }
                 else
                 {
-                    Console.Error.WriteLine($"Exit code: {process.ExitCode}");
+                    Console.Error.WriteLine("clang++:");
                 }
+                Console.Error.WriteLine(stderr);
+            }
+            else if (process.ExitCode != 0)
+            {
+                Console.Error.WriteLine($"clang++ exit code: {process.ExitCode}");
             }
         }
 
