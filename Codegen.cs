@@ -179,9 +179,9 @@ namespace Puma
 
             foreach (var node in ast.Where(n => n.Kind == NodeKind.UseStatement))
             {
-                if (node.UseIsFilePath && !string.IsNullOrWhiteSpace(node.UseTarget))
+                if (node.UseStatementNode.IsFilePath && !string.IsNullOrWhiteSpace(node.UseStatementNode.Target))
                 {
-                    var includeTarget = node.UseTarget;
+                    var includeTarget = node.UseStatementNode.Target;
                     if (includeTarget.EndsWith(".puma", StringComparison.OrdinalIgnoreCase))
                     {
                         includeTarget = includeTarget[..^5] + ".h";
@@ -189,9 +189,9 @@ namespace Puma
 
                     includes.Add($"\"{includeTarget}\"");
                 }
-                else if (!string.IsNullOrWhiteSpace(node.UseTarget))
+                else if (!string.IsNullOrWhiteSpace(node.UseStatementNode.Target))
                 {
-                    includes.Add($"<{node.UseTarget.Replace('.', '/')}>");
+                    includes.Add($"<{node.UseStatementNode.Target.Replace('.', '/')}>");
                 }
             }
 
@@ -1327,9 +1327,9 @@ namespace Puma
                             break;
                         }
                     case NodeKind.WriteLine:
-                        if (!string.IsNullOrWhiteSpace(node.StringValue))
+                        if (!string.IsNullOrWhiteSpace(node.WriteLineNode.StringValue))
                         {
-                            sb.AppendLine($"{indent}puts({node.StringValue});");
+                            sb.AppendLine($"{indent}puts({node.WriteLineNode.StringValue});");
                         }
                         break;
                     case NodeKind.IfStatement:

@@ -85,12 +85,20 @@ namespace Puma
         public Section Section { get; set; } = Section.None;
 
         // For WriteLine nodes
-        public string? StringValue { get; set; }
+        public struct WriteLineNodes
+        {
+            public string? StringValue { get; set; }
+        }
+        public WriteLineNodes WriteLineNode;
 
         // For UseStatement nodes
-        public string? UseTarget { get; set; }
-        public string? UseAlias { get; set; }
-        public bool UseIsFilePath { get; set; }
+        public struct UseStatementNodes
+        {
+            public string? Target { get; set; }
+            public string? Alias { get; set; }
+            public bool IsFilePath { get; set; }
+        }
+        public UseStatementNodes UseStatementNode;
 
         // For TypeDeclaration nodes
         public string? DeclarationKind { get; set; }
@@ -202,7 +210,10 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.WriteLine,
-                StringValue = literal
+                WriteLineNode = new WriteLineNodes
+                {
+                    StringValue = literal
+                }
             };
         }
 
@@ -211,9 +222,12 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.UseStatement,
-                UseTarget = target,
-                UseAlias = alias,
-                UseIsFilePath = isFilePath
+                UseStatementNode = new UseStatementNodes
+                {
+                    Target = target,
+                    Alias = alias,
+                    IsFilePath = isFilePath
+                }
             };
         }
 
