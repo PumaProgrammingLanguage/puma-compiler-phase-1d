@@ -443,11 +443,11 @@ namespace Puma
         }
 
         private Section CurrentSection = Section.None;
-        private LexerTokens? token = new LexerTokens();
-        private Node? rootNode = new Node();
-        private Node? currentNode = new Node();
-        private Node? previousNode = new Node();
-        private List<Node> ast = new List<Node>();
+        private LexerTokens? token = new();
+        private Node? rootNode = new();
+        private Node? currentNode = new();
+        private Node? previousNode = new();
+        private List<Node> ast = new();
         private int index = 0;
 
         // Keep a reference to tokens to allow sub-parsers to read ahead
@@ -518,7 +518,7 @@ namespace Puma
             _pendingBlockTarget = null;
             _typeOrTraitNode = null;
             CurrentSection = Section.None;
-            ast = new List<Node>();
+            ast = [];
 
             while (true)
             {
