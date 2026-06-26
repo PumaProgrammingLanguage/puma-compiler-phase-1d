@@ -125,12 +125,19 @@ namespace Puma
         public List<string> PropertyModifiers { get; } = new();
 
         // For AssignmentStatement nodes
-        public string? AssignmentLeft { get; set; }
-        public string? AssignmentRight { get; set; }
-        public string? AssignmentOperator { get; set; }
-        public ExpressionNode? AssignmentLeftExpression { get; set; }
-        public ExpressionNode? AssignmentRightExpression { get; set; }
-        public bool IsLoweredPostfixMutation { get; set; }
+        public struct AssignmentStatementNodes
+        {
+            public string? Left { get; set; }
+            public string? Right { get; set; }
+            public string? Operator { get; set; }
+            public string? AssignmentLeft { get; set; }
+            public string? AssignmentRight { get; set; }
+            public string? AssignmentOperator { get; set; }
+            public ExpressionNode? AssignmentLeftExpression { get; set; }
+            public ExpressionNode? AssignmentRightExpression { get; set; }
+            public bool IsLoweredPostfixMutation { get; set; }
+        }
+        public AssignmentStatementNodes AssignmentStatementNode;
 
         // For Section nodes
         public string? SectionParameters { get; set; }
@@ -295,9 +302,15 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.AssignmentStatement,
-                AssignmentLeft = left,
-                AssignmentRight = right,
-                AssignmentOperator = assignmentOperator
+                AssignmentStatementNode = new AssignmentStatementNodes
+                {
+                    AssignmentLeft = left,
+                    AssignmentRight = right,
+                    AssignmentOperator = assignmentOperator,
+                    Left = left,
+                    Right = right,
+                    Operator = assignmentOperator
+                }
             };
         }
 

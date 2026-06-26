@@ -1,4 +1,4 @@
-﻿// LLVM Compiler for the Puma programming language
+// LLVM Compiler for the Puma programming language
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //   
@@ -39,10 +39,10 @@ namespace Puma
             var allNodes = EnumerateAllNodes(ast).ToList();
 
             var needsStdBool = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentOperator == "="
-                && (string.Equals(n.AssignmentRight, "true", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(n.AssignmentRight, "false", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(n.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)));
+                && n.AssignmentStatementNode.AssignmentOperator == "="
+                && (string.Equals(n.AssignmentStatementNode.AssignmentRight, "true", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(n.AssignmentStatementNode.AssignmentRight, "false", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(n.AssignmentStatementNode.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)));
             if (!needsStdBool)
             {
                 needsStdBool = allNodes.Any(n => n.Kind == NodeKind.RepeatStatement
@@ -55,10 +55,10 @@ namespace Puma
             }
 
             var needsString = ast.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentOperator == "="
-                && (!string.IsNullOrWhiteSpace(n.AssignmentRight)
-                    && (string.Equals(n.AssignmentRight, "str", StringComparison.OrdinalIgnoreCase)
-                        || n.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))));
+                && n.AssignmentStatementNode.AssignmentOperator == "="
+                && (!string.IsNullOrWhiteSpace(n.AssignmentStatementNode.AssignmentRight)
+                    && (string.Equals(n.AssignmentStatementNode.AssignmentRight, "str", StringComparison.OrdinalIgnoreCase)
+                        || n.AssignmentStatementNode.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))));
             if (needsString)
             {
                 includes.Add("<String.hpp>");
@@ -67,17 +67,17 @@ namespace Puma
             var needsStringH = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration)
                 .Any(fn => EnumerateAllNodes(fn.FunctionBody)
                     .Any(n => n.Kind == NodeKind.AssignmentStatement
-                        && n.AssignmentOperator == "="
-                        && !string.IsNullOrWhiteSpace(n.AssignmentRight)
-                        && n.AssignmentRight.StartsWith("\"", StringComparison.Ordinal)));
+                        && n.AssignmentStatementNode.AssignmentOperator == "="
+                        && !string.IsNullOrWhiteSpace(n.AssignmentStatementNode.AssignmentRight)
+                        && n.AssignmentStatementNode.AssignmentRight.StartsWith("\"", StringComparison.Ordinal)));
             if (needsStringH)
             {
                 includes.Add("<String.hpp>");
             }
 
             var needsCharacter = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentOperator == "="
-                && IsCharacterLiteralText(n.AssignmentRight))
+                && n.AssignmentStatementNode.AssignmentOperator == "="
+                && IsCharacterLiteralText(n.AssignmentStatementNode.AssignmentRight))
                 || ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
                     && (IsCharacterLiteralText(n.PropertyValue)
                         || string.Equals(n.PropertyType, "char", StringComparison.OrdinalIgnoreCase)))
@@ -164,8 +164,8 @@ namespace Puma
             var numericPropertyReassignmentMode = UsesTypedPropertyReassignmentMode(ast);
 
             var needsCStdIntForAssignments = hasStartSection && allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentOperator == "="
-                && TryGetTypedLiteralDeclaration(n.AssignmentRight ?? string.Empty, out var typeName, out _)
+                && n.AssignmentStatementNode.AssignmentOperator == "="
+                && TryGetTypedLiteralDeclaration(n.AssignmentStatementNode.AssignmentRight ?? string.Empty, out var typeName, out _)
                 && typeName is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t");
             var shouldIncludeCStdIntForAssignments = needsCStdIntForAssignments
                 && (numericPropertyReassignmentMode
@@ -1044,16 +1044,16 @@ namespace Puma
             foreach (var statement in statements)
             {
                 if (statement.Kind == NodeKind.AssignmentStatement
-                    && statement.AssignmentOperator == "="
-                    && !string.IsNullOrWhiteSpace(statement.AssignmentLeft)
-                    && IsSimpleIdentifier(statement.AssignmentLeft)
-                    && !declared.Contains(statement.AssignmentLeft)
-                    && !string.IsNullOrWhiteSpace(statement.AssignmentRight)
-                    && statement.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))
+                    && statement.AssignmentStatementNode.AssignmentOperator == "="
+                    && !string.IsNullOrWhiteSpace(statement.AssignmentStatementNode.AssignmentLeft)
+                    && IsSimpleIdentifier(statement.AssignmentStatementNode.AssignmentLeft)
+                    && !declared.Contains(statement.AssignmentStatementNode.AssignmentLeft)
+                    && !string.IsNullOrWhiteSpace(statement.AssignmentStatementNode.AssignmentRight)
+                    && statement.AssignmentStatementNode.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))
                 {
-                    var value = ToPumaStringLiteral(statement.AssignmentRight);
-                    sb.AppendLine($"{indent}auto {statement.AssignmentLeft} = {value};");
-                    declared.Add(statement.AssignmentLeft);
+                    var value = ToPumaStringLiteral(statement.AssignmentStatementNode.AssignmentRight);
+                    sb.AppendLine($"{indent}auto {statement.AssignmentStatementNode.AssignmentLeft} = {value};");
+                    declared.Add(statement.AssignmentStatementNode.AssignmentLeft);
                     continue;
                 }
 
@@ -1208,43 +1208,43 @@ namespace Puma
                 {
                     case NodeKind.AssignmentStatement:
                         {
-                            var leftExpression = GenerateExpression(node.AssignmentLeftExpression, node.AssignmentLeft);
-                            var rightExpression = GenerateExpression(node.AssignmentRightExpression, node.AssignmentRight);
-                            if (node.AssignmentRightExpression == null
-                                && !string.IsNullOrWhiteSpace(node.AssignmentRight)
-                                && node.AssignmentRight.Contains('(')
-                                && node.AssignmentRight.Contains(')'))
+                            var leftExpression = GenerateExpression(node.AssignmentStatementNode.AssignmentLeftExpression, node.AssignmentStatementNode.AssignmentLeft);
+                            var rightExpression = GenerateExpression(node.AssignmentStatementNode.AssignmentRightExpression, node.AssignmentStatementNode.AssignmentRight);
+                            if (node.AssignmentStatementNode.AssignmentRightExpression == null
+                                && !string.IsNullOrWhiteSpace(node.AssignmentStatementNode.AssignmentRight)
+                                && node.AssignmentStatementNode.AssignmentRight.Contains('(')
+                                && node.AssignmentStatementNode.AssignmentRight.Contains(')'))
                             {
-                                rightExpression = node.AssignmentRight;
+                                rightExpression = node.AssignmentStatementNode.AssignmentRight;
                             }
 
-                            if (node.IsLoweredPostfixMutation && (node.AssignmentOperator == "+=" || node.AssignmentOperator == "-="))
+                            if (node.AssignmentStatementNode.IsLoweredPostfixMutation && (node.AssignmentStatementNode.AssignmentOperator == "+=" || node.AssignmentStatementNode.AssignmentOperator == "-="))
                             {
-                                var op = node.AssignmentOperator == "+=" ? "++" : "--";
+                                var op = node.AssignmentStatementNode.AssignmentOperator == "+=" ? "++" : "--";
                                 sb.AppendLine($"{indent}{leftExpression}{op};");
                                 break;
                             }
 
-                            if (node.AssignmentOperator == "="
-                                && node.AssignmentLeftExpression?.Kind == ExpressionKind.Binary && node.AssignmentLeftExpression.Value == ","
-                                && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary && node.AssignmentRightExpression.Value == ",")
+                            if (node.AssignmentStatementNode.AssignmentOperator == "="
+                                && node.AssignmentStatementNode.AssignmentLeftExpression?.Kind == ExpressionKind.Binary && node.AssignmentStatementNode.AssignmentLeftExpression.Value == ","
+                                && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Binary && node.AssignmentStatementNode.AssignmentRightExpression.Value == ",")
                             {
-                                var left0 = GenerateExpression(node.AssignmentLeftExpression.Left, null);
-                                var left1 = GenerateExpression(node.AssignmentLeftExpression.Right, null);
-                                var right0 = GenerateExpression(node.AssignmentRightExpression.Left, null);
-                                var right1 = GenerateExpression(node.AssignmentRightExpression.Right, null);
+                                var left0 = GenerateExpression(node.AssignmentStatementNode.AssignmentLeftExpression.Left, null);
+                                var left1 = GenerateExpression(node.AssignmentStatementNode.AssignmentLeftExpression.Right, null);
+                                var right0 = GenerateExpression(node.AssignmentStatementNode.AssignmentRightExpression.Left, null);
+                                var right1 = GenerateExpression(node.AssignmentStatementNode.AssignmentRightExpression.Right, null);
                                 sb.AppendLine($"{indent}{left0} = {right0};");
                                 sb.AppendLine($"{indent}{left1} = {right1});");
                                 break;
                             }
 
-                            if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Binary)
+                            if (node.AssignmentStatementNode.AssignmentOperator == "=" && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Binary)
                             {
                                 rightExpression = UnwrapOutermostParentheses(rightExpression);
                             }
 
-                            if (node.AssignmentOperator == "="
-                                && node.AssignmentRightExpression?.Kind == ExpressionKind.Literal
+                            if (node.AssignmentStatementNode.AssignmentOperator == "="
+                                && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Literal
                                 && !string.IsNullOrWhiteSpace(rightExpression)
                                 && rightExpression.StartsWith("\"", StringComparison.Ordinal)
                                 && !rightExpression.EndsWith("s", StringComparison.Ordinal))
@@ -1252,22 +1252,22 @@ namespace Puma
                                 rightExpression = ToPumaStringLiteral(rightExpression);
                             }
 
-                            if (node.AssignmentOperator == "="
-                                && node.AssignmentRightExpression?.Kind == ExpressionKind.Literal
+                            if (node.AssignmentStatementNode.AssignmentOperator == "="
+                                && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Literal
                                 && IsCharacterLiteralText(rightExpression))
                             {
                                 rightExpression = $"Character({rightExpression})";
                             }
 
                             var emittedTypedPropertyLiteral = false;
-                            if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Literal)
+                            if (node.AssignmentStatementNode.AssignmentOperator == "=" && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Literal)
                             {
                                 var propertyNode = ast?.FirstOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
-                                    && string.Equals(n.PropertyName, node.AssignmentLeft, StringComparison.Ordinal));
+                                    && string.Equals(n.PropertyName, node.AssignmentStatementNode.AssignmentLeft, StringComparison.Ordinal));
                                 if (propertyNode != null
                                     && ast != null
                                     && UsesTypedPropertyReassignmentMode(ast)
-                                    && TryGetTypedLiteralDeclaration(node.AssignmentRight ?? string.Empty, out var typedLiteralName, out var typedLiteralValue))
+                                    && TryGetTypedLiteralDeclaration(node.AssignmentStatementNode.AssignmentRight ?? string.Empty, out var typedLiteralName, out var typedLiteralValue))
                                 {
                                     rightExpression = typedLiteralName switch
                                     {
@@ -1284,11 +1284,11 @@ namespace Puma
                                 onTypedPropertyLiteralAssignment?.Invoke();
                             }
 
-                            if (node.AssignmentOperator == "=" && node.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
+                            if (node.AssignmentStatementNode.AssignmentOperator == "=" && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
                             {
                                 var allConditionalAssignments = statements.Count > 1
                                     && statements.All(s => s.Kind == NodeKind.AssignmentStatement
-                                        && s.AssignmentRightExpression?.Kind == ExpressionKind.Conditional);
+                                        && s.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Conditional);
 
                                 if (allConditionalAssignments && i == 0)
                                 {
@@ -1301,7 +1301,7 @@ namespace Puma
                                 }
                             }
 
-                            sb.AppendLine($"{indent}{leftExpression} {node.AssignmentOperator} {rightExpression};");
+                            sb.AppendLine($"{indent}{leftExpression} {node.AssignmentStatementNode.AssignmentOperator} {rightExpression};");
                             break;
                         }
                     case NodeKind.FunctionCall:
@@ -1545,15 +1545,15 @@ namespace Puma
             HashSet<string> functionsReturningConstructedObject,
             HashSet<string> ownedLocalsToDelete)
         {
-            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentOperator != "=")
+            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentStatementNode.AssignmentOperator != "=")
             {
                 return;
             }
 
-            var leftName = statement.AssignmentLeft?.Trim() ?? string.Empty;
+            var leftName = statement.AssignmentStatementNode.AssignmentLeft?.Trim() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(leftName)
                 && heapAllocatedGlobalProperties.Contains(leftName)
-                && IsNoneExpression(statement.AssignmentRightExpression, statement.AssignmentRight))
+                && IsNoneExpression(statement.AssignmentStatementNode.AssignmentRightExpression, statement.AssignmentStatementNode.AssignmentRight))
             {
                 propertiesAssignedToNone.Add(leftName);
                 return;
@@ -1566,9 +1566,9 @@ namespace Puma
                 return;
             }
 
-            if (statement.AssignmentRightExpression?.Kind == ExpressionKind.Identifier)
+            if (statement.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Identifier)
             {
-                var source = statement.AssignmentRightExpression.Value ?? string.Empty;
+                var source = statement.AssignmentStatementNode.AssignmentRightExpression.Value ?? string.Empty;
                 if (heapAllocatedGlobalProperties.Contains(source))
                 {
                     transferredOwnershipLocals[source] = leftName;
@@ -1578,15 +1578,15 @@ namespace Puma
                 return;
             }
 
-            if (statement.AssignmentRightExpression?.Kind != ExpressionKind.Call)
+            if (statement.AssignmentStatementNode.AssignmentRightExpression?.Kind != ExpressionKind.Call)
             {
                 return;
             }
 
-            if (statement.AssignmentRightExpression.Left?.Kind == ExpressionKind.Identifier)
+            if (statement.AssignmentStatementNode.AssignmentRightExpression.Left?.Kind == ExpressionKind.Identifier)
             {
-                var functionName = statement.AssignmentRightExpression.Left.Value ?? string.Empty;
-                var callText = GenerateExpression(statement.AssignmentRightExpression, statement.AssignmentRight) ?? string.Empty;
+                var functionName = statement.AssignmentStatementNode.AssignmentRightExpression.Left.Value ?? string.Empty;
+                var callText = GenerateExpression(statement.AssignmentStatementNode.AssignmentRightExpression, statement.AssignmentStatementNode.AssignmentRight) ?? string.Empty;
                 if (LooksLikeObjectConstructorCall(callText))
                 {
                     ownedLocalsToDelete.Add(leftName);
@@ -1601,7 +1601,7 @@ namespace Puma
                 return;
             }
 
-            var callTarget = statement.AssignmentRightExpression.Left;
+            var callTarget = statement.AssignmentStatementNode.AssignmentRightExpression.Left;
             if (callTarget?.Kind != ExpressionKind.MemberAccess || callTarget.Left?.Kind != ExpressionKind.Identifier)
             {
                 return;
@@ -1653,9 +1653,9 @@ namespace Puma
             var startStatements = CollectStatements(ast, startIndex + 1);
             return startStatements.Count > 0
                 && startStatements.All(s => s.Kind == NodeKind.AssignmentStatement
-                    && s.AssignmentOperator == "="
-                    && !string.IsNullOrWhiteSpace(s.AssignmentLeft)
-                    && propertyNames.Contains(s.AssignmentLeft));
+                    && s.AssignmentStatementNode.AssignmentOperator == "="
+                    && !string.IsNullOrWhiteSpace(s.AssignmentStatementNode.AssignmentLeft)
+                    && propertyNames.Contains(s.AssignmentStatementNode.AssignmentLeft));
         }
 
         private static bool TryGetExpressionTypeAndInitializer(Node statement, out string typeName, out string initializer)
@@ -1663,26 +1663,26 @@ namespace Puma
             typeName = "int64_t";
             initializer = string.Empty;
 
-            if (statement.AssignmentRightExpression == null)
+            if (statement.AssignmentStatementNode.AssignmentRightExpression == null)
             {
                 return false;
             }
 
-            var expressionText = GenerateExpression(statement.AssignmentRightExpression, statement.AssignmentRight);
+            var expressionText = GenerateExpression(statement.AssignmentStatementNode.AssignmentRightExpression, statement.AssignmentStatementNode.AssignmentRight);
             if (string.IsNullOrWhiteSpace(expressionText))
             {
                 return false;
             }
 
-            if (ContainsBooleanKeyword(statement.AssignmentRightExpression))
+            if (ContainsBooleanKeyword(statement.AssignmentStatementNode.AssignmentRightExpression))
             {
                 typeName = "bool";
             }
-            else if (ContainsStringLiteral(statement.AssignmentRightExpression))
+            else if (ContainsStringLiteral(statement.AssignmentStatementNode.AssignmentRightExpression))
             {
                 typeName = "Puma::Type::String";
             }
-            else if (ContainsDecimalLiteral(statement.AssignmentRightExpression))
+            else if (ContainsDecimalLiteral(statement.AssignmentStatementNode.AssignmentRightExpression))
             {
                 typeName = "double";
             }
@@ -1867,12 +1867,12 @@ namespace Puma
             usedExpressionFallback = false;
             usedPropertyTypedAssignment = false;
 
-            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentOperator != "=")
+            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentStatementNode.AssignmentOperator != "=")
             {
                 return false;
             }
 
-            var leftName = statement.AssignmentLeft;
+            var leftName = statement.AssignmentStatementNode.AssignmentLeft;
             if (string.IsNullOrWhiteSpace(leftName) || !IsSimpleIdentifier(leftName))
             {
                 return false;
@@ -1884,7 +1884,7 @@ namespace Puma
             }
 
             var expressionFallback = false;
-            if (!TryGetTypedLiteralDeclaration(statement.AssignmentRight ?? string.Empty, out var typeName, out var value))
+            if (!TryGetTypedLiteralDeclaration(statement.AssignmentStatementNode.AssignmentRight ?? string.Empty, out var typeName, out var value))
             {
                 if (!TryGetExpressionTypeAndInitializer(statement, out typeName, out value))
                 {
@@ -1897,7 +1897,7 @@ namespace Puma
             if (expressionFallback)
             {
                 usedExpressionFallback = true;
-                var normalized = statement.AssignmentRightExpression?.Kind == ExpressionKind.Conditional
+                var normalized = statement.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Conditional
                     ? value
                     : UnwrapOutermostParentheses(value);
                 sb.AppendLine($"{indent}auto {leftName} = {normalized};");
@@ -2160,3 +2160,4 @@ namespace Puma
         }
     }
 }
+

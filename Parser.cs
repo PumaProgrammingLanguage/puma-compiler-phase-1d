@@ -1,4 +1,4 @@
-﻿// LLVM Compiler for the Puma programming language
+// LLVM Compiler for the Puma programming language
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //
@@ -2428,8 +2428,18 @@ namespace Puma
             }
 
             var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
-            node.AssignmentLeftExpression = leftExpression;
-            node.AssignmentRightExpression = rightExpression;
+            node.AssignmentStatementNode = new Node.AssignmentStatementNodes
+            {
+                Left = node.AssignmentStatementNode.Left,
+                Right = node.AssignmentStatementNode.Right,
+                Operator = node.AssignmentStatementNode.Operator,
+                AssignmentLeft = node.AssignmentStatementNode.AssignmentLeft,
+                AssignmentRight = node.AssignmentStatementNode.AssignmentRight,
+                AssignmentOperator = node.AssignmentStatementNode.AssignmentOperator,
+                AssignmentLeftExpression = leftExpression,
+                AssignmentRightExpression = rightExpression,
+                IsLoweredPostfixMutation = node.AssignmentStatementNode.IsLoweredPostfixMutation
+            };
             target.Add(node);
 
             if (assignmentOperator == "="
@@ -2656,9 +2666,18 @@ namespace Puma
 
             var assignmentOperator = last.TokenText == "++" ? "+=" : "-=";
             var node = Node.CreateAssignmentStatement(left, "1", assignmentOperator);
-            node.AssignmentLeftExpression = ParseExpression(leftTokens);
-            node.AssignmentRightExpression = new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" };
-            node.IsLoweredPostfixMutation = true;
+            node.AssignmentStatementNode = new Node.AssignmentStatementNodes
+            {
+                Left = node.AssignmentStatementNode.Left,
+                Right = node.AssignmentStatementNode.Right,
+                Operator = node.AssignmentStatementNode.Operator,
+                AssignmentLeft = node.AssignmentStatementNode.AssignmentLeft,
+                AssignmentRight = node.AssignmentStatementNode.AssignmentRight,
+                AssignmentOperator = node.AssignmentStatementNode.AssignmentOperator,
+                AssignmentLeftExpression = ParseExpression(leftTokens),
+                AssignmentRightExpression = new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" },
+                IsLoweredPostfixMutation = true
+            };
             target.Add(node);
             return true;
         }
@@ -3263,3 +3282,4 @@ namespace Puma
         }
     }
 }
+
