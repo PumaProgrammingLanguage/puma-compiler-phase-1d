@@ -1306,7 +1306,7 @@ namespace Puma
                         }
                     case NodeKind.FunctionCall:
                         {
-                            var callExpressionNode = node.FunctionCallExpression ?? node.StatementExpression;
+                            var callExpressionNode = node.FunctionCallNode.Expression ?? node.StatementExpression;
                             var callExpression = GenerateExpression(callExpressionNode, null);
                             if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
                             {
@@ -1322,7 +1322,7 @@ namespace Puma
                             }
                             else
                             {
-                                sb.AppendLine($"{indent}{node.FunctionName}({node.FunctionArguments});");
+                                sb.AppendLine($"{indent}{node.FunctionCallNode.Name}({node.FunctionCallNode.Arguments});");
                             }
                             break;
                         }
@@ -1346,7 +1346,7 @@ namespace Puma
                         }
                         break;
                     case NodeKind.MatchStatement:
-                        sb.AppendLine($"{indent}switch ({GenerateExpression(node.MatchExpressionNode, node.MatchExpression)})");
+                        sb.AppendLine($"{indent}switch ({GenerateExpression(node.MatchStatementNode.ExpressionNode, node.MatchStatementNode.Expression)})");
                         sb.AppendLine($"{indent}{{");
                         foreach (var when in node.StatementBody.Where(n => n.Kind == NodeKind.WhenStatement))
                         {

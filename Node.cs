@@ -145,9 +145,13 @@ namespace Puma
         public int LeadingBlankLines { get; set; }
 
         // For FunctionCall nodes
-        public string? FunctionName { get; set; }
-        public string? FunctionArguments { get; set; }
-        public ExpressionNode? FunctionCallExpression { get; set; }
+        public struct FunctionCallNodes
+        {
+            public string? Name { get; set; }
+            public string? Arguments { get; set; }
+            public ExpressionNode? Expression { get; set; }
+        }
+        public FunctionCallNodes FunctionCallNode;
 
         // For IfStatement nodes
         public string? IfCondition { get; set; }
@@ -155,8 +159,12 @@ namespace Puma
         public ExpressionNode? ConditionExpression { get; set; }
 
         // For MatchStatement nodes
-        public string? MatchExpression { get; set; }
-        public ExpressionNode? MatchExpressionNode { get; set; }
+        public struct MatchStatementNodes
+        {
+            public string? Expression { get; set; }
+            public ExpressionNode? ExpressionNode { get; set; }
+        }
+        public MatchStatementNodes MatchStatementNode;
 
         // For WhenStatement nodes
         public string? WhenCondition { get; set; }
@@ -319,9 +327,12 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.FunctionCall,
-                FunctionName = name,
-                FunctionArguments = arguments,
-                FunctionCallExpression = expression
+                FunctionCallNode = new FunctionCallNodes
+                {
+                    Name = name,
+                    Arguments = arguments,
+                    Expression = expression
+                }
             };
         }
 
@@ -339,7 +350,10 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.MatchStatement,
-                MatchExpression = expression
+                MatchStatementNode = new MatchStatementNodes
+                {
+                    Expression = expression
+                }
             };
         }
 
