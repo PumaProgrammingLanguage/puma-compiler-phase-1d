@@ -3009,7 +3009,11 @@ namespace Puma
             }
 
             var node = Node.CreateMatchStatement(expression);
-            node.MatchExpressionNode = ParseExpression(expressionTokens);
+            node.MatchStatementNode = new Node.MatchStatementNodes
+            {
+                Expression = node.MatchStatementNode.Expression,
+                ExpressionNode = ParseExpression(expressionTokens)
+            };
             target.Add(node);
             return true;
         }
