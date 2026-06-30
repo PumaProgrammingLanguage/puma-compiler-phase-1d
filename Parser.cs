@@ -2806,7 +2806,11 @@ namespace Puma
             var expression = BuildQualifiedName(expressionTokens);
 
             var node = Node.CreateRepeatStatement(expression);
-            node.RepeatExpressionNode = ParseExpression(expressionTokens);
+            node.RepeatStatementNode = new Node.RepeatStatementNodes
+            {
+                RepeatExpression = node.RepeatStatementNode.RepeatExpression,
+                RepeatExpressionNode = ParseExpression(expressionTokens)
+            };
             target.Add(node);
             return true;
         }
@@ -2843,7 +2847,11 @@ namespace Puma
             }
 
             var node = Node.CreateHasStatement(condition);
-            node.HasExpression = ParseExpression(conditionTokens);
+            node.HasStatementNode = new Node.HasStatementNodes
+            {
+                HasCondition = node.HasStatementNode.HasCondition,
+                HasExpression = ParseExpression(conditionTokens)
+            };
             target.Add(node);
             return true;
         }
@@ -2887,7 +2895,13 @@ namespace Puma
             }
 
             var node = Node.CreateHasTraitStatement(condition, traitType, traitVariable);
-            node.HasTraitExpression = ParseExpression(variableTokens);
+            node.HasTraitStatementNode = new Node.HasTraitStatementNodes
+            {
+                HasTraitCondition = node.HasTraitStatementNode.HasTraitCondition,
+                HasTraitTypeName = node.HasTraitStatementNode.HasTraitTypeName,
+                HasTraitVariableName = node.HasTraitStatementNode.HasTraitVariableName,
+                HasTraitExpression = ParseExpression(variableTokens)
+            };
             target.Add(node);
             return true;
         }
@@ -3038,7 +3052,11 @@ namespace Puma
             }
 
             var node = Node.CreateWhenStatement(condition);
-            node.WhenExpression = ParseExpression(conditionTokens);
+            node.WhenStatementNode = new Node.WhenStatementNodes
+            {
+                WhenCondition = node.WhenStatementNode.WhenCondition,
+                WhenExpression = ParseExpression(conditionTokens)
+            };
             target.Add(node);
             return true;
         }
@@ -3063,7 +3081,11 @@ namespace Puma
             }
 
             var node = Node.CreateWhileStatement(condition);
-            node.WhileExpression = ParseExpression(conditionTokens);
+            node.WhileStatementNode = new Node.WhileStatementNodes
+            {
+                WhileCondition = node.WhileStatementNode.WhileCondition,
+                WhileExpression = ParseExpression(conditionTokens)
+            };
             target.Add(node);
             return true;
         }
@@ -3096,13 +3118,23 @@ namespace Puma
             if (tokens[0].TokenText == "for")
             {
                 var node = Node.CreateForStatement(variable, container);
-                node.ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList());
+                node.ForStatementNode = new Node.ForStatementNodes
+                {
+                    ForVariable = node.ForStatementNode.ForVariable,
+                    ForContainer = node.ForStatementNode.ForContainer,
+                    ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList())
+                };
                 target.Add(node);
             }
             else
             {
                 var node = Node.CreateForAllStatement(variable, container);
-                node.ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList());
+                node.ForStatementNode = new Node.ForStatementNodes
+                {
+                    ForVariable = node.ForStatementNode.ForVariable,
+                    ForContainer = node.ForStatementNode.ForContainer,
+                    ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList())
+                };
                 target.Add(node);
             }
 

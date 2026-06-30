@@ -46,8 +46,8 @@ namespace Puma
             if (!needsStdBool)
             {
                 needsStdBool = allNodes.Any(n => n.Kind == NodeKind.RepeatStatement
-                    && (string.IsNullOrWhiteSpace(n.RepeatExpression)
-                        || string.Equals(n.RepeatExpression, "1", StringComparison.Ordinal)));
+                    && (string.IsNullOrWhiteSpace(n.RepeatStatementNode.RepeatExpression)
+                        || string.Equals(n.RepeatStatementNode.RepeatExpression, "1", StringComparison.Ordinal)));
             }
             if (needsStdBool)
             {
@@ -1350,31 +1350,31 @@ namespace Puma
                         sb.AppendLine($"{indent}{{");
                         foreach (var when in node.StatementBody.Where(n => n.Kind == NodeKind.WhenStatement))
                         {
-                            sb.AppendLine($"{indent}    case {GenerateExpression(when.WhenExpression, when.WhenCondition)}:");
+                            sb.AppendLine($"{indent}    case {GenerateExpression(when.WhenStatementNode.WhenExpression, when.WhenStatementNode.WhenCondition)}:");
                             EmitStatements(when.StatementBody, sb, indent + "        ");
                             sb.AppendLine($"{indent}        break;");
                         }
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.WhenStatement:
-                        sb.AppendLine($"{indent}/* when {GenerateExpression(node.WhenExpression, node.WhenCondition)} */");
+                        sb.AppendLine($"{indent}/* when {GenerateExpression(node.WhenStatementNode.WhenExpression, node.WhenStatementNode.WhenCondition)} */");
                         break;
                     case NodeKind.WhileStatement:
-                        sb.AppendLine($"{indent}while ({UnwrapOutermostParentheses(GenerateExpression(node.WhileExpression, node.WhileCondition))})");
+                        sb.AppendLine($"{indent}while ({UnwrapOutermostParentheses(GenerateExpression(node.WhileStatementNode.WhileExpression, node.WhileStatementNode.WhileCondition))})");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.ForStatement:
                     case NodeKind.ForAllStatement:
-                        sb.AppendLine($"{indent}for (auto {node.ForVariable} : {GenerateExpression(node.ForContainerExpression, node.ForContainer)})");
+                        sb.AppendLine($"{indent}for (auto {node.ForStatementNode.ForVariable} : {GenerateExpression(node.ForStatementNode.ForContainerExpression, node.ForStatementNode.ForContainer)})");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.RepeatStatement:
                         {
-                            var repeatCondition = GenerateExpression(node.RepeatExpressionNode, node.RepeatExpression);
+                            var repeatCondition = GenerateExpression(node.RepeatStatementNode.RepeatExpressionNode, node.RepeatStatementNode.RepeatExpression);
                             if (string.IsNullOrWhiteSpace(repeatCondition) || repeatCondition == "1")
                             {
                                 repeatCondition = "true";
@@ -1386,15 +1386,15 @@ namespace Puma
                             break;
                         }
                     case NodeKind.HasStatement:
-                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasExpression, node.HasCondition)} != null)");
+                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasStatementNode.HasExpression, node.HasStatementNode.HasCondition)} != null)");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.HasTraitStatement:
                         {
-                            var variable = node.HasTraitVariableName ?? GenerateExpression(node.HasTraitExpression, node.HasTraitCondition);
-                            var traitType = node.HasTraitTypeName ?? "Trait";
+                            var variable = node.HasTraitStatementNode.HasTraitVariableName ?? GenerateExpression(node.HasTraitStatementNode.HasTraitExpression, node.HasTraitStatementNode.HasTraitCondition);
+                            var traitType = node.HasTraitStatementNode.HasTraitTypeName ?? "Trait";
                             sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == typeof({traitType}))");
                             sb.AppendLine($"{indent}{{");
                             EmitStatements(node.StatementBody, sb, indent + "    ");

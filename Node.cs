@@ -167,31 +167,55 @@ namespace Puma
         public MatchStatementNodes MatchStatementNode;
 
         // For WhenStatement nodes
-        public string? WhenCondition { get; set; }
-        public ExpressionNode? WhenExpression { get; set; }
+        public struct WhenStatementNodes
+        {
+            public string? WhenCondition { get; set; }
+            public ExpressionNode? WhenExpression { get; set; }
+        }
+        public WhenStatementNodes WhenStatementNode;
 
         // For WhileStatement nodes
-        public string? WhileCondition { get; set; }
-        public ExpressionNode? WhileExpression { get; set; }
+        public struct WhileStatementNodes
+        {
+            public string? WhileCondition { get; set; }
+            public ExpressionNode? WhileExpression { get; set; }
+        }
+        public WhileStatementNodes WhileStatementNode;
 
         // For ForStatement nodes
-        public string? ForVariable { get; set; }
-        public string? ForContainer { get; set; }
-        public ExpressionNode? ForContainerExpression { get; set; }
+        public struct ForStatementNodes
+        {
+            public string? ForVariable { get; set; }
+            public string? ForContainer { get; set; }
+            public ExpressionNode? ForContainerExpression { get; set; }
+        }
+        public ForStatementNodes ForStatementNode;
 
         // For RepeatStatement nodes
-        public string? RepeatExpression { get; set; }
-        public ExpressionNode? RepeatExpressionNode { get; set; }
+        public struct RepeatStatementNodes
+        {
+            public string? RepeatExpression { get; set; }
+            public ExpressionNode? RepeatExpressionNode { get; set; }
+        }
+        public RepeatStatementNodes RepeatStatementNode;
 
         // For HasStatement nodes
-        public string? HasCondition { get; set; }
-        public ExpressionNode? HasExpression { get; set; }
+        public struct HasStatementNodes
+        {
+            public string? HasCondition { get; set; }
+            public ExpressionNode? HasExpression { get; set; }
+        }
+        public HasStatementNodes HasStatementNode;
 
         // For HasTraitStatement nodes
-        public string? HasTraitCondition { get; set; }
-        public ExpressionNode? HasTraitExpression { get; set; }
-        public string? HasTraitTypeName { get; set; }
-        public string? HasTraitVariableName { get; set; }
+        public struct HasTraitStatementNodes
+        {
+            public string? HasTraitCondition { get; set; }
+            public ExpressionNode? HasTraitExpression { get; set; }
+            public string? HasTraitTypeName { get; set; }
+            public string? HasTraitVariableName { get; set; }
+        }
+        public HasTraitStatementNodes HasTraitStatementNode;
 
         // For FunctionDeclaration nodes
         public string? FunctionDeclarationName { get; set; }
@@ -362,7 +386,10 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.WhenStatement,
-                WhenCondition = condition
+                WhenStatementNode = new WhenStatementNodes
+                {
+                    WhenCondition = condition
+                }
             };
         }
 
@@ -371,7 +398,10 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.WhileStatement,
-                WhileCondition = condition
+                WhileStatementNode = new WhileStatementNodes
+                {
+                    WhileCondition = condition
+                }
             };
         }
 
@@ -380,8 +410,11 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.ForStatement,
-                ForVariable = variable,
-                ForContainer = container
+                ForStatementNode = new ForStatementNodes
+                {
+                    ForVariable = variable,
+                    ForContainer = container
+                }
             };
         }
 
@@ -390,8 +423,11 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.ForAllStatement,
-                ForVariable = variable,
-                ForContainer = container
+                ForStatementNode = new ForStatementNodes
+                {
+                    ForVariable = variable,
+                    ForContainer = container
+                }
             };
         }
 
@@ -400,7 +436,10 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.RepeatStatement,
-                RepeatExpression = expression
+                RepeatStatementNode = new RepeatStatementNodes
+                {
+                    RepeatExpression = expression
+                }
             };
         }
 
@@ -409,7 +448,10 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.HasStatement,
-                HasCondition = condition
+                HasStatementNode = new HasStatementNodes
+                {
+                    HasCondition = condition
+                }
             };
         }
 
@@ -418,9 +460,12 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.HasTraitStatement,
-                HasTraitCondition = condition,
-                HasTraitTypeName = traitTypeName,
-                HasTraitVariableName = traitVariableName
+                HasTraitStatementNode = new HasTraitStatementNodes
+                {
+                    HasTraitCondition = condition,
+                    HasTraitTypeName = traitTypeName,
+                    HasTraitVariableName = traitVariableName
+                }
             };
         }
 
