@@ -101,12 +101,16 @@ namespace Puma
         public UseStatementNodes UseStatementNode;
 
         // For TypeDeclaration nodes
-        public string? DeclarationKind { get; set; }
-        public string? DeclarationName { get; set; }
-        public string? BaseTypeName { get; set; }
-        public List<string> TraitNames { get; } = new();
-        public List<Node> TypeProperties { get; } = new();
-        public List<Node> TypeFunctions { get; } = new();
+        public struct TypeDeclarationNodes
+        {
+            public string? DeclarationKind { get; set; }
+            public string? DeclarationName { get; set; }
+            public string? BaseTypeName { get; set; }
+            public List<string> TraitNames { get; } = new();
+            public List<Node> TypeProperties { get; } = new();
+            public List<Node> TypeFunctions { get; } = new();
+        }
+        public TypeDeclarationNodes TypeDeclarationNode;
 
         // For EnumDeclaration nodes
         public string? EnumName { get; set; }
