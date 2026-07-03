@@ -103,6 +103,10 @@ namespace Puma
         // For TypeDeclaration nodes
         public struct TypeDeclarationNodes
         {
+            public TypeDeclarationNodes()
+            {
+            }
+
             public string? DeclarationKind { get; set; }
             public string? DeclarationName { get; set; }
             public string? BaseTypeName { get; set; }
@@ -113,8 +117,16 @@ namespace Puma
         public TypeDeclarationNodes TypeDeclarationNode;
 
         // For EnumDeclaration nodes
-        public string? EnumName { get; set; }
-        public List<string> EnumMembers { get; } = new();
+        public struct EnumDeclarationNodes
+        {
+            public EnumDeclarationNodes()
+            {
+            }
+
+            public string? EnumName { get; set; }
+            public List<string> EnumMembers { get; } = new();
+        }
+        public EnumDeclarationNodes EnumDeclarationNode;
 
         // For RecordDeclaration nodes
         public string? RecordName { get; set; }
@@ -279,14 +291,20 @@ namespace Puma
             var node = new Node
             {
                 Kind = NodeKind.TypeDeclaration,
-                DeclarationKind = declarationKind,
-                DeclarationName = name,
-                BaseTypeName = baseType
+                TypeDeclarationNode = new TypeDeclarationNodes
+                {
+                    DeclarationKind = declarationKind,
+                    DeclarationName = name,
+                    BaseTypeName = baseType
+                }
             };
 
             if (traits != null)
             {
-                node.TraitNames.AddRange(traits);
+                foreach (var trait in traits)
+                {
+                    node.TypeDeclarationNode.TraitNames.Add(trait);
+                }
             }
 
             return node;
@@ -297,9 +315,15 @@ namespace Puma
             var node = new Node
             {
                 Kind = NodeKind.EnumDeclaration,
-                EnumName = name
+                EnumDeclarationNode = new EnumDeclarationNodes
+                {
+                    EnumName = name
+                }
             };
-            node.EnumMembers.AddRange(members);
+            foreach (var member in members)
+            {
+                node.EnumDeclarationNode.EnumMembers.Add(member);
+            }
             return node;
         }
 

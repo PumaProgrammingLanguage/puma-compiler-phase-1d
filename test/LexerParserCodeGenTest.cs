@@ -1104,8 +1104,8 @@ struct MyRecord
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumName == "MyEnum");
-            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.EnumMembers.ToArray());
+            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumDeclarationNode.EnumName == "MyEnum");
+            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.EnumDeclarationNode.EnumMembers.ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1150,8 +1150,8 @@ Enums MyEnum
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumName == "MyEnum");
-            CollectionAssert.AreEqual(new[] { "A=1", "B=3", "C=5" }, enumNode.EnumMembers.ToArray());
+            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumDeclarationNode.EnumName == "MyEnum");
+            CollectionAssert.AreEqual(new[] { "A=1", "B=3", "C=5" }, enumNode.EnumDeclarationNode.EnumMembers.ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1284,5 +1284,6 @@ int main()
         }
     }
 }
+
 
 

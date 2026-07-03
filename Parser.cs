@@ -591,17 +591,17 @@ namespace Puma
             if (_currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait)
             {
                 var typeNode = ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
-                    (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
+                    (n.TypeDeclarationNode.DeclarationKind == "type" || n.TypeDeclarationNode.DeclarationKind == "trait"));
                 if (typeNode != null)
                 {
-                    if (typeNode.TypeProperties.Count == 0)
+                    if (typeNode.TypeDeclarationNode.TypeProperties.Count == 0)
                     {
-                        typeNode.TypeProperties.AddRange(ast.Where(n => n.Kind == NodeKind.PropertyDeclaration));
+                        typeNode.TypeDeclarationNode.TypeProperties.AddRange(ast.Where(n => n.Kind == NodeKind.PropertyDeclaration));
                     }
 
-                    if (typeNode.TypeFunctions.Count == 0)
+                    if (typeNode.TypeDeclarationNode.TypeFunctions.Count == 0)
                     {
-                        typeNode.TypeFunctions.AddRange(ast.Where(n => n.Kind == NodeKind.FunctionDeclaration));
+                        typeNode.TypeDeclarationNode.TypeFunctions.AddRange(ast.Where(n => n.Kind == NodeKind.FunctionDeclaration));
                     }
                 }
             }
@@ -981,7 +981,7 @@ namespace Puma
             ParseTypeDeclaration(token.Value, "type");
             _typeHeaderParsed = true;
             _currentFileKind = FileDeclarationKind.Type;
-            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.DeclarationKind == "type");
+            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.TypeDeclarationNode.DeclarationKind == "type");
         }
 
         private void ParseTrait(LexerTokens? token)
@@ -1004,7 +1004,7 @@ namespace Puma
             ParseSimpleDeclaration(token.Value, "trait");
             _traitHeaderParsed = true;
             _currentFileKind = FileDeclarationKind.Trait;
-            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.DeclarationKind == "trait");
+            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.TypeDeclarationNode.DeclarationKind == "trait");
         }
 
         private void ParseModule(LexerTokens? token)
@@ -1230,7 +1230,7 @@ namespace Puma
                 if (propertyNode != null && _currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait)
                 {
                     var owner = _typeOrTraitNode ?? GetTypeOrTraitOwner();
-                    owner?.TypeProperties.Add(propertyNode);
+                    owner?.TypeDeclarationNode.TypeProperties.Add(propertyNode);
                     return;
                 }
             }
@@ -1337,7 +1337,7 @@ namespace Puma
             if (_currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait && _typeOrTraitNode == null)
             {
                 _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
-                    (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
+                    (n.TypeDeclarationNode.DeclarationKind == "type" || n.TypeDeclarationNode.DeclarationKind == "trait"));
             }
 
             if (UpdateIndentation(token.Value))
@@ -2230,7 +2230,7 @@ namespace Puma
         private Node? GetTypeOrTraitOwner()
         {
             return ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
-                (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
+                (n.TypeDeclarationNode.DeclarationKind == "type" || n.TypeDeclarationNode.DeclarationKind == "trait"));
         }
 
         private void ParseStatement(LexerTokens firstToken) => ParseStatement(firstToken, ast);
@@ -3318,4 +3318,5 @@ namespace Puma
         }
     }
 }
+
 

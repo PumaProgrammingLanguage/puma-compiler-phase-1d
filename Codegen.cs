@@ -208,8 +208,8 @@ namespace Puma
             }
 
             var typeDeclarations = ast.Where(n => n.Kind == NodeKind.TypeDeclaration).ToList();
-            var typeProperties = typeDeclarations.SelectMany(n => n.TypeProperties).ToHashSet();
-            var typeFunctions = typeDeclarations.SelectMany(n => n.TypeFunctions).ToHashSet();
+            var typeProperties = typeDeclarations.SelectMany(n => n.TypeDeclarationNode.TypeProperties).ToHashSet();
+            var typeFunctions = typeDeclarations.SelectMany(n => n.TypeDeclarationNode.TypeFunctions).ToHashSet();
 
             EmitEnums(ast, sb);
             EmitRecords(ast, sb);
@@ -227,8 +227,8 @@ namespace Puma
 
             var output = sb.ToString();
             var moduleNode = ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration
-                && string.Equals(n.DeclarationKind, "module", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(n.DeclarationName));
+                && string.Equals(n.TypeDeclarationNode.DeclarationKind, "module", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(n.TypeDeclarationNode.DeclarationName));
             if (moduleNode != null)
             {
                 var normalizedOutput = output.Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -249,7 +249,7 @@ namespace Puma
                 }
 
                 var moduleBody = string.Join("\n", lines.Skip(lineIndex)).TrimEnd();
-                var wrappedModule = $"namespace {moduleNode.DeclarationName}\n{{\n{IndentBlock(moduleBody)}\n}}\n";
+                var wrappedModule = $"namespace {moduleNode.TypeDeclarationNode.DeclarationName}\n{{\n{IndentBlock(moduleBody)}\n}}\n";
                 output = includeLines.Count > 0
                     ? string.Join("\n", includeLines) + "\n\n" + wrappedModule
                     : wrappedModule;
@@ -305,9 +305,9 @@ namespace Puma
             foreach (var node in ast.Where(n => n.Kind == NodeKind.EnumDeclaration))
             {
                 sb.AppendLine("// enums");
-                sb.AppendLine($"Enums {node.EnumName}");
+                sb.AppendLine($"Enums {node.EnumDeclarationNode.EnumName}");
                 sb.AppendLine("{");
-                foreach (var member in node.EnumMembers)
+                foreach (var member in node.EnumDeclarationNode.EnumMembers)
                 {
                     sb.AppendLine($"    {member},");
                 }
@@ -793,8 +793,8 @@ namespace Puma
         private static void EmitInitializeFinalize(List<Node> ast, StringBuilder sb)
         {
             var hasTypeOrTrait = ast.Any(n => n.Kind == NodeKind.TypeDeclaration
-                && (string.Equals(n.DeclarationKind, "type", StringComparison.Ordinal)
-                    || string.Equals(n.DeclarationKind, "trait", StringComparison.Ordinal)));
+                && (string.Equals(n.TypeDeclarationNode.DeclarationKind, "type", StringComparison.Ordinal)
+                    || string.Equals(n.TypeDeclarationNode.DeclarationKind, "trait", StringComparison.Ordinal)));
 
             if (!hasTypeOrTrait)
             {
@@ -951,20 +951,20 @@ namespace Puma
             var (initIndex, _) = FindSection(ast, Section.Initialize);
             var initializeStatements = initIndex >= 0 ? CollectStatements(ast, initIndex + 1) : new List<Node>();
 
-            foreach (var node in typeDeclarations.Where(n => n.DeclarationKind == "type"))
+            foreach (var node in typeDeclarations.Where(n => n.TypeDeclarationNode.DeclarationKind == "type"))
             {
-                var name = ToCppQualifiedName(node.DeclarationName) ?? "Type";
+                var name = ToCppQualifiedName(node.TypeDeclarationNode.DeclarationName) ?? "Type";
                 var bases = new List<string>();
-                if (!string.IsNullOrWhiteSpace(node.BaseTypeName))
+                if (!string.IsNullOrWhiteSpace(node.TypeDeclarationNode.BaseTypeName))
                 {
-                    var baseName = ToCppQualifiedName(node.BaseTypeName);
-                    if (!(string.Equals(baseName, "object", StringComparison.OrdinalIgnoreCase) && node.TraitNames.Count > 0))
+                    var baseName = ToCppQualifiedName(node.TypeDeclarationNode.BaseTypeName);
+                    if (!(string.Equals(baseName, "object", StringComparison.OrdinalIgnoreCase) && node.TypeDeclarationNode.TraitNames.Count > 0))
                     {
                         bases.Add($"public {baseName}");
                     }
                 }
 
-                foreach (var trait in node.TraitNames)
+                foreach (var trait in node.TypeDeclarationNode.TraitNames)
                 {
                     bases.Add($"public {ToCppQualifiedName(trait)}");
                 }
@@ -992,9 +992,9 @@ namespace Puma
             var (initIndex, _) = FindSection(ast, Section.Initialize);
             var initializeStatements = initIndex >= 0 ? CollectStatements(ast, initIndex + 1) : new List<Node>();
 
-            foreach (var node in typeDeclarations.Where(n => n.DeclarationKind == "trait"))
+            foreach (var node in typeDeclarations.Where(n => n.TypeDeclarationNode.DeclarationKind == "trait"))
             {
-                var name = ToCppQualifiedName(node.DeclarationName) ?? "Trait";
+                var name = ToCppQualifiedName(node.TypeDeclarationNode.DeclarationName) ?? "Trait";
                 sb.AppendLine($"class {name}");
                 sb.AppendLine("{");
                 if (initializeStatements.Count > 0)
@@ -1108,7 +1108,7 @@ namespace Puma
             var protectedProperties = new List<Node>();
             var publicProperties = new List<Node>();
 
-            foreach (var property in node.TypeProperties)
+            foreach (var property in node.TypeDeclarationNode.TypeProperties)
             {
                 if (property.PropertyModifiers.Contains("public"))
                 {
@@ -1124,7 +1124,7 @@ namespace Puma
             EmitPropertiesForAccess(protectedProperties, "protected", sb, indent);
             EmitPropertiesForAccess(publicProperties, "public", sb, indent);
 
-            if ((protectedProperties.Count > 0 || publicProperties.Count > 0) && node.TypeFunctions.Count > 0)
+            if ((protectedProperties.Count > 0 || publicProperties.Count > 0) && node.TypeDeclarationNode.TypeFunctions.Count > 0)
             {
                 sb.AppendLine();
             }
@@ -1152,7 +1152,7 @@ namespace Puma
             var protectedFunctions = new List<Node>();
             var publicFunctions = new List<Node>();
 
-            foreach (var function in node.TypeFunctions)
+            foreach (var function in node.TypeDeclarationNode.TypeFunctions)
             {
                 if (function.FunctionModifiers.Contains("private") || function.FunctionModifiers.Contains("internal"))
                 {
@@ -2152,7 +2152,9 @@ namespace Puma
                     yield return elseNode;
                 }
 
-                foreach (var typeFunction in EnumerateAllNodes(node.TypeFunctions))
+                foreach (var typeFunction in node.Kind == NodeKind.TypeDeclaration
+                    ? EnumerateAllNodes(node.TypeDeclarationNode.TypeFunctions)
+                    : Enumerable.Empty<Node>())
                 {
                     yield return typeFunction;
                 }
