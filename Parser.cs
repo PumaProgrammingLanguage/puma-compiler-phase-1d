@@ -356,13 +356,13 @@ namespace Puma
         private Node? GetFunctionDeclarationForCall(string functionName)
         {
             if (_currentFunctionNode != null
-                && string.Equals(_currentFunctionNode.FunctionDeclarationName, functionName, StringComparison.Ordinal))
+                && string.Equals(_currentFunctionNode.FunctionDeclarationNode.FunctionDeclarationName, functionName, StringComparison.Ordinal))
             {
                 return _currentFunctionNode;
             }
 
             return ast.LastOrDefault(n => n.Kind == NodeKind.FunctionDeclaration
-                && string.Equals(n.FunctionDeclarationName, functionName, StringComparison.Ordinal));
+                && string.Equals(n.FunctionDeclarationNode.FunctionDeclarationName, functionName, StringComparison.Ordinal));
         }
 
         private static List<string> SplitCallArgumentTexts(List<LexerTokens> argumentTokens)
@@ -429,10 +429,11 @@ namespace Puma
             }
 
             var argumentTexts = SplitCallArgumentTexts(argumentTokens);
-            var max = Math.Min(Math.Min(callExpression.Arguments.Count, declaration.FunctionParameterList.Count), argumentTexts.Count);
+            var declarationParameters = declaration.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>();
+            var max = Math.Min(Math.Min(callExpression.Arguments.Count, declarationParameters.Count), argumentTexts.Count);
             for (var i = 0; i < max; i++)
             {
-                var parameter = declaration.FunctionParameterList[i];
+                var parameter = declarationParameters[i];
                 if (!TryMapConvertionType(parameter.Type, out var toType))
                 {
                     continue;
@@ -882,7 +883,7 @@ namespace Puma
                 return;
             }
 
-            _currentFunctionNode.FunctionBody.AddRange(_currentFunctionBody);
+            _currentFunctionNode.FunctionDeclarationNode.FunctionBody.AddRange(_currentFunctionBody);
             ast.Add(_currentFunctionNode);
             _currentFunctionNode = null;
             _currentFunctionBody = new List<Node>();
@@ -2555,7 +2556,7 @@ namespace Puma
                 return false;
             }
 
-            return _currentFunctionNode.FunctionParameterList.Any(p =>
+            return _currentFunctionNode.FunctionDeclarationNode.FunctionParameterList.Any(p =>
                 string.Equals(p.Name, name, StringComparison.Ordinal)
                 && p.Modifiers.Contains("const"));
         }
@@ -2568,7 +2569,7 @@ namespace Puma
             }
 
             if (_currentFunctionNode != null
-                && _currentFunctionNode.FunctionParameterList.Any(p =>
+                && _currentFunctionNode.FunctionDeclarationNode.FunctionParameterList.Any(p =>
                     string.Equals(p.Name, name, StringComparison.Ordinal)
                     && p.Modifiers.Contains("readonly")))
             {
@@ -2591,7 +2592,7 @@ namespace Puma
             }
 
             if (_currentFunctionNode != null
-                && _currentFunctionNode.FunctionParameterList.Any(p =>
+                && _currentFunctionNode.FunctionDeclarationNode.FunctionParameterList.Any(p =>
                     string.Equals(p.Name, name, StringComparison.Ordinal)
                     && p.Modifiers.Contains("readwrite")))
             {
@@ -2961,7 +2962,7 @@ namespace Puma
             }
 
             var node = Node.CreateIfStatement(condition);
-            node.ConditionExpression = ParseExpression(conditionTokens);
+            node.IfStatementNode.ConditionExpression = ParseExpression(conditionTokens);
             target.Add(node);
             return true;
         }
@@ -2998,11 +2999,11 @@ namespace Puma
                 return;
             }
 
-            previous.ElseBody.AddRange(elseNode.StatementBody);
+            previous.IfStatementNode.ElseBody.AddRange(elseNode.StatementBody);
             target.RemoveAt(startCount);
             if (_pendingBlockTarget == elseNode.StatementBody)
             {
-                _pendingBlockTarget = previous.ElseBody;
+                _pendingBlockTarget = previous.IfStatementNode.ElseBody;
             }
         }
 
@@ -3245,7 +3246,7 @@ namespace Puma
             node.StatementExpression = ParseExpression(valueTokens);
 
             if (_currentFunctionNode != null
-                && TryMapConvertionType(_currentFunctionNode.FunctionDeclarationReturnType, out var returnType))
+                && TryMapConvertionType(_currentFunctionNode.FunctionDeclarationNode.FunctionDeclarationReturnType, out var returnType))
             {
                 ValidateImplicitExpressionConversion(node.StatementExpression, returnType, value);
             }

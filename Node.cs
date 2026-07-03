@@ -1,4 +1,4 @@
-﻿// LLVM Compiler for the Puma programming language
+// LLVM Compiler for the Puma programming language
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //
@@ -194,9 +194,18 @@ namespace Puma
         public FunctionCallNodes FunctionCallNode;
 
         // For IfStatement nodes
-        public string? IfCondition { get; set; }
-        public List<Node> ElseBody { get; } = new();
-        public ExpressionNode? ConditionExpression { get; set; }
+        public struct IfStatementNodes
+        {
+            public IfStatementNodes()
+            {
+            }
+
+            public string? IfCondition { get; set; }
+            public ExpressionNode? ConditionExpression { get; set; }
+            public List<Node> IfBody { get; } = new();
+            public List<Node> ElseBody { get; } = new();
+        }
+        public IfStatementNodes IfStatementNode;
 
         // For MatchStatement nodes
         public struct MatchStatementNodes
@@ -258,12 +267,20 @@ namespace Puma
         public HasTraitStatementNodes HasTraitStatementNode;
 
         // For FunctionDeclaration nodes
-        public string? FunctionDeclarationName { get; set; }
-        public string? FunctionDeclarationParameters { get; set; }
-        public string? FunctionDeclarationReturnType { get; set; }
-        public List<string> FunctionModifiers { get; } = new();
-        public List<Node> FunctionBody { get; } = new();
-        public List<ParameterInfo> FunctionParameterList { get; } = new();
+        public struct FunctionDeclarationNodes
+        {
+            public FunctionDeclarationNodes()
+            {
+            }
+
+            public string? FunctionDeclarationName { get; set; }
+            public string? FunctionDeclarationParameters { get; set; }
+            public string? FunctionDeclarationReturnType { get; set; }
+            public List<string> FunctionModifiers { get; } = new();
+            public List<Node> FunctionBody { get; } = new();
+            public List<ParameterInfo> FunctionParameterList { get; } = new();
+        }
+        public FunctionDeclarationNodes FunctionDeclarationNode;
 
         // For DelegateDeclaration nodes
         public string? DelegateName { get; set; }
@@ -430,7 +447,10 @@ namespace Puma
             return new Node
             {
                 Kind = NodeKind.IfStatement,
-                IfCondition = condition
+                IfStatementNode = new IfStatementNodes
+                {
+                    IfCondition = condition
+                }
             };
         }
 
@@ -539,16 +559,19 @@ namespace Puma
             var node = new Node
             {
                 Kind = NodeKind.FunctionDeclaration,
-                FunctionDeclarationName = name,
-                FunctionDeclarationParameters = parameters,
-                FunctionDeclarationReturnType = returnType
+                FunctionDeclarationNode = new FunctionDeclarationNodes
+                {
+                    FunctionDeclarationName = name,
+                    FunctionDeclarationParameters = parameters,
+                    FunctionDeclarationReturnType = returnType
+                }
             };
 
-            node.FunctionParameterList.AddRange(parameterList);
-            node.FunctionBody.AddRange(body);
+            node.FunctionDeclarationNode.FunctionParameterList.AddRange(parameterList);
+            node.FunctionDeclarationNode.FunctionBody.AddRange(body);
             if (modifiers != null)
             {
-                node.FunctionModifiers.AddRange(modifiers);
+                node.FunctionDeclarationNode.FunctionModifiers.AddRange(modifiers);
             }
             return node;
         }

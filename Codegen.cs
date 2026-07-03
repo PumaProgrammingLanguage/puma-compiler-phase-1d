@@ -65,7 +65,7 @@ namespace Puma
             }
 
             var needsStringH = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration)
-                .Any(fn => EnumerateAllNodes(fn.FunctionBody)
+                .Any(fn => EnumerateAllNodes(fn.FunctionDeclarationNode.FunctionBody ?? new List<Node>())
                     .Any(n => n.Kind == NodeKind.AssignmentStatement
                         && n.AssignmentStatementNode.AssignmentOperator == "="
                         && !string.IsNullOrWhiteSpace(n.AssignmentStatementNode.AssignmentRight)
@@ -81,7 +81,8 @@ namespace Puma
                 || ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
                     && (IsCharacterLiteralText(n.PropertyDeclarationNode.PropertyValue)
                         || string.Equals(n.PropertyDeclarationNode.PropertyType, "char", StringComparison.OrdinalIgnoreCase)))
-                || allNodes.Any(n => n.FunctionParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase))
+                || allNodes.Any(n => (n.Kind == NodeKind.FunctionDeclaration
+                        && (n.FunctionDeclarationNode.FunctionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
                     || (n.Kind == NodeKind.Section
                         && (n.SectionNode.SectionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
                     || n.DelegateParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)));
@@ -151,7 +152,7 @@ namespace Puma
             }
 
             var needsStdIntForFunctionParameters = allNodes.Any(n => n.Kind == NodeKind.FunctionDeclaration
-                && n.FunctionParameterList.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t"));
+                && (n.FunctionDeclarationNode.FunctionParameterList?.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t") ?? false));
             if (needsStdIntForFunctionParameters)
             {
                 includes.Add("<stdint>");
@@ -759,21 +760,23 @@ namespace Puma
 
             foreach (var node in globalFunctions)
             {
-                var returnType = string.IsNullOrWhiteSpace(node.FunctionDeclarationReturnType)
+                var returnType = string.IsNullOrWhiteSpace(node.FunctionDeclarationNode.FunctionDeclarationReturnType)
                     ? "void"
-                    : node.FunctionDeclarationReturnType;
-                var parameters = node.FunctionParameterList.Count == 0
+                    : node.FunctionDeclarationNode.FunctionDeclarationReturnType;
+                var functionParameterList = node.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>();
+                var functionBody = node.FunctionDeclarationNode.FunctionBody ?? new List<Node>();
+                var parameters = functionParameterList.Count == 0
                     ? "void"
-                    : string.Join(", ", node.FunctionParameterList.Select(FormatFunctionSignatureParameter));
-                sb.AppendLine($"{returnType} {node.FunctionDeclarationName}({parameters})");
+                    : string.Join(", ", functionParameterList.Select(FormatFunctionSignatureParameter));
+                sb.AppendLine($"{returnType} {node.FunctionDeclarationNode.FunctionDeclarationName}({parameters})");
                 sb.AppendLine("{");
-                if (string.Equals(node.FunctionDeclarationReturnType, "char", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(node.FunctionDeclarationNode.FunctionDeclarationReturnType, "char", StringComparison.OrdinalIgnoreCase))
                 {
-                    EmitStatementsWithLocalDeclarations(node.FunctionBody, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
+                    EmitStatementsWithLocalDeclarations(functionBody, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
                 }
                 else
                 {
-                    EmitStatementsWithStringLocalDeclarations(node.FunctionBody, sb, "    ", ast);
+                    EmitStatementsWithStringLocalDeclarations(functionBody, sb, "    ", ast);
                 }
                 sb.AppendLine("}");
                 sb.AppendLine();
@@ -881,9 +884,10 @@ namespace Puma
                 .ToList();
             var functionsReturningConstructedObject = ast
                 .Where(n => n.Kind == NodeKind.FunctionDeclaration
-                    && n.FunctionBody.Any(s => s.Kind == NodeKind.ReturnStatement
+                    && ((n.FunctionDeclarationNode.FunctionBody?.Any(s => s.Kind == NodeKind.ReturnStatement
                         && LooksLikeObjectConstructorCall(GenerateExpression(s.StatementExpression, s.StatementValue)?.Trim() ?? string.Empty)))
-                .Select(n => n.FunctionDeclarationName)
+                        ?? false))
+                .Select(n => n.FunctionDeclarationNode.FunctionDeclarationName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
             var propertiesAssignedToNone = new HashSet<string>(StringComparer.Ordinal);
@@ -1071,7 +1075,7 @@ namespace Puma
             }
 
             var declaration = ast.FirstOrDefault(n => n.Kind == NodeKind.FunctionDeclaration
-                && string.Equals(n.FunctionDeclarationName, functionName, StringComparison.Ordinal));
+                && string.Equals(n.FunctionDeclarationNode.FunctionDeclarationName, functionName, StringComparison.Ordinal));
             if (declaration == null)
             {
                 return $"{functionName}({string.Join(", ", callExpressionNode.Arguments.Select(a => GenerateExpression(a, null)))})";
@@ -1081,9 +1085,11 @@ namespace Puma
                 .Select(a => GenerateExpression(a, null))
                 .ToList();
 
-            for (var i = arguments.Count; i < declaration.FunctionParameterList.Count; i++)
+            var declarationParameters = declaration.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>();
+
+            for (var i = arguments.Count; i < declarationParameters.Count; i++)
             {
-                arguments.Add(FormatDefaultArgument(declaration.FunctionParameterList[i]));
+                arguments.Add(FormatDefaultArgument(declarationParameters[i]));
             }
 
             return $"{functionName}({string.Join(", ", arguments)})";
@@ -1156,7 +1162,7 @@ namespace Puma
 
             foreach (var function in node.TypeDeclarationNode.TypeFunctions)
             {
-                if (function.FunctionModifiers.Contains("private") || function.FunctionModifiers.Contains("internal"))
+                if (function.FunctionDeclarationNode.FunctionModifiers.Contains("private") || function.FunctionDeclarationNode.FunctionModifiers.Contains("internal"))
                 {
                     protectedFunctions.Add(function);
                 }
@@ -1182,11 +1188,11 @@ namespace Puma
 
             foreach (var function in functions)
             {
-                var returnType = MapType(function.FunctionDeclarationReturnType) ?? "void";
-                var parameters = string.Join(", ", function.FunctionParameterList.Select(FormatParameter));
-                sb.AppendLine($"{indent}{returnType} {function.FunctionDeclarationName}({parameters})");
+                var returnType = MapType(function.FunctionDeclarationNode.FunctionDeclarationReturnType) ?? "void";
+                var parameters = string.Join(", ", (function.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>()).Select(FormatParameter));
+                sb.AppendLine($"{indent}{returnType} {function.FunctionDeclarationNode.FunctionDeclarationName}({parameters})");
                 sb.AppendLine($"{indent}{{");
-                EmitStatements(function.FunctionBody, sb, indent + "    ");
+                EmitStatements(function.FunctionDeclarationNode.FunctionBody ?? new List<Node>(), sb, indent + "    ");
                 sb.AppendLine($"{indent}}}");
             }
         }
@@ -1335,15 +1341,15 @@ namespace Puma
                         }
                         break;
                     case NodeKind.IfStatement:
-                        sb.AppendLine($"{indent}if ({UnwrapOutermostParentheses(GenerateExpression(node.ConditionExpression, node.IfCondition))})");
+                        sb.AppendLine($"{indent}if ({UnwrapOutermostParentheses(GenerateExpression(node.IfStatementNode.ConditionExpression, node.IfStatementNode.IfCondition))})");
                         sb.AppendLine($"{indent}{{");
                         EmitStatements(node.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
-                        if (node.ElseBody.Count > 0)
+                        if (node.IfStatementNode.ElseBody.Count > 0)
                         {
                             sb.AppendLine($"{indent}else");
                             sb.AppendLine($"{indent}{{");
-                            EmitStatements(node.ElseBody, sb, indent + "    ");
+                            EmitStatements(node.IfStatementNode.ElseBody, sb, indent + "    ");
                             sb.AppendLine($"{indent}}}");
                         }
                         break;
@@ -1534,7 +1540,8 @@ namespace Puma
                 return true;
             }
 
-            return node.FunctionParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase))
+            return node.Kind == NodeKind.FunctionDeclaration
+                && (node.FunctionDeclarationNode.FunctionParameterList?.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase)) ?? false)
                 || node.DelegateParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase));
         }
 
@@ -2139,7 +2146,9 @@ namespace Puma
             {
                 yield return node;
 
-                foreach (var functionNode in EnumerateAllNodes(node.FunctionBody))
+                foreach (var functionNode in node.Kind == NodeKind.FunctionDeclaration
+                    ? EnumerateAllNodes(node.FunctionDeclarationNode.FunctionBody ?? new List<Node>())
+                    : Enumerable.Empty<Node>())
                 {
                     yield return functionNode;
                 }
@@ -2149,7 +2158,9 @@ namespace Puma
                     yield return statementNode;
                 }
 
-                foreach (var elseNode in EnumerateAllNodes(node.ElseBody))
+                foreach (var elseNode in node.Kind == NodeKind.IfStatement
+                    ? EnumerateAllNodes(node.IfStatementNode.ElseBody)
+                    : Enumerable.Empty<Node>())
                 {
                     yield return elseNode;
                 }
