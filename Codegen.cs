@@ -79,10 +79,11 @@ namespace Puma
                 && n.AssignmentStatementNode.AssignmentOperator == "="
                 && IsCharacterLiteralText(n.AssignmentStatementNode.AssignmentRight))
                 || ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
-                    && (IsCharacterLiteralText(n.PropertyValue)
-                        || string.Equals(n.PropertyType, "char", StringComparison.OrdinalIgnoreCase)))
+                    && (IsCharacterLiteralText(n.PropertyDeclarationNode.PropertyValue)
+                        || string.Equals(n.PropertyDeclarationNode.PropertyType, "char", StringComparison.OrdinalIgnoreCase)))
                 || allNodes.Any(n => n.FunctionParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase))
-                    || n.SectionParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase))
+                    || (n.Kind == NodeKind.Section
+                        && (n.SectionNode.SectionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
                     || n.DelegateParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)));
             if (needsCharacter)
             {
@@ -90,7 +91,7 @@ namespace Puma
             }
 
             var needsStdBoolForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .SelectMany(n => n.RecordMembers)
+                .SelectMany(n => n.RecordDeclarationNode.RecordMembers)
                 .Any(m =>
                 {
                     var value = GetRecordMemberValue(m);
@@ -102,7 +103,7 @@ namespace Puma
             }
 
             var needsStringForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .SelectMany(n => n.RecordMembers)
+                .SelectMany(n => n.RecordDeclarationNode.RecordMembers)
                 .Any(m =>
                 {
                     var value = GetRecordMemberValue(m);
@@ -114,13 +115,13 @@ namespace Puma
             }
 
             var needsCStdIntForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .Any(record => record.RecordMembers.Any(member =>
+                .Any(record => record.RecordDeclarationNode.RecordMembers.Any(member =>
                 {
                     var value = GetRecordMemberValue(member);
                     var memberName = member.Contains('=', StringComparison.Ordinal)
                         ? member[..member.IndexOf('=')]
                         : member;
-                    record.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
+                    record.RecordDeclarationNode.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
                     return RequiresFixedWidthIntegerCast(value, declaredType);
                 }));
             if (needsCStdIntForRecords)
@@ -133,17 +134,17 @@ namespace Puma
             var autoPropertiesMode = !hasStartSection && propertyDeclarations.Count > 0;
             if (autoPropertiesMode)
             {
-                if (propertyDeclarations.Any(p => RequiresFixedWidthIntegerCast(p.PropertyValue, p.PropertyType)))
+                if (propertyDeclarations.Any(p => RequiresFixedWidthIntegerCast(p.PropertyDeclarationNode.PropertyValue, p.PropertyDeclarationNode.PropertyType)))
                 {
                     includes.Add("<stdint>");
                 }
 
-                if (propertyDeclarations.Any(p => IsBooleanPropertyValue(p.PropertyValue)))
+                if (propertyDeclarations.Any(p => IsBooleanPropertyValue(p.PropertyDeclarationNode.PropertyValue)))
                 {
                     includes.Add("<stdbool>");
                 }
 
-                if (propertyDeclarations.Any(p => IsStringPropertyValue(p.PropertyValue)))
+                if (propertyDeclarations.Any(p => IsStringPropertyValue(p.PropertyDeclarationNode.PropertyValue)))
                 {
                     includes.Add("<String.hpp>");
                 }
@@ -157,7 +158,7 @@ namespace Puma
             }
 
             var propertyNames = propertyDeclarations
-                .Select(n => n.PropertyName)
+                .Select(n => n.PropertyDeclarationNode.PropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
@@ -171,7 +172,7 @@ namespace Puma
                 && (numericPropertyReassignmentMode
                     || !propertyDeclarations.Any()
                     || includes.Contains("<String.hpp>")
-                    || !string.IsNullOrWhiteSpace(propertyDeclarations.FirstOrDefault()?.PropertyName));
+                    || !string.IsNullOrWhiteSpace(propertyDeclarations.FirstOrDefault()?.PropertyDeclarationNode.PropertyName));
             if (shouldIncludeCStdIntForAssignments && !autoPropertiesMode)
             {
                 includes.Add("<cstdint>");
@@ -320,21 +321,21 @@ namespace Puma
         {
             foreach (var node in ast.Where(n => n.Kind == NodeKind.RecordDeclaration))
             {
-                var hasAssignedMembers = node.RecordMembers.Any(m => m.Contains('=', StringComparison.Ordinal));
-                var packedSuffix = node.RecordPackSize.HasValue ? " [[gnu::packed]]" : string.Empty;
+                var hasAssignedMembers = node.RecordDeclarationNode.RecordMembers.Any(m => m.Contains('=', StringComparison.Ordinal));
+                var packedSuffix = node.RecordDeclarationNode.RecordPackSize.HasValue ? " [[gnu::packed]]" : string.Empty;
                 if (hasAssignedMembers)
                 {
                     sb.AppendLine("// records");
-                    sb.AppendLine($"struct {node.RecordName}{packedSuffix}");
+                    sb.AppendLine($"struct {node.RecordDeclarationNode.RecordName}{packedSuffix}");
                     sb.AppendLine("{");
-                    foreach (var member in node.RecordMembers)
+                    foreach (var member in node.RecordDeclarationNode.RecordMembers)
                     {
                         var equalsIndex = member.IndexOf('=');
                         if (equalsIndex > 0)
                         {
                             var memberName = member[..equalsIndex];
                             var value = member[(equalsIndex + 1)..];
-                            node.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
+                            node.RecordDeclarationNode.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
                             var initializer = FormatAutoPropertyInitializer(value, declaredType);
                             sb.AppendLine($"    auto {memberName} = {initializer};");
                         }
@@ -348,13 +349,13 @@ namespace Puma
                     continue;
                 }
 
-                sb.AppendLine($"typedef struct {node.RecordName} {{");
-                foreach (var member in node.RecordMembers)
+                sb.AppendLine($"typedef struct {node.RecordDeclarationNode.RecordName} {{");
+                foreach (var member in node.RecordDeclarationNode.RecordMembers)
                 {
                     var memberType = string.Equals(member, "Name", StringComparison.Ordinal) ? "stdstr" : "int";
                     sb.AppendLine($"    {memberType} {member};");
                 }
-                sb.AppendLine($"}} {node.RecordName};");
+                sb.AppendLine($"}} {node.RecordDeclarationNode.RecordName};");
                 sb.AppendLine();
             }
         }
@@ -453,16 +454,16 @@ namespace Puma
                 sb.AppendLine("// properties");
                 foreach (var node in globalProperties)
                 {
-                    var initializer = FormatAutoPropertyInitializer(node.PropertyValue, node.PropertyType);
-                    sb.AppendLine($"auto {node.PropertyName} = {initializer};");
+                    var initializer = FormatAutoPropertyInitializer(node.PropertyDeclarationNode.PropertyValue, node.PropertyDeclarationNode.PropertyType);
+                    sb.AppendLine($"auto {node.PropertyDeclarationNode.PropertyName} = {initializer};");
                 }
 
                 sb.AppendLine();
                 return;
             }
 
-            var shouldEmitPropertiesHeaderWithStart = globalProperties.Any(p => p.PropertyModifiers.Contains("const"))
-                || globalProperties.Any(p => !string.IsNullOrWhiteSpace(p.PropertyType));
+            var shouldEmitPropertiesHeaderWithStart = globalProperties.Any(p => p.PropertyDeclarationNode.PropertyModifiers.Contains("const"))
+                || globalProperties.Any(p => !string.IsNullOrWhiteSpace(p.PropertyDeclarationNode.PropertyType));
 
             if (hasStartSection && globalProperties.Count > 0 && shouldEmitPropertiesHeaderWithStart)
             {
@@ -471,11 +472,11 @@ namespace Puma
 
             foreach (var node in globalProperties)
             {
-                var modifiers = node.PropertyModifiers.Contains("const") ? "const " : string.Empty;
-                var trimmed = node.PropertyValue?.Trim() ?? string.Empty;
-                var shouldUseAuto = IsBooleanPropertyValue(node.PropertyValue)
-                    || IsStringPropertyValue(node.PropertyValue)
-                    || RequiresFixedWidthIntegerCast(node.PropertyValue, node.PropertyType)
+                var modifiers = node.PropertyDeclarationNode.PropertyModifiers.Contains("const") ? "const " : string.Empty;
+                var trimmed = node.PropertyDeclarationNode.PropertyValue?.Trim() ?? string.Empty;
+                var shouldUseAuto = IsBooleanPropertyValue(node.PropertyDeclarationNode.PropertyValue)
+                    || IsStringPropertyValue(node.PropertyDeclarationNode.PropertyValue)
+                    || RequiresFixedWidthIntegerCast(node.PropertyDeclarationNode.PropertyValue, node.PropertyDeclarationNode.PropertyType)
                     || double.TryParse(trimmed, out _)
                     || (!string.IsNullOrWhiteSpace(trimmed)
                         && (trimmed.Contains('(')
@@ -484,13 +485,13 @@ namespace Puma
 
                 if (shouldUseAuto)
                 {
-                    var initializer = FormatAutoPropertyInitializer(node.PropertyValue, node.PropertyType);
-                    sb.AppendLine($"{modifiers}auto {node.PropertyName} = {initializer};");
+                    var initializer = FormatAutoPropertyInitializer(node.PropertyDeclarationNode.PropertyValue, node.PropertyDeclarationNode.PropertyType);
+                    sb.AppendLine($"{modifiers}auto {node.PropertyDeclarationNode.PropertyName} = {initializer};");
                 }
                 else
                 {
-                    var (type, value) = InferCTypeAndValue(node.PropertyValue);
-                    sb.AppendLine($"{modifiers}{type} {node.PropertyName} = {value};");
+                    var (type, value) = InferCTypeAndValue(node.PropertyDeclarationNode.PropertyValue);
+                    sb.AppendLine($"{modifiers}{type} {node.PropertyDeclarationNode.PropertyName} = {value};");
                 }
             }
 
@@ -735,7 +736,7 @@ namespace Puma
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
         {
             var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
-                .Select(n => n.PropertyName)
+                .Select(n => n.PropertyDeclarationNode.PropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
@@ -811,9 +812,10 @@ namespace Puma
                 return;
             }
 
-            var parameters = sectionNode.SectionParameterList.Count == 0
+            var sectionParameters = sectionNode.SectionNode.SectionParameterList ?? new List<Node.ParameterInfo>();
+            var parameters = sectionParameters.Count == 0
                 ? "void"
-                : string.Join(", ", sectionNode.SectionParameterList.Select(FormatParameter));
+                : string.Join(", ", sectionParameters.Select(FormatParameter));
             sb.AppendLine($"// {name}");
             sb.AppendLine($"void {name}({parameters})");
             sb.AppendLine("{");
@@ -821,7 +823,7 @@ namespace Puma
             if (section == Section.Initialize)
             {
                 var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
-                    .Select(n => n.PropertyName)
+                    .Select(n => n.PropertyDeclarationNode.PropertyName)
                     .Where(n => !string.IsNullOrWhiteSpace(n))
                     .ToHashSet(StringComparer.Ordinal);
                 EmitStatementsWithLocalDeclarations(statements, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
@@ -840,7 +842,7 @@ namespace Puma
             var (finalIndex, finalSection) = FindSection(ast, Section.Finalize);
             var (startIndex, startSection) = FindSection(ast, Section.Start);
             var globalPropertyNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
-                .Select(n => n.PropertyName)
+                .Select(n => n.PropertyDeclarationNode.PropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
@@ -851,7 +853,7 @@ namespace Puma
 
             if (startSection != null)
             {
-                for (var i = 0; i < startSection.LeadingBlankLines; i++)
+                for (var i = 0; i < startSection.SectionNode.LeadingBlankLines; i++)
                 {
                     sb.AppendLine();
                 }
@@ -862,7 +864,7 @@ namespace Puma
             sb.AppendLine("{");
             if (initIndex >= 0 && initSection != null)
             {
-                sb.AppendLine($"    initialize({FormatArguments(initSection.SectionParameterList)});");
+                sb.AppendLine($"    initialize({FormatArguments(initSection.SectionNode.SectionParameterList ?? new List<Node.ParameterInfo>())});");
             }
             var statements = startIndex >= 0 ? CollectStatements(ast, startIndex + 1) : new List<Node>();
             var numericPropertyReassignmentMode = UsesTypedPropertyReassignmentMode(ast);
@@ -873,9 +875,9 @@ namespace Puma
             var emittedPropertyTypedAssignment = false;
             var heapAllocatedGlobalProperties = ast
                 .Where(n => n.Kind == NodeKind.PropertyDeclaration
-                    && !string.IsNullOrWhiteSpace(n.PropertyName)
-                    && LooksLikeObjectConstructorCall(n.PropertyValue?.Trim() ?? string.Empty))
-                .Select(n => n.PropertyName!)
+                    && !string.IsNullOrWhiteSpace(n.PropertyDeclarationNode.PropertyName)
+                    && LooksLikeObjectConstructorCall(n.PropertyDeclarationNode.PropertyValue?.Trim() ?? string.Empty))
+                .Select(n => n.PropertyDeclarationNode.PropertyName!)
                 .ToList();
             var functionsReturningConstructedObject = ast
                 .Where(n => n.Kind == NodeKind.FunctionDeclaration
@@ -919,7 +921,7 @@ namespace Puma
 
             if (finalIndex >= 0 && finalSection != null)
             {
-                sb.AppendLine($"    finalize({FormatArguments(finalSection.SectionParameterList)});");
+                sb.AppendLine($"    finalize({FormatArguments(finalSection.SectionNode.SectionParameterList ?? new List<Node.ParameterInfo>())});");
             }
 
             foreach (var propertyName in heapAllocatedGlobalProperties)
@@ -1110,7 +1112,7 @@ namespace Puma
 
             foreach (var property in node.TypeDeclarationNode.TypeProperties)
             {
-                if (property.PropertyModifiers.Contains("public"))
+                if (property.PropertyDeclarationNode.PropertyModifiers.Contains("public"))
                 {
                     publicProperties.Add(property);
                 }
@@ -1141,9 +1143,9 @@ namespace Puma
             sb.AppendLine($"{indent}{access}:");
             foreach (var property in properties)
             {
-                var value = FormatAutoPropertyInitializer(property.PropertyValue, property.PropertyType);
-                var modifiers = property.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
-                sb.AppendLine($"{indent}{modifiers}auto {property.PropertyName} = {value};");
+                var value = FormatAutoPropertyInitializer(property.PropertyDeclarationNode.PropertyValue, property.PropertyDeclarationNode.PropertyType);
+                var modifiers = property.PropertyDeclarationNode.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
+                sb.AppendLine($"{indent}{modifiers}auto {property.PropertyDeclarationNode.PropertyName} = {value};");
             }
         }
 
@@ -1263,7 +1265,7 @@ namespace Puma
                             if (node.AssignmentStatementNode.AssignmentOperator == "=" && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Literal)
                             {
                                 var propertyNode = ast?.FirstOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
-                                    && string.Equals(n.PropertyName, node.AssignmentStatementNode.AssignmentLeft, StringComparison.Ordinal));
+                                    && string.Equals(n.PropertyDeclarationNode.PropertyName, node.AssignmentStatementNode.AssignmentLeft, StringComparison.Ordinal));
                                 if (propertyNode != null
                                     && ast != null
                                     && UsesTypedPropertyReassignmentMode(ast)
@@ -1522,12 +1524,12 @@ namespace Puma
 
         private static bool UsesBool(Node node)
         {
-            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(node.PropertyValue, "true", StringComparison.OrdinalIgnoreCase))
+            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(node.PropertyDeclarationNode.PropertyValue, "true", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(node.PropertyValue, "false", StringComparison.OrdinalIgnoreCase))
+            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(node.PropertyDeclarationNode.PropertyValue, "false", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -1634,11 +1636,11 @@ namespace Puma
             }
 
             var propertyNames = properties
-                .Select(n => n.PropertyName)
+                .Select(n => n.PropertyDeclarationNode.PropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
-            if (!properties.All(p => TryGetTypedLiteralDeclaration(p.PropertyValue ?? string.Empty, out var typeName, out _)
+            if (!properties.All(p => TryGetTypedLiteralDeclaration(p.PropertyDeclarationNode.PropertyValue ?? string.Empty, out var typeName, out _)
                 && typeName is not "Puma::Type::String" and not "bool"))
             {
                 return false;

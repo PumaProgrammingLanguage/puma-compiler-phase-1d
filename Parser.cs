@@ -251,9 +251,9 @@ namespace Puma
             }
 
             var property = ast.LastOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, identifier, StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(n.PropertyType));
-            if (property != null && TryMapConvertionType(property.PropertyType, out type))
+                && string.Equals(n.PropertyDeclarationNode.PropertyName, identifier, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(n.PropertyDeclarationNode.PropertyType));
+            if (property != null && TryMapConvertionType(property.PropertyDeclarationNode.PropertyType, out type))
             {
                 return true;
             }
@@ -680,7 +680,10 @@ namespace Puma
                         : Math.Max(0, _pendingLeadingBlankLines - 1);
                     _currentSectionNode = new Node(next)
                     {
-                        LeadingBlankLines = leadingBlankLines
+                        SectionNode =
+                        {
+                            LeadingBlankLines = leadingBlankLines
+                        }
                     };
                     _pendingLeadingBlankLines = 0;
                     ast.Add(_currentSectionNode);
@@ -1249,7 +1252,7 @@ namespace Puma
 
             if (!_startHeaderParsed && TryParseSectionParameters(token, out var parameters))
             {
-                _currentSectionNode!.SectionParameters = parameters;
+                _currentSectionNode!.SectionNode.SectionParameters = parameters;
                 _startHeaderParsed = true;
                 return;
             }
@@ -1287,7 +1290,7 @@ namespace Puma
 
             if (!_initializeHeaderParsed && TryParseSectionParameters(token, out var parameters))
             {
-                _currentSectionNode!.SectionParameters = parameters;
+                _currentSectionNode!.SectionNode.SectionParameters = parameters;
                 _initializeHeaderParsed = true;
                 return;
             }
@@ -2144,7 +2147,7 @@ namespace Puma
             var node = Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers);
             foreach (var pair in _currentRecordMemberTypes)
             {
-                node.RecordMemberTypes[pair.Key] = pair.Value;
+                node.RecordDeclarationNode.RecordMemberTypes[pair.Key] = pair.Value;
             }
 
             ast.Add(node);
@@ -2526,7 +2529,7 @@ namespace Puma
             }
 
             return ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, name, StringComparison.Ordinal));
+                && string.Equals(n.PropertyDeclarationNode.PropertyName, name, StringComparison.Ordinal));
         }
 
         private void EnsureReadonlyLocalScope()
@@ -2641,7 +2644,7 @@ namespace Puma
             }
 
             return ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, name, StringComparison.Ordinal));
+                && string.Equals(n.PropertyDeclarationNode.PropertyName, name, StringComparison.Ordinal));
         }
 
         private bool TryParseIncrementDecrementStatement(List<LexerTokens> tokens, List<Node> target)
@@ -3208,12 +3211,12 @@ namespace Puma
             parameters = BuildQualifiedName(parameterTokens);
             if (_currentSectionNode != null)
             {
-                _currentSectionNode.SectionParameterList.Clear();
-                _currentSectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
+                _currentSectionNode.SectionNode.SectionParameterList.Clear();
+                _currentSectionNode.SectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
 
                 _readonlySectionParameters.Clear();
                 _readwriteSectionParameters.Clear();
-                foreach (var parameter in _currentSectionNode.SectionParameterList)
+                foreach (var parameter in _currentSectionNode.SectionNode.SectionParameterList)
                 {
                     if (!string.IsNullOrWhiteSpace(parameter.Name) && parameter.Modifiers.Contains("readonly"))
                     {

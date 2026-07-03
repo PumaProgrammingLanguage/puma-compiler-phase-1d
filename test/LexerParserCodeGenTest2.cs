@@ -536,7 +536,7 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(4, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, properties.Select(p => p.PropertyDeclarationNode.PropertyName).ToArray());
 
             var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
             Assert.AreEqual(14, function.FunctionBody.Count);
@@ -621,7 +621,7 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(3, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "myList" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "myList" }, properties.Select(p => p.PropertyDeclarationNode.PropertyName).ToArray());
 
             var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
             Assert.AreEqual(2, functions.Count);
@@ -925,7 +925,7 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(2, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => p.PropertyDeclarationNode.PropertyName).ToArray());
 
             var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
             Assert.AreEqual(3, functions.Count);

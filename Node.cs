@@ -129,16 +129,31 @@ namespace Puma
         public EnumDeclarationNodes EnumDeclarationNode;
 
         // For RecordDeclaration nodes
-        public string? RecordName { get; set; }
-        public int? RecordPackSize { get; set; }
-        public List<string> RecordMembers { get; } = new();
-        public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
+        public struct RecordDeclarationNodes
+        {
+            public RecordDeclarationNodes()
+            {
+            }
+
+            public string? RecordName { get; set; }
+            public int? RecordPackSize { get; set; }
+            public List<string> RecordMembers { get; } = new();
+            public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
+        }
+        public RecordDeclarationNodes RecordDeclarationNode;
 
         // For PropertyDeclaration nodes
-        public string? PropertyName { get; set; }
-        public string? PropertyValue { get; set; }
-        public string? PropertyType { get; set; }
-        public List<string> PropertyModifiers { get; } = new();
+        public struct PropertyDeclarationNodes
+        {
+            public PropertyDeclarationNodes()
+            {
+            }
+            public string? PropertyName { get; set; }
+            public string? PropertyValue { get; set; }
+            public string? PropertyType { get; set; }
+            public List<string> PropertyModifiers { get; } = new();
+        }
+        public PropertyDeclarationNodes PropertyDeclarationNode;
 
         // For AssignmentStatement nodes
         public struct AssignmentStatementNodes
@@ -156,9 +171,18 @@ namespace Puma
         public AssignmentStatementNodes AssignmentStatementNode;
 
         // For Section nodes
-        public string? SectionParameters { get; set; }
-        public List<ParameterInfo> SectionParameterList { get; } = new();
-        public int LeadingBlankLines { get; set; }
+        public struct SectionNodes
+        {
+            public SectionNodes()
+            {
+            }
+
+            public string? SectionName { get; set; }
+            public string? SectionParameters { get; set; }
+            public List<ParameterInfo> SectionParameterList { get; } = new();
+            public int LeadingBlankLines { get; set; }
+        }
+        public SectionNodes SectionNode;
 
         // For FunctionCall nodes
         public struct FunctionCallNodes
@@ -258,6 +282,10 @@ namespace Puma
         {
             Kind = NodeKind.Section;
             Section = section;
+            SectionNode = new SectionNodes
+            {
+                SectionName = section.ToString()
+            };
         }
 
         public static Node CreateWriteLine(string literal)
@@ -332,10 +360,16 @@ namespace Puma
             var node = new Node
             {
                 Kind = NodeKind.RecordDeclaration,
-                RecordName = name,
-                RecordPackSize = packSize
+                RecordDeclarationNode = new RecordDeclarationNodes
+                {
+                    RecordName = name,
+                    RecordPackSize = packSize
+                }
             };
-            node.RecordMembers.AddRange(members);
+            foreach (var member in members)
+            {
+                node.RecordDeclarationNode.RecordMembers.Add(member);
+            }
             return node;
         }
 
@@ -344,14 +378,17 @@ namespace Puma
             var node = new Node
             {
                 Kind = NodeKind.PropertyDeclaration,
-                PropertyName = name,
-                PropertyValue = value,
-                PropertyType = type
+                PropertyDeclarationNode = new PropertyDeclarationNodes
+                {
+                    PropertyName = name,
+                    PropertyValue = value,
+                    PropertyType = type
+                }
             };
 
             if (modifiers != null)
             {
-                node.PropertyModifiers.AddRange(modifiers);
+                node.PropertyDeclarationNode.PropertyModifiers.AddRange(modifiers);
             }
 
             return node;
