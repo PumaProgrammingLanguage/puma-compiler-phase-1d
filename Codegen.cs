@@ -85,7 +85,8 @@ namespace Puma
                         && (n.FunctionDeclarationNode.FunctionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
                     || (n.Kind == NodeKind.Section
                         && (n.SectionNode.SectionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
-                    || n.DelegateParameterList.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)));
+                    || (n.Kind == NodeKind.DelegateDeclaration
+                        && (n.DelegateDeclarationNode.DelegateParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false)));
             if (needsCharacter)
             {
                 includes.Add("<Character.hpp>");
@@ -743,8 +744,8 @@ namespace Puma
 
             foreach (var node in ast.Where(n => n.Kind == NodeKind.DelegateDeclaration))
             {
-                var parameters = string.Join(", ", node.DelegateParameterList.Select(FormatParameter));
-                sb.AppendLine($"typedef void (*{node.DelegateName})({parameters});");
+                var parameters = string.Join(", ", (node.DelegateDeclarationNode.DelegateParameterList ?? new List<Node.ParameterInfo>()).Select(FormatParameter));
+                sb.AppendLine($"typedef void (*{node.DelegateDeclarationNode.DelegateName})({parameters});");
             }
 
             if (ast.Any(n => n.Kind == NodeKind.DelegateDeclaration))
@@ -885,7 +886,7 @@ namespace Puma
             var functionsReturningConstructedObject = ast
                 .Where(n => n.Kind == NodeKind.FunctionDeclaration
                     && ((n.FunctionDeclarationNode.FunctionBody?.Any(s => s.Kind == NodeKind.ReturnStatement
-                        && LooksLikeObjectConstructorCall(GenerateExpression(s.StatementExpression, s.StatementValue)?.Trim() ?? string.Empty)))
+                        && LooksLikeObjectConstructorCall(GenerateExpression(s.StatementNode.StatementExpression, s.StatementNode.StatementValue)?.Trim() ?? string.Empty)))
                         ?? false))
                 .Select(n => n.FunctionDeclarationNode.FunctionDeclarationName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
@@ -1314,7 +1315,7 @@ namespace Puma
                         }
                     case NodeKind.FunctionCall:
                         {
-                            var callExpressionNode = node.FunctionCallNode.Expression ?? node.StatementExpression;
+                            var callExpressionNode = node.FunctionCallNode.Expression ?? node.StatementNode.StatementExpression;
                             var callExpression = GenerateExpression(callExpressionNode, null);
                             if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
                             {
@@ -1343,7 +1344,7 @@ namespace Puma
                     case NodeKind.IfStatement:
                         sb.AppendLine($"{indent}if ({UnwrapOutermostParentheses(GenerateExpression(node.IfStatementNode.ConditionExpression, node.IfStatementNode.IfCondition))})");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementBody, sb, indent + "    ");
+                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         if (node.IfStatementNode.ElseBody.Count > 0)
                         {
@@ -1356,10 +1357,10 @@ namespace Puma
                     case NodeKind.MatchStatement:
                         sb.AppendLine($"{indent}switch ({GenerateExpression(node.MatchStatementNode.ExpressionNode, node.MatchStatementNode.Expression)})");
                         sb.AppendLine($"{indent}{{");
-                        foreach (var when in node.StatementBody.Where(n => n.Kind == NodeKind.WhenStatement))
+                        foreach (var when in node.StatementNode.StatementBody.Where(n => n.Kind == NodeKind.WhenStatement))
                         {
                             sb.AppendLine($"{indent}    case {GenerateExpression(when.WhenStatementNode.WhenExpression, when.WhenStatementNode.WhenCondition)}:");
-                            EmitStatements(when.StatementBody, sb, indent + "        ");
+                            EmitStatements(when.StatementNode.StatementBody, sb, indent + "        ");
                             sb.AppendLine($"{indent}        break;");
                         }
                         sb.AppendLine($"{indent}}}");
@@ -1370,14 +1371,14 @@ namespace Puma
                     case NodeKind.WhileStatement:
                         sb.AppendLine($"{indent}while ({UnwrapOutermostParentheses(GenerateExpression(node.WhileStatementNode.WhileExpression, node.WhileStatementNode.WhileCondition))})");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementBody, sb, indent + "    ");
+                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.ForStatement:
                     case NodeKind.ForAllStatement:
                         sb.AppendLine($"{indent}for (auto {node.ForStatementNode.ForVariable} : {GenerateExpression(node.ForStatementNode.ForContainerExpression, node.ForStatementNode.ForContainer)})");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementBody, sb, indent + "    ");
+                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.RepeatStatement:
@@ -1389,14 +1390,14 @@ namespace Puma
                             }
                             sb.AppendLine($"{indent}do");
                             sb.AppendLine($"{indent}{{");
-                            EmitStatements(node.StatementBody, sb, indent + "    ");
+                            EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
                             sb.AppendLine($"{indent}}} while ({repeatCondition});");
                             break;
                         }
                     case NodeKind.HasStatement:
                         sb.AppendLine($"{indent}if ({GenerateExpression(node.HasStatementNode.HasExpression, node.HasStatementNode.HasCondition)} != null)");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementBody, sb, indent + "    ");
+                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.HasTraitStatement:
@@ -1405,13 +1406,13 @@ namespace Puma
                             var traitType = node.HasTraitStatementNode.HasTraitTypeName ?? "Trait";
                             sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == typeof({traitType}))");
                             sb.AppendLine($"{indent}{{");
-                            EmitStatements(node.StatementBody, sb, indent + "    ");
+                            EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
                             sb.AppendLine($"{indent}}}");
                             break;
                         }
                     case NodeKind.ReturnStatement:
                         {
-                            var returnExpression = UnwrapOutermostParentheses(GenerateExpression(node.StatementExpression, node.StatementValue));
+                            var returnExpression = UnwrapOutermostParentheses(GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue));
                             if (string.IsNullOrWhiteSpace(returnExpression))
                             {
                                 sb.AppendLine($"{indent}return;");
@@ -1424,7 +1425,7 @@ namespace Puma
                             break;
                         }
                     case NodeKind.YieldStatement:
-                        sb.AppendLine($"{indent}/* yield {GenerateExpression(node.StatementExpression, node.StatementValue)} */");
+                        sb.AppendLine($"{indent}/* yield {GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue)} */");
                         break;
                     case NodeKind.BreakStatement:
                         sb.AppendLine($"{indent}break;");
@@ -1433,10 +1434,10 @@ namespace Puma
                         sb.AppendLine($"{indent}continue;");
                         break;
                     case NodeKind.ErrorStatement:
-                        sb.AppendLine($"{indent}/* error {GenerateExpression(node.StatementExpression, node.StatementValue)} */");
+                        sb.AppendLine($"{indent}/* error {GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue)} */");
                         break;
                     case NodeKind.CatchStatement:
-                        sb.AppendLine($"{indent}/* catch {GenerateExpression(node.StatementExpression, node.StatementValue)} */");
+                        sb.AppendLine($"{indent}/* catch {GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue)} */");
                         break;
                 }
             }
@@ -1542,7 +1543,8 @@ namespace Puma
 
             return node.Kind == NodeKind.FunctionDeclaration
                 && (node.FunctionDeclarationNode.FunctionParameterList?.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase)) ?? false)
-                || node.DelegateParameterList.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase));
+                || (node.Kind == NodeKind.DelegateDeclaration
+                    && (node.DelegateDeclarationNode.DelegateParameterList?.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase)) ?? false));
         }
 
         private static void TrackOwnershipTransfer(
@@ -2153,7 +2155,7 @@ namespace Puma
                     yield return functionNode;
                 }
 
-                foreach (var statementNode in EnumerateAllNodes(node.StatementBody))
+                foreach (var statementNode in EnumerateAllNodes(node.StatementNode.StatementBody ?? new List<Node>()))
                 {
                     yield return statementNode;
                 }

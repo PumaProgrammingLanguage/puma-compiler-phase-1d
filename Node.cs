@@ -283,19 +283,35 @@ namespace Puma
         public FunctionDeclarationNodes FunctionDeclarationNode;
 
         // For DelegateDeclaration nodes
-        public string? DelegateName { get; set; }
-        public List<ParameterInfo> DelegateParameterList { get; } = new();
+        public struct DelegateDeclarationNodes
+        {
+            public DelegateDeclarationNodes()
+            {
+            }
+
+            public string? DelegateName { get; set; }
+            public List<ParameterInfo> DelegateParameterList { get; } = new();
+        }
+        public DelegateDeclarationNodes DelegateDeclarationNode;
 
         // For statement nodes
-        public string? StatementValue { get; set; }
-        public List<Node> StatementBody { get; } = new();
-        public ExpressionNode? StatementExpression { get; set; }
+        public struct StatementNodes
+        {
+            public StatementNodes()
+            {
+            }
+            public string? StatementValue { get; set; }
+            public List<Node> StatementBody { get; } = new();
+            public ExpressionNode? StatementExpression { get; set; }
+        }
+        public StatementNodes StatementNode;
 
         public Node()
         {
+            StatementNode = new StatementNodes();
         }
 
-        public Node(Section section)
+        public Node(Section section) : this()
         {
             Kind = NodeKind.Section;
             Section = section;
@@ -581,7 +597,10 @@ namespace Puma
             return new Node
             {
                 Kind = kind,
-                StatementValue = value
+                StatementNode = new StatementNodes
+                {
+                    StatementValue = value
+                }
             };
         }
 
@@ -590,10 +609,13 @@ namespace Puma
             var node = new Node
             {
                 Kind = NodeKind.DelegateDeclaration,
-                DelegateName = name
+                DelegateDeclarationNode = new DelegateDeclarationNodes
+                {
+                    DelegateName = name
+                }
             };
 
-            node.DelegateParameterList.AddRange(parameterList);
+            node.DelegateDeclarationNode.DelegateParameterList.AddRange(parameterList);
             return node;
         }
     }
