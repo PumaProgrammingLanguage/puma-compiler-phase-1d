@@ -315,22 +315,6 @@ namespace Puma
         public NodeKind Kind { get; set; } = NodeKind.Section;
         public Section Section { get; set; } = Section.None;
 
-        // For TypeDeclaration nodes
-        public struct TypeDeclarationNodes
-        {
-            public TypeDeclarationNodes()
-            {
-            }
-
-            public string? DeclarationKind { get; set; }
-            public string? DeclarationName { get; set; }
-            public string? BaseTypeName { get; set; }
-            public List<string> TraitNames { get; } = new();
-            public List<Node> TypeProperties { get; } = new();
-            public List<Node> TypeFunctions { get; } = new();
-        }
-        public TypeDeclarationNodes TypeDeclarationNode;
-
         // For EnumDeclaration nodes
         public struct EnumDeclarationNodes
         {
@@ -357,34 +341,6 @@ namespace Puma
         }
         public RecordDeclarationNodes RecordDeclarationNode;
 
-        // For PropertyDeclaration nodes
-        public struct PropertyDeclarationNodes
-        {
-            public PropertyDeclarationNodes()
-            {
-            }
-            public string? PropertyName { get; set; }
-            public string? PropertyValue { get; set; }
-            public string? PropertyType { get; set; }
-            public List<string> PropertyModifiers { get; } = new();
-        }
-        public PropertyDeclarationNodes PropertyDeclarationNode;
-
-        // For AssignmentStatement nodes
-        public struct AssignmentStatementNodes
-        {
-            public string? Left { get; set; }
-            public string? Right { get; set; }
-            public string? Operator { get; set; }
-            public string? AssignmentLeft { get; set; }
-            public string? AssignmentRight { get; set; }
-            public string? AssignmentOperator { get; set; }
-            public ExpressionNode? AssignmentLeftExpression { get; set; }
-            public ExpressionNode? AssignmentRightExpression { get; set; }
-            public bool IsLoweredPostfixMutation { get; set; }
-        }
-        public AssignmentStatementNodes AssignmentStatementNode;
-
         // For Section nodes
         public struct SectionNodes
         {
@@ -398,22 +354,6 @@ namespace Puma
             public int LeadingBlankLines { get; set; }
         }
         public SectionNodes SectionNode;
-
-        // For FunctionDeclaration nodes
-        public struct FunctionDeclarationNodes
-        {
-            public FunctionDeclarationNodes()
-            {
-            }
-
-            public string? FunctionDeclarationName { get; set; }
-            public string? FunctionDeclarationParameters { get; set; }
-            public string? FunctionDeclarationReturnType { get; set; }
-            public List<string> FunctionModifiers { get; } = new();
-            public List<Node> FunctionBody { get; } = new();
-            public List<ParameterInfo> FunctionParameterList { get; } = new();
-        }
-        public FunctionDeclarationNodes FunctionDeclarationNode;
 
         public Node()
         {
@@ -453,13 +393,7 @@ namespace Puma
             {
                 DeclarationKind = declarationKind,
                 DeclarationName = name,
-                BaseTypeName = baseType,
-                TypeDeclarationNode = new TypeDeclarationNodes
-                {
-                    DeclarationKind = declarationKind,
-                    DeclarationName = name,
-                    BaseTypeName = baseType
-                }
+                BaseTypeName = baseType
             };
 
             if (traits != null)
@@ -467,7 +401,6 @@ namespace Puma
                 foreach (var trait in traits)
                 {
                     node.TraitNames.Add(trait);
-                    node.TypeDeclarationNode.TraitNames.Add(trait);
                 }
             }
 
@@ -515,19 +448,12 @@ namespace Puma
             {
                 PropertyName = name,
                 PropertyValue = value,
-                PropertyType = type,
-                PropertyDeclarationNode = new PropertyDeclarationNodes
-                {
-                    PropertyName = name,
-                    PropertyValue = value,
-                    PropertyType = type
-                }
+                PropertyType = type
             };
 
             if (modifiers != null)
             {
                 node.PropertyModifiers.AddRange(modifiers);
-                node.PropertyDeclarationNode.PropertyModifiers.AddRange(modifiers);
             }
 
             return node;
@@ -542,16 +468,7 @@ namespace Puma
                 AssignmentOperator = assignmentOperator,
                 Left = left,
                 Right = right,
-                Operator = assignmentOperator,
-                AssignmentStatementNode = new AssignmentStatementNodes
-                {
-                    AssignmentLeft = left,
-                    AssignmentRight = right,
-                    AssignmentOperator = assignmentOperator,
-                    Left = left,
-                    Right = right,
-                    Operator = assignmentOperator
-                }
+                Operator = assignmentOperator
             };
         }
 
@@ -647,23 +564,14 @@ namespace Puma
             {
                 FunctionDeclarationName = name,
                 FunctionDeclarationParameters = parameters,
-                FunctionDeclarationReturnType = returnType,
-                FunctionDeclarationNode = new FunctionDeclarationNodes
-                {
-                    FunctionDeclarationName = name,
-                    FunctionDeclarationParameters = parameters,
-                    FunctionDeclarationReturnType = returnType
-                }
+                FunctionDeclarationReturnType = returnType
             };
 
             node.FunctionParameterList.AddRange(parameterList);
             node.FunctionBody.AddRange(body);
-            node.FunctionDeclarationNode.FunctionParameterList.AddRange(parameterList);
-            node.FunctionDeclarationNode.FunctionBody.AddRange(body);
             if (modifiers != null)
             {
                 node.FunctionModifiers.AddRange(modifiers);
-                node.FunctionDeclarationNode.FunctionModifiers.AddRange(modifiers);
             }
             return node;
         }

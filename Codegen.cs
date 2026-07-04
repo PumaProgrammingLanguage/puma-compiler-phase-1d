@@ -230,8 +230,8 @@ namespace Puma
 
             var output = sb.ToString();
             var moduleNode = ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration
-                && string.Equals(n.TypeDeclarationNode.DeclarationKind, "module", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(n.TypeDeclarationNode.DeclarationName));
+                && string.Equals(GetTypeDeclarationKind(n), "module", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(GetTypeDeclarationName(n)));
             if (moduleNode != null)
             {
                 var normalizedOutput = output.Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -252,7 +252,7 @@ namespace Puma
                 }
 
                 var moduleBody = string.Join("\n", lines.Skip(lineIndex)).TrimEnd();
-                var wrappedModule = $"namespace {moduleNode.TypeDeclarationNode.DeclarationName}\n{{\n{IndentBlock(moduleBody)}\n}}\n";
+                var wrappedModule = $"namespace {GetTypeDeclarationName(moduleNode)}\n{{\n{IndentBlock(moduleBody)}\n}}\n";
                 output = includeLines.Count > 0
                     ? string.Join("\n", includeLines) + "\n\n" + wrappedModule
                     : wrappedModule;
@@ -456,16 +456,16 @@ namespace Puma
                 sb.AppendLine("// properties");
                 foreach (var node in globalProperties)
                 {
-                    var initializer = FormatAutoPropertyInitializer(node.PropertyDeclarationNode.PropertyValue, node.PropertyDeclarationNode.PropertyType);
-                    sb.AppendLine($"auto {node.PropertyDeclarationNode.PropertyName} = {initializer};");
+                    var initializer = FormatAutoPropertyInitializer(GetPropertyValue(node), GetPropertyType(node));
+                    sb.AppendLine($"auto {GetPropertyName(node)} = {initializer};");
                 }
 
                 sb.AppendLine();
                 return;
             }
 
-            var shouldEmitPropertiesHeaderWithStart = globalProperties.Any(p => p.PropertyDeclarationNode.PropertyModifiers.Contains("const"))
-                || globalProperties.Any(p => !string.IsNullOrWhiteSpace(p.PropertyDeclarationNode.PropertyType));
+            var shouldEmitPropertiesHeaderWithStart = globalProperties.Any(p => GetPropertyModifiers(p).Contains("const"))
+                || globalProperties.Any(p => !string.IsNullOrWhiteSpace(GetPropertyType(p)));
 
             if (hasStartSection && globalProperties.Count > 0 && shouldEmitPropertiesHeaderWithStart)
             {
@@ -474,11 +474,14 @@ namespace Puma
 
             foreach (var node in globalProperties)
             {
-                var modifiers = node.PropertyDeclarationNode.PropertyModifiers.Contains("const") ? "const " : string.Empty;
-                var trimmed = node.PropertyDeclarationNode.PropertyValue?.Trim() ?? string.Empty;
-                var shouldUseAuto = IsBooleanPropertyValue(node.PropertyDeclarationNode.PropertyValue)
-                    || IsStringPropertyValue(node.PropertyDeclarationNode.PropertyValue)
-                    || RequiresFixedWidthIntegerCast(node.PropertyDeclarationNode.PropertyValue, node.PropertyDeclarationNode.PropertyType)
+                var propertyValue = GetPropertyValue(node);
+                var propertyType = GetPropertyType(node);
+                var propertyName = GetPropertyName(node);
+                var modifiers = GetPropertyModifiers(node).Contains("const") ? "const " : string.Empty;
+                var trimmed = propertyValue?.Trim() ?? string.Empty;
+                var shouldUseAuto = IsBooleanPropertyValue(propertyValue)
+                    || IsStringPropertyValue(propertyValue)
+                    || RequiresFixedWidthIntegerCast(propertyValue, propertyType)
                     || double.TryParse(trimmed, out _)
                     || (!string.IsNullOrWhiteSpace(trimmed)
                         && (trimmed.Contains('(')
@@ -487,13 +490,13 @@ namespace Puma
 
                 if (shouldUseAuto)
                 {
-                    var initializer = FormatAutoPropertyInitializer(node.PropertyDeclarationNode.PropertyValue, node.PropertyDeclarationNode.PropertyType);
-                    sb.AppendLine($"{modifiers}auto {node.PropertyDeclarationNode.PropertyName} = {initializer};");
+                    var initializer = FormatAutoPropertyInitializer(propertyValue, propertyType);
+                    sb.AppendLine($"{modifiers}auto {propertyName} = {initializer};");
                 }
                 else
                 {
-                    var (type, value) = InferCTypeAndValue(node.PropertyDeclarationNode.PropertyValue);
-                    sb.AppendLine($"{modifiers}{type} {node.PropertyDeclarationNode.PropertyName} = {value};");
+                    var (type, value) = InferCTypeAndValue(propertyValue);
+                    sb.AppendLine($"{modifiers}{type} {propertyName} = {value};");
                 }
             }
 
@@ -541,62 +544,44 @@ namespace Puma
 
         private static string? GetAssignmentOperator(Node node)
         {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                return typedNode.AssignmentOperator ?? node.AssignmentStatementNode.AssignmentOperator;
-            }
-
-            return node.AssignmentStatementNode.AssignmentOperator;
+            return node is AssignmentStatementAstNode typedNode
+                ? typedNode.AssignmentOperator
+                : null;
         }
 
         private static string? GetAssignmentRight(Node node)
         {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                return typedNode.AssignmentRight ?? node.AssignmentStatementNode.AssignmentRight;
-            }
-
-            return node.AssignmentStatementNode.AssignmentRight;
+            return node is AssignmentStatementAstNode typedNode
+                ? typedNode.AssignmentRight
+                : null;
         }
 
         private static string? GetAssignmentLeft(Node node)
         {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                return typedNode.AssignmentLeft ?? node.AssignmentStatementNode.AssignmentLeft;
-            }
-
-            return node.AssignmentStatementNode.AssignmentLeft;
+            return node is AssignmentStatementAstNode typedNode
+                ? typedNode.AssignmentLeft
+                : null;
         }
 
         private static ExpressionNode? GetAssignmentLeftExpression(Node node)
         {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                return typedNode.AssignmentLeftExpression ?? node.AssignmentStatementNode.AssignmentLeftExpression;
-            }
-
-            return node.AssignmentStatementNode.AssignmentLeftExpression;
+            return node is AssignmentStatementAstNode typedNode
+                ? typedNode.AssignmentLeftExpression
+                : null;
         }
 
         private static ExpressionNode? GetAssignmentRightExpression(Node node)
         {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                return typedNode.AssignmentRightExpression ?? node.AssignmentStatementNode.AssignmentRightExpression;
-            }
-
-            return node.AssignmentStatementNode.AssignmentRightExpression;
+            return node is AssignmentStatementAstNode typedNode
+                ? typedNode.AssignmentRightExpression
+                : null;
         }
 
         private static bool GetIsLoweredPostfixMutation(Node node)
         {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                return typedNode.IsLoweredPostfixMutation || node.AssignmentStatementNode.IsLoweredPostfixMutation;
-            }
-
-            return node.AssignmentStatementNode.IsLoweredPostfixMutation;
+            return node is AssignmentStatementAstNode typedNode
+                ? typedNode.IsLoweredPostfixMutation
+                : false;
         }
 
         private static string? GetRepeatExpression(Node node)
@@ -622,51 +607,35 @@ namespace Puma
 
             return node is PropertyDeclarationAstNode typedNode
                 ? typedNode.PropertyName
-                : node.PropertyDeclarationNode.PropertyName;
+                : null;
         }
 
         private static string? GetPropertyValue(Node node)
         {
             return node is PropertyDeclarationAstNode typedNode
                 ? typedNode.PropertyValue
-                : node.PropertyDeclarationNode.PropertyValue;
+                : null;
         }
 
         private static string? GetPropertyType(Node node)
         {
             return node is PropertyDeclarationAstNode typedNode
                 ? typedNode.PropertyType
-                : node.PropertyDeclarationNode.PropertyType;
+                : null;
         }
 
         private static List<Node>? GetFunctionBody(Node node)
         {
-            if (node is FunctionDeclarationAstNode typedNode)
-            {
-                if (typedNode.FunctionBody.Count > 0)
-                {
-                    return typedNode.FunctionBody;
-                }
-
-                return node.FunctionDeclarationNode.FunctionBody;
-            }
-
-            return node.FunctionDeclarationNode.FunctionBody;
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionBody
+                : null;
         }
 
         private static List<Node.ParameterInfo>? GetFunctionParameterList(Node node)
         {
-            if (node is FunctionDeclarationAstNode typedNode)
-            {
-                if (typedNode.FunctionParameterList.Count > 0)
-                {
-                    return typedNode.FunctionParameterList;
-                }
-
-                return node.FunctionDeclarationNode.FunctionParameterList;
-            }
-
-            return node.FunctionDeclarationNode.FunctionParameterList;
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionParameterList
+                : null;
         }
 
         private static List<Node.ParameterInfo>? GetDelegateParameterList(Node node)
@@ -697,7 +666,7 @@ namespace Puma
                 return typedNode.PropertyModifiers;
             }
 
-            return node.PropertyDeclarationNode.PropertyModifiers;
+            return new List<string>();
         }
 
         private static List<string> GetFunctionModifiers(Node node)
@@ -707,7 +676,7 @@ namespace Puma
                 return typedNode.FunctionModifiers;
             }
 
-            return node.FunctionDeclarationNode.FunctionModifiers;
+            return new List<string>();
         }
 
         private static string? GetDelegateDeclarationName(Node node)
@@ -719,52 +688,30 @@ namespace Puma
 
         private static List<Node> GetTypeProperties(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode)
-            {
-                if (typedNode.TypeProperties.Count > 0)
-                {
-                    return typedNode.TypeProperties;
-                }
-
-                return node.TypeDeclarationNode.TypeProperties;
-            }
-
-            return node.TypeDeclarationNode.TypeProperties;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TypeProperties
+                : new List<Node>();
         }
 
         private static List<Node> GetTypeFunctions(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode)
-            {
-                if (typedNode.TypeFunctions.Count > 0)
-                {
-                    return typedNode.TypeFunctions;
-                }
-
-                return node.TypeDeclarationNode.TypeFunctions;
-            }
-
-            return node.TypeDeclarationNode.TypeFunctions;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TypeFunctions
+                : new List<Node>();
         }
 
         private static string? GetFunctionDeclarationName(Node node)
         {
-            if (node is FunctionDeclarationAstNode typedNode)
-            {
-                return typedNode.FunctionDeclarationName ?? node.FunctionDeclarationNode.FunctionDeclarationName;
-            }
-
-            return node.FunctionDeclarationNode.FunctionDeclarationName;
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionDeclarationName
+                : null;
         }
 
         private static string? GetFunctionDeclarationReturnType(Node node)
         {
-            if (node is FunctionDeclarationAstNode typedNode)
-            {
-                return typedNode.FunctionDeclarationReturnType ?? node.FunctionDeclarationNode.FunctionDeclarationReturnType;
-            }
-
-            return node.FunctionDeclarationNode.FunctionDeclarationReturnType;
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionDeclarationReturnType
+                : null;
         }
 
         private static ExpressionNode? GetFunctionCallExpression(Node node)
@@ -797,47 +744,30 @@ namespace Puma
 
         private static string? GetTypeDeclarationKind(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode)
-            {
-                return typedNode.DeclarationKind ?? node.TypeDeclarationNode.DeclarationKind;
-            }
-
-            return node.TypeDeclarationNode.DeclarationKind;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.DeclarationKind
+                : null;
         }
 
         private static string? GetTypeDeclarationName(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode)
-            {
-                return typedNode.DeclarationName ?? node.TypeDeclarationNode.DeclarationName;
-            }
-
-            return node.TypeDeclarationNode.DeclarationName;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.DeclarationName
+                : null;
         }
 
         private static string? GetTypeBaseTypeName(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode)
-            {
-                return typedNode.BaseTypeName ?? node.TypeDeclarationNode.BaseTypeName;
-            }
-
-            return node.TypeDeclarationNode.BaseTypeName;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.BaseTypeName
+                : null;
         }
 
         private static List<string> GetTypeTraitNames(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode)
-            {
-                if (typedNode.TraitNames.Count > 0)
-                {
-                    return typedNode.TraitNames;
-                }
-
-                return node.TypeDeclarationNode.TraitNames;
-            }
-
-            return node.TypeDeclarationNode.TraitNames;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TraitNames
+                : new List<string>();
         }
 
         private static string? GetStatementValue(Node node)

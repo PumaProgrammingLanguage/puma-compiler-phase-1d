@@ -429,7 +429,9 @@ namespace Puma
             }
 
             var argumentTexts = SplitCallArgumentTexts(argumentTokens);
-            var declarationParameters = declaration.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>();
+            var declarationParameters = declaration is FunctionDeclarationAstNode typedDeclaration
+                ? typedDeclaration.FunctionParameterList
+                : new List<Node.ParameterInfo>();
             var max = Math.Min(Math.Min(callExpression.Arguments.Count, declarationParameters.Count), argumentTexts.Count);
             for (var i = 0; i < max; i++)
             {
@@ -2244,89 +2246,77 @@ namespace Puma
         {
             return node is TypeDeclarationAstNode typedNode
                 ? typedNode.DeclarationKind
-                : node.TypeDeclarationNode.DeclarationKind;
+                : null;
         }
 
         private static string? GetTypeDeclarationName(Node node)
         {
             return node is TypeDeclarationAstNode typedNode
                 ? typedNode.DeclarationName
-                : node.TypeDeclarationNode.DeclarationName;
+                : null;
         }
 
         private static List<string> GetTypeTraitNames(Node node)
         {
             return node is TypeDeclarationAstNode typedNode
                 ? typedNode.TraitNames
-                : node.TypeDeclarationNode.TraitNames;
+                : new List<string>();
         }
 
         private static List<Node> GetTypeProperties(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode && typedNode.TypeProperties.Count > 0)
-            {
-                return typedNode.TypeProperties;
-            }
-
-            return node.TypeDeclarationNode.TypeProperties;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TypeProperties
+                : new List<Node>();
         }
 
         private static List<Node> GetTypeFunctions(Node node)
         {
-            if (node is TypeDeclarationAstNode typedNode && typedNode.TypeFunctions.Count > 0)
-            {
-                return typedNode.TypeFunctions;
-            }
-
-            return node.TypeDeclarationNode.TypeFunctions;
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TypeFunctions
+                : new List<Node>();
         }
 
         private static string? GetPropertyName(Node node)
         {
             return node is PropertyDeclarationAstNode typedNode
                 ? typedNode.PropertyName
-                : node.PropertyDeclarationNode.PropertyName;
+                : null;
         }
 
         private static string? GetPropertyType(Node node)
         {
             return node is PropertyDeclarationAstNode typedNode
                 ? typedNode.PropertyType
-                : node.PropertyDeclarationNode.PropertyType;
+                : null;
         }
 
         private static string? GetFunctionDeclarationName(Node node)
         {
             return node is FunctionDeclarationAstNode typedNode
                 ? typedNode.FunctionDeclarationName
-                : node.FunctionDeclarationNode.FunctionDeclarationName;
+                : null;
         }
 
         private static string? GetFunctionDeclarationReturnType(Node node)
         {
             return node is FunctionDeclarationAstNode typedNode
                 ? typedNode.FunctionDeclarationReturnType
-                : node.FunctionDeclarationNode.FunctionDeclarationReturnType;
+                : null;
         }
 
         private static List<Node> GetFunctionBody(Node node)
         {
-            if (node is FunctionDeclarationAstNode typedNode && typedNode.FunctionBody.Count > 0)
-            {
-                return typedNode.FunctionBody;
-            }
-
-            return node.FunctionDeclarationNode.FunctionBody;
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionBody
+                : new List<Node>();
         }
 
         private static List<Node.ParameterInfo> GetFunctionParameterList(Node node)
         {
-            if (node is FunctionDeclarationAstNode typedNode && typedNode.FunctionParameterList.Count > 0)
-            {
-                return typedNode.FunctionParameterList;
-            }
-
-            return node.FunctionDeclarationNode.FunctionParameterList;
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionParameterList
+                : new List<Node.ParameterInfo>();
         }
 
         private static List<Node> GetStatementBody(Node node)
@@ -2377,10 +2367,6 @@ namespace Puma
                 typedNode.AssignmentRightExpression = rightExpression;
                 typedNode.IsLoweredPostfixMutation = isLoweredPostfixMutation;
             }
-
-            node.AssignmentStatementNode.AssignmentLeftExpression = leftExpression;
-            node.AssignmentStatementNode.AssignmentRightExpression = rightExpression;
-            node.AssignmentStatementNode.IsLoweredPostfixMutation = isLoweredPostfixMutation;
         }
 
         private static void SetIfConditionExpression(Node node, ExpressionNode? expression)
