@@ -236,7 +236,8 @@ namespace Puma
                 }
                 Console.Error.WriteLine(stderr);
             }
-            else if (process.ExitCode != 0)
+
+            if (process.ExitCode != 0)
             {
                 Console.Error.WriteLine($"clang++ exit code: {process.ExitCode}");
             }
