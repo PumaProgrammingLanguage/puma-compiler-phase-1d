@@ -261,6 +261,12 @@ namespace Puma
 
         private static string? FindPumaTypeDirectory()
         {
+            var packagedDirectory = Path.Combine(AppContext.BaseDirectory, "PumaType");
+            if (IsPumaTypeDirectory(packagedDirectory))
+            {
+                return packagedDirectory;
+            }
+
             foreach (var root in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
             {
                 var directory = FindPumaTypeDirectory(root);
@@ -284,14 +290,7 @@ namespace Puma
             while (directory != null)
             {
                 var candidate = Path.Combine(directory.FullName, "PumaType");
-                if (Directory.Exists(candidate)
-                    && File.Exists(Path.Combine(candidate, "String.hpp"))
-                    && File.Exists(Path.Combine(candidate, "String.cpp"))
-                    && File.Exists(Path.Combine(candidate, "Character.hpp"))
-                    && File.Exists(Path.Combine(candidate, "Character.cpp"))
-                    && File.Exists(Path.Combine(candidate, "StringIterator.hpp"))
-                    && File.Exists(Path.Combine(candidate, "StringIterator.cpp"))
-                    )
+                if (IsPumaTypeDirectory(candidate))
                 {
                     return candidate;
                 }
@@ -300,6 +299,18 @@ namespace Puma
             }
 
             return null;
+        }
+
+        private static bool IsPumaTypeDirectory(string? candidate)
+        {
+            return !string.IsNullOrWhiteSpace(candidate)
+                && Directory.Exists(candidate)
+                && File.Exists(Path.Combine(candidate, "String.hpp"))
+                && File.Exists(Path.Combine(candidate, "String.cpp"))
+                && File.Exists(Path.Combine(candidate, "Character.hpp"))
+                && File.Exists(Path.Combine(candidate, "Character.cpp"))
+                && File.Exists(Path.Combine(candidate, "StringIterator.hpp"))
+                && File.Exists(Path.Combine(candidate, "StringIterator.cpp"));
         }
 
         private static void PrintHelp()
