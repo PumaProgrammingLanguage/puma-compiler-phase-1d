@@ -358,12 +358,6 @@ namespace Puma
         {
         }
 
-        public Node(Section section) : this()
-        {
-            Kind = NodeKind.Section;
-            Section = section;
-        }
-
         public static Node CreateSection(Section section, int leadingBlankLines = 0)
         {
             return new SectionAstNode(section)
