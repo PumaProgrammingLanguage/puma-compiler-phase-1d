@@ -39,15 +39,15 @@ namespace Puma
             var allNodes = EnumerateAllNodes(ast).ToList();
 
             var needsStdBool = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentStatementNode.AssignmentOperator == "="
-                && (string.Equals(n.AssignmentStatementNode.AssignmentRight, "true", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(n.AssignmentStatementNode.AssignmentRight, "false", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(n.AssignmentStatementNode.AssignmentRight, "bool", StringComparison.OrdinalIgnoreCase)));
+                && GetAssignmentOperator(n) == "="
+                && (string.Equals(GetAssignmentRight(n), "true", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(GetAssignmentRight(n), "false", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(GetAssignmentRight(n), "bool", StringComparison.OrdinalIgnoreCase)));
             if (!needsStdBool)
             {
                 needsStdBool = allNodes.Any(n => n.Kind == NodeKind.RepeatStatement
-                    && (string.IsNullOrWhiteSpace(n.RepeatStatementNode.RepeatExpression)
-                        || string.Equals(n.RepeatStatementNode.RepeatExpression, "1", StringComparison.Ordinal)));
+                    && (string.IsNullOrWhiteSpace(GetRepeatExpression(n))
+                        || string.Equals(GetRepeatExpression(n), "1", StringComparison.Ordinal)));
             }
             if (needsStdBool)
             {
@@ -55,38 +55,38 @@ namespace Puma
             }
 
             var needsString = ast.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentStatementNode.AssignmentOperator == "="
-                && (!string.IsNullOrWhiteSpace(n.AssignmentStatementNode.AssignmentRight)
-                    && (string.Equals(n.AssignmentStatementNode.AssignmentRight, "str", StringComparison.OrdinalIgnoreCase)
-                        || n.AssignmentStatementNode.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))));
+                && GetAssignmentOperator(n) == "="
+                && (!string.IsNullOrWhiteSpace(GetAssignmentRight(n))
+                    && (string.Equals(GetAssignmentRight(n), "str", StringComparison.OrdinalIgnoreCase)
+                        || GetAssignmentRight(n).StartsWith("\"", StringComparison.Ordinal))));
             if (needsString)
             {
                 includes.Add("<String.hpp>");
             }
 
             var needsStringH = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration)
-                .Any(fn => EnumerateAllNodes(fn.FunctionDeclarationNode.FunctionBody ?? new List<Node>())
+                .Any(fn => EnumerateAllNodes(GetFunctionBody(fn) ?? new List<Node>())
                     .Any(n => n.Kind == NodeKind.AssignmentStatement
-                        && n.AssignmentStatementNode.AssignmentOperator == "="
-                        && !string.IsNullOrWhiteSpace(n.AssignmentStatementNode.AssignmentRight)
-                        && n.AssignmentStatementNode.AssignmentRight.StartsWith("\"", StringComparison.Ordinal)));
+                        && GetAssignmentOperator(n) == "="
+                        && !string.IsNullOrWhiteSpace(GetAssignmentRight(n))
+                        && GetAssignmentRight(n).StartsWith("\"", StringComparison.Ordinal)));
             if (needsStringH)
             {
                 includes.Add("<String.hpp>");
             }
 
             var needsCharacter = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentStatementNode.AssignmentOperator == "="
-                && IsCharacterLiteralText(n.AssignmentStatementNode.AssignmentRight))
+                && GetAssignmentOperator(n) == "="
+                && IsCharacterLiteralText(GetAssignmentRight(n)))
                 || ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
-                    && (IsCharacterLiteralText(n.PropertyDeclarationNode.PropertyValue)
-                        || string.Equals(n.PropertyDeclarationNode.PropertyType, "char", StringComparison.OrdinalIgnoreCase)))
+                    && (IsCharacterLiteralText(GetPropertyValue(n))
+                        || string.Equals(GetPropertyType(n), "char", StringComparison.OrdinalIgnoreCase)))
                 || allNodes.Any(n => (n.Kind == NodeKind.FunctionDeclaration
-                        && (n.FunctionDeclarationNode.FunctionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
+                        && (GetFunctionParameterList(n)?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
                     || (n.Kind == NodeKind.Section
                         && (n.SectionNode.SectionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
                     || (n.Kind == NodeKind.DelegateDeclaration
-                        && (n.DelegateDeclarationNode.DelegateParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false)));
+                        && (GetDelegateParameterList(n)?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false)));
             if (needsCharacter)
             {
                 includes.Add("<Character.hpp>");
@@ -136,45 +136,45 @@ namespace Puma
             var autoPropertiesMode = !hasStartSection && propertyDeclarations.Count > 0;
             if (autoPropertiesMode)
             {
-                if (propertyDeclarations.Any(p => RequiresFixedWidthIntegerCast(p.PropertyDeclarationNode.PropertyValue, p.PropertyDeclarationNode.PropertyType)))
+                if (propertyDeclarations.Any(p => RequiresFixedWidthIntegerCast(GetPropertyValue(p), GetPropertyType(p))))
                 {
                     includes.Add("<stdint>");
                 }
 
-                if (propertyDeclarations.Any(p => IsBooleanPropertyValue(p.PropertyDeclarationNode.PropertyValue)))
+                if (propertyDeclarations.Any(p => IsBooleanPropertyValue(GetPropertyValue(p))))
                 {
                     includes.Add("<stdbool>");
                 }
 
-                if (propertyDeclarations.Any(p => IsStringPropertyValue(p.PropertyDeclarationNode.PropertyValue)))
+                if (propertyDeclarations.Any(p => IsStringPropertyValue(GetPropertyValue(p))))
                 {
                     includes.Add("<String.hpp>");
                 }
             }
 
             var needsStdIntForFunctionParameters = allNodes.Any(n => n.Kind == NodeKind.FunctionDeclaration
-                && (n.FunctionDeclarationNode.FunctionParameterList?.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t") ?? false));
+                && (GetFunctionParameterList(n)?.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t") ?? false));
             if (needsStdIntForFunctionParameters)
             {
                 includes.Add("<stdint>");
             }
 
             var propertyNames = propertyDeclarations
-                .Select(n => n.PropertyDeclarationNode.PropertyName)
+                .Select(GetPropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
             var numericPropertyReassignmentMode = UsesTypedPropertyReassignmentMode(ast);
 
             var needsCStdIntForAssignments = hasStartSection && allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
-                && n.AssignmentStatementNode.AssignmentOperator == "="
-                && TryGetTypedLiteralDeclaration(n.AssignmentStatementNode.AssignmentRight ?? string.Empty, out var typeName, out _)
+                && GetAssignmentOperator(n) == "="
+                && TryGetTypedLiteralDeclaration(GetAssignmentRight(n) ?? string.Empty, out var typeName, out _)
                 && typeName is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t");
             var shouldIncludeCStdIntForAssignments = needsCStdIntForAssignments
                 && (numericPropertyReassignmentMode
                     || !propertyDeclarations.Any()
                     || includes.Contains("<String.hpp>")
-                    || !string.IsNullOrWhiteSpace(propertyDeclarations.FirstOrDefault()?.PropertyDeclarationNode.PropertyName));
+                    || !string.IsNullOrWhiteSpace(GetPropertyName(propertyDeclarations.FirstOrDefault())));
             if (shouldIncludeCStdIntForAssignments && !autoPropertiesMode)
             {
                 includes.Add("<cstdint>");
@@ -182,9 +182,9 @@ namespace Puma
 
             foreach (var node in ast.Where(n => n.Kind == NodeKind.UseStatement))
             {
-                if (node.UseStatementNode.IsFilePath && !string.IsNullOrWhiteSpace(node.UseStatementNode.Target))
+                if (GetUseStatementIsFilePath(node) && !string.IsNullOrWhiteSpace(GetUseStatementTarget(node)))
                 {
-                    var includeTarget = node.UseStatementNode.Target;
+                    var includeTarget = GetUseStatementTarget(node)!;
                     if (includeTarget.EndsWith(".puma", StringComparison.OrdinalIgnoreCase))
                     {
                         includeTarget = includeTarget[..^5] + ".h";
@@ -192,9 +192,9 @@ namespace Puma
 
                     includes.Add($"\"{includeTarget}\"");
                 }
-                else if (!string.IsNullOrWhiteSpace(node.UseStatementNode.Target))
+                else if (!string.IsNullOrWhiteSpace(GetUseStatementTarget(node)))
                 {
-                    includes.Add($"<{node.UseStatementNode.Target.Replace('.', '/')}>");
+                    includes.Add($"<{GetUseStatementTarget(node)!.Replace('.', '/')}>");
                 }
             }
 
@@ -211,8 +211,8 @@ namespace Puma
             }
 
             var typeDeclarations = ast.Where(n => n.Kind == NodeKind.TypeDeclaration).ToList();
-            var typeProperties = typeDeclarations.SelectMany(n => n.TypeDeclarationNode.TypeProperties).ToHashSet();
-            var typeFunctions = typeDeclarations.SelectMany(n => n.TypeDeclarationNode.TypeFunctions).ToHashSet();
+            var typeProperties = typeDeclarations.SelectMany(GetTypeProperties).ToHashSet();
+            var typeFunctions = typeDeclarations.SelectMany(GetTypeFunctions).ToHashSet();
 
             EmitEnums(ast, sb);
             EmitRecords(ast, sb);
@@ -539,6 +539,544 @@ namespace Puma
                 && text.EndsWith("'", StringComparison.Ordinal);
         }
 
+        private static string? GetAssignmentOperator(Node node)
+        {
+            if (node is AssignmentStatementAstNode typedNode)
+            {
+                return typedNode.AssignmentOperator ?? node.AssignmentStatementNode.AssignmentOperator;
+            }
+
+            return node.AssignmentStatementNode.AssignmentOperator;
+        }
+
+        private static string? GetAssignmentRight(Node node)
+        {
+            if (node is AssignmentStatementAstNode typedNode)
+            {
+                return typedNode.AssignmentRight ?? node.AssignmentStatementNode.AssignmentRight;
+            }
+
+            return node.AssignmentStatementNode.AssignmentRight;
+        }
+
+        private static string? GetAssignmentLeft(Node node)
+        {
+            if (node is AssignmentStatementAstNode typedNode)
+            {
+                return typedNode.AssignmentLeft ?? node.AssignmentStatementNode.AssignmentLeft;
+            }
+
+            return node.AssignmentStatementNode.AssignmentLeft;
+        }
+
+        private static ExpressionNode? GetAssignmentLeftExpression(Node node)
+        {
+            if (node is AssignmentStatementAstNode typedNode)
+            {
+                return typedNode.AssignmentLeftExpression ?? node.AssignmentStatementNode.AssignmentLeftExpression;
+            }
+
+            return node.AssignmentStatementNode.AssignmentLeftExpression;
+        }
+
+        private static ExpressionNode? GetAssignmentRightExpression(Node node)
+        {
+            if (node is AssignmentStatementAstNode typedNode)
+            {
+                return typedNode.AssignmentRightExpression ?? node.AssignmentStatementNode.AssignmentRightExpression;
+            }
+
+            return node.AssignmentStatementNode.AssignmentRightExpression;
+        }
+
+        private static bool GetIsLoweredPostfixMutation(Node node)
+        {
+            if (node is AssignmentStatementAstNode typedNode)
+            {
+                return typedNode.IsLoweredPostfixMutation || node.AssignmentStatementNode.IsLoweredPostfixMutation;
+            }
+
+            return node.AssignmentStatementNode.IsLoweredPostfixMutation;
+        }
+
+        private static string? GetRepeatExpression(Node node)
+        {
+            if (node is RepeatStatementAstNode typedNode)
+            {
+                return typedNode.RepeatExpression ?? node.RepeatStatementNode.RepeatExpression;
+            }
+
+            return node.RepeatStatementNode.RepeatExpression;
+        }
+
+        private static ExpressionNode? GetRepeatExpressionNode(Node node)
+        {
+            if (node is RepeatStatementAstNode typedNode)
+            {
+                return typedNode.RepeatExpressionNode ?? node.RepeatStatementNode.RepeatExpressionNode;
+            }
+
+            return node.RepeatStatementNode.RepeatExpressionNode;
+        }
+
+        private static string? GetPropertyName(Node? node)
+        {
+            if (node == null)
+            {
+                return null;
+            }
+
+            return node is PropertyDeclarationAstNode typedNode
+                ? typedNode.PropertyName
+                : node.PropertyDeclarationNode.PropertyName;
+        }
+
+        private static string? GetPropertyValue(Node node)
+        {
+            return node is PropertyDeclarationAstNode typedNode
+                ? typedNode.PropertyValue
+                : node.PropertyDeclarationNode.PropertyValue;
+        }
+
+        private static string? GetPropertyType(Node node)
+        {
+            return node is PropertyDeclarationAstNode typedNode
+                ? typedNode.PropertyType
+                : node.PropertyDeclarationNode.PropertyType;
+        }
+
+        private static List<Node>? GetFunctionBody(Node node)
+        {
+            if (node is FunctionDeclarationAstNode typedNode)
+            {
+                if (typedNode.FunctionBody.Count > 0)
+                {
+                    return typedNode.FunctionBody;
+                }
+
+                return node.FunctionDeclarationNode.FunctionBody;
+            }
+
+            return node.FunctionDeclarationNode.FunctionBody;
+        }
+
+        private static List<Node.ParameterInfo>? GetFunctionParameterList(Node node)
+        {
+            if (node is FunctionDeclarationAstNode typedNode)
+            {
+                if (typedNode.FunctionParameterList.Count > 0)
+                {
+                    return typedNode.FunctionParameterList;
+                }
+
+                return node.FunctionDeclarationNode.FunctionParameterList;
+            }
+
+            return node.FunctionDeclarationNode.FunctionParameterList;
+        }
+
+        private static List<Node.ParameterInfo>? GetDelegateParameterList(Node node)
+        {
+            if (node is DelegateDeclarationAstNode typedNode)
+            {
+                if (typedNode.DelegateParameterList.Count > 0)
+                {
+                    return typedNode.DelegateParameterList;
+                }
+
+                return node.DelegateDeclarationNode.DelegateParameterList;
+            }
+
+            return node.DelegateDeclarationNode.DelegateParameterList;
+        }
+
+        private static string? GetUseStatementTarget(Node node)
+        {
+            return node is UseStatementAstNode typedNode
+                ? typedNode.Target
+                : null;
+        }
+
+        private static bool GetUseStatementIsFilePath(Node node)
+        {
+            return node is UseStatementAstNode typedNode
+                ? typedNode.IsFilePath
+                : false;
+        }
+
+        private static List<string> GetPropertyModifiers(Node node)
+        {
+            if (node is PropertyDeclarationAstNode typedNode && typedNode.PropertyModifiers.Count > 0)
+            {
+                return typedNode.PropertyModifiers;
+            }
+
+            return node.PropertyDeclarationNode.PropertyModifiers;
+        }
+
+        private static List<string> GetFunctionModifiers(Node node)
+        {
+            if (node is FunctionDeclarationAstNode typedNode && typedNode.FunctionModifiers.Count > 0)
+            {
+                return typedNode.FunctionModifiers;
+            }
+
+            return node.FunctionDeclarationNode.FunctionModifiers;
+        }
+
+        private static string? GetDelegateDeclarationName(Node node)
+        {
+            if (node is DelegateDeclarationAstNode typedNode)
+            {
+                return typedNode.DelegateName ?? node.DelegateDeclarationNode.DelegateName;
+            }
+
+            return node.DelegateDeclarationNode.DelegateName;
+        }
+
+        private static List<Node> GetTypeProperties(Node node)
+        {
+            if (node is TypeDeclarationAstNode typedNode)
+            {
+                if (typedNode.TypeProperties.Count > 0)
+                {
+                    return typedNode.TypeProperties;
+                }
+
+                return node.TypeDeclarationNode.TypeProperties;
+            }
+
+            return node.TypeDeclarationNode.TypeProperties;
+        }
+
+        private static List<Node> GetTypeFunctions(Node node)
+        {
+            if (node is TypeDeclarationAstNode typedNode)
+            {
+                if (typedNode.TypeFunctions.Count > 0)
+                {
+                    return typedNode.TypeFunctions;
+                }
+
+                return node.TypeDeclarationNode.TypeFunctions;
+            }
+
+            return node.TypeDeclarationNode.TypeFunctions;
+        }
+
+        private static string? GetFunctionDeclarationName(Node node)
+        {
+            if (node is FunctionDeclarationAstNode typedNode)
+            {
+                return typedNode.FunctionDeclarationName ?? node.FunctionDeclarationNode.FunctionDeclarationName;
+            }
+
+            return node.FunctionDeclarationNode.FunctionDeclarationName;
+        }
+
+        private static string? GetFunctionDeclarationReturnType(Node node)
+        {
+            if (node is FunctionDeclarationAstNode typedNode)
+            {
+                return typedNode.FunctionDeclarationReturnType ?? node.FunctionDeclarationNode.FunctionDeclarationReturnType;
+            }
+
+            return node.FunctionDeclarationNode.FunctionDeclarationReturnType;
+        }
+
+        private static ExpressionNode? GetFunctionCallExpression(Node node)
+        {
+            return node is FunctionCallAstNode typedNode
+                ? typedNode.Expression
+                : null;
+        }
+
+        private static string? GetFunctionCallName(Node node)
+        {
+            return node is FunctionCallAstNode typedNode
+                ? typedNode.Name
+                : null;
+        }
+
+        private static string? GetFunctionCallArguments(Node node)
+        {
+            return node is FunctionCallAstNode typedNode
+                ? typedNode.Arguments
+                : null;
+        }
+
+        private static string? GetWriteLineStringValue(Node node)
+        {
+            return node is WriteLineAstNode typedNode
+                ? typedNode.StringValue
+                : null;
+        }
+
+        private static string? GetTypeDeclarationKind(Node node)
+        {
+            if (node is TypeDeclarationAstNode typedNode)
+            {
+                return typedNode.DeclarationKind ?? node.TypeDeclarationNode.DeclarationKind;
+            }
+
+            return node.TypeDeclarationNode.DeclarationKind;
+        }
+
+        private static string? GetTypeDeclarationName(Node node)
+        {
+            if (node is TypeDeclarationAstNode typedNode)
+            {
+                return typedNode.DeclarationName ?? node.TypeDeclarationNode.DeclarationName;
+            }
+
+            return node.TypeDeclarationNode.DeclarationName;
+        }
+
+        private static string? GetTypeBaseTypeName(Node node)
+        {
+            if (node is TypeDeclarationAstNode typedNode)
+            {
+                return typedNode.BaseTypeName ?? node.TypeDeclarationNode.BaseTypeName;
+            }
+
+            return node.TypeDeclarationNode.BaseTypeName;
+        }
+
+        private static List<string> GetTypeTraitNames(Node node)
+        {
+            if (node is TypeDeclarationAstNode typedNode)
+            {
+                if (typedNode.TraitNames.Count > 0)
+                {
+                    return typedNode.TraitNames;
+                }
+
+                return node.TypeDeclarationNode.TraitNames;
+            }
+
+            return node.TypeDeclarationNode.TraitNames;
+        }
+
+        private static string? GetStatementValue(Node node)
+        {
+            if (node is StatementAstNode typedNode)
+            {
+                return typedNode.StatementValue ?? node.StatementNode.StatementValue;
+            }
+
+            return node.StatementNode.StatementValue;
+        }
+
+        private static ExpressionNode? GetStatementExpression(Node node)
+        {
+            if (node is StatementAstNode typedNode)
+            {
+                return typedNode.StatementExpression ?? node.StatementNode.StatementExpression;
+            }
+
+            return node.StatementNode.StatementExpression;
+        }
+
+        private static List<Node> GetStatementBody(Node node)
+        {
+            if (node is StatementAstNode typedNode)
+            {
+                if (typedNode.StatementBody.Count > 0)
+                {
+                    return typedNode.StatementBody;
+                }
+
+                return node.StatementNode.StatementBody;
+            }
+
+            return node.StatementNode.StatementBody;
+        }
+
+        private static string? GetIfCondition(Node node)
+        {
+            if (node is IfStatementAstNode typedNode)
+            {
+                return typedNode.IfCondition ?? node.IfStatementNode.IfCondition;
+            }
+
+            return node.IfStatementNode.IfCondition;
+        }
+
+        private static ExpressionNode? GetIfConditionExpression(Node node)
+        {
+            if (node is IfStatementAstNode typedNode)
+            {
+                return typedNode.ConditionExpression ?? node.IfStatementNode.ConditionExpression;
+            }
+
+            return node.IfStatementNode.ConditionExpression;
+        }
+
+        private static List<Node> GetIfElseBody(Node node)
+        {
+            if (node is IfStatementAstNode typedNode)
+            {
+                if (typedNode.ElseBody.Count > 0)
+                {
+                    return typedNode.ElseBody;
+                }
+
+                return node.IfStatementNode.ElseBody;
+            }
+
+            return node.IfStatementNode.ElseBody;
+        }
+
+        private static string? GetMatchExpression(Node node)
+        {
+            if (node is MatchStatementAstNode typedNode)
+            {
+                return typedNode.Expression ?? node.MatchStatementNode.Expression;
+            }
+
+            return node.MatchStatementNode.Expression;
+        }
+
+        private static ExpressionNode? GetMatchExpressionNode(Node node)
+        {
+            if (node is MatchStatementAstNode typedNode)
+            {
+                return typedNode.ExpressionNode ?? node.MatchStatementNode.ExpressionNode;
+            }
+
+            return node.MatchStatementNode.ExpressionNode;
+        }
+
+        private static string? GetWhenCondition(Node node)
+        {
+            if (node is WhenStatementAstNode typedNode)
+            {
+                return typedNode.WhenCondition ?? node.WhenStatementNode.WhenCondition;
+            }
+
+            return node.WhenStatementNode.WhenCondition;
+        }
+
+        private static ExpressionNode? GetWhenExpression(Node node)
+        {
+            if (node is WhenStatementAstNode typedNode)
+            {
+                return typedNode.WhenExpression ?? node.WhenStatementNode.WhenExpression;
+            }
+
+            return node.WhenStatementNode.WhenExpression;
+        }
+
+        private static string? GetWhileCondition(Node node)
+        {
+            if (node is WhileStatementAstNode typedNode)
+            {
+                return typedNode.WhileCondition ?? node.WhileStatementNode.WhileCondition;
+            }
+
+            return node.WhileStatementNode.WhileCondition;
+        }
+
+        private static ExpressionNode? GetWhileExpression(Node node)
+        {
+            if (node is WhileStatementAstNode typedNode)
+            {
+                return typedNode.WhileExpression ?? node.WhileStatementNode.WhileExpression;
+            }
+
+            return node.WhileStatementNode.WhileExpression;
+        }
+
+        private static string? GetForVariable(Node node)
+        {
+            return node.Kind switch
+            {
+                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForVariable ?? node.ForStatementNode.ForVariable,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForVariable ?? node.ForStatementNode.ForVariable,
+                _ => node.ForStatementNode.ForVariable
+            };
+        }
+
+        private static string? GetForContainer(Node node)
+        {
+            return node.Kind switch
+            {
+                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForContainer ?? node.ForStatementNode.ForContainer,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForContainer ?? node.ForStatementNode.ForContainer,
+                _ => node.ForStatementNode.ForContainer
+            };
+        }
+
+        private static ExpressionNode? GetForContainerExpression(Node node)
+        {
+            return node.Kind switch
+            {
+                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForContainerExpression ?? node.ForStatementNode.ForContainerExpression,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForContainerExpression ?? node.ForStatementNode.ForContainerExpression,
+                _ => node.ForStatementNode.ForContainerExpression
+            };
+        }
+
+        private static string? GetHasCondition(Node node)
+        {
+            if (node is HasStatementAstNode typedNode)
+            {
+                return typedNode.HasCondition ?? node.HasStatementNode.HasCondition;
+            }
+
+            return node.HasStatementNode.HasCondition;
+        }
+
+        private static ExpressionNode? GetHasExpression(Node node)
+        {
+            if (node is HasStatementAstNode typedNode)
+            {
+                return typedNode.HasExpression ?? node.HasStatementNode.HasExpression;
+            }
+
+            return node.HasStatementNode.HasExpression;
+        }
+
+        private static string? GetHasTraitTypeName(Node node)
+        {
+            if (node is HasTraitStatementAstNode typedNode)
+            {
+                return typedNode.HasTraitTypeName ?? node.HasTraitStatementNode.HasTraitTypeName;
+            }
+
+            return node.HasTraitStatementNode.HasTraitTypeName;
+        }
+
+        private static string? GetHasTraitVariableName(Node node)
+        {
+            if (node is HasTraitStatementAstNode typedNode)
+            {
+                return typedNode.HasTraitVariableName ?? node.HasTraitStatementNode.HasTraitVariableName;
+            }
+
+            return node.HasTraitStatementNode.HasTraitVariableName;
+        }
+
+        private static string? GetHasTraitCondition(Node node)
+        {
+            if (node is HasTraitStatementAstNode typedNode)
+            {
+                return typedNode.HasTraitCondition ?? node.HasTraitStatementNode.HasTraitCondition;
+            }
+
+            return node.HasTraitStatementNode.HasTraitCondition;
+        }
+
+        private static ExpressionNode? GetHasTraitExpression(Node node)
+        {
+            if (node is HasTraitStatementAstNode typedNode)
+            {
+                return typedNode.HasTraitExpression ?? node.HasTraitStatementNode.HasTraitExpression;
+            }
+
+            return node.HasTraitStatementNode.HasTraitExpression;
+        }
+
         private static string FormatAutoPropertyInitializer(string? value, string? declaredType)
         {
             var text = value?.Trim() ?? string.Empty;
@@ -738,14 +1276,14 @@ namespace Puma
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
         {
             var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
-                .Select(n => n.PropertyDeclarationNode.PropertyName)
+                .Select(GetPropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
             foreach (var node in ast.Where(n => n.Kind == NodeKind.DelegateDeclaration))
             {
-                var parameters = string.Join(", ", (node.DelegateDeclarationNode.DelegateParameterList ?? new List<Node.ParameterInfo>()).Select(FormatParameter));
-                sb.AppendLine($"typedef void (*{node.DelegateDeclarationNode.DelegateName})({parameters});");
+                var parameters = string.Join(", ", (GetDelegateParameterList(node) ?? new List<Node.ParameterInfo>()).Select(FormatParameter));
+                sb.AppendLine($"typedef void (*{(node is DelegateDeclarationAstNode typedDelegate ? typedDelegate.DelegateName ?? node.DelegateDeclarationNode.DelegateName : node.DelegateDeclarationNode.DelegateName)})({parameters});");
             }
 
             if (ast.Any(n => n.Kind == NodeKind.DelegateDeclaration))
@@ -761,17 +1299,17 @@ namespace Puma
 
             foreach (var node in globalFunctions)
             {
-                var returnType = string.IsNullOrWhiteSpace(node.FunctionDeclarationNode.FunctionDeclarationReturnType)
+                var returnType = string.IsNullOrWhiteSpace(GetFunctionDeclarationReturnType(node))
                     ? "void"
-                    : node.FunctionDeclarationNode.FunctionDeclarationReturnType;
-                var functionParameterList = node.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>();
-                var functionBody = node.FunctionDeclarationNode.FunctionBody ?? new List<Node>();
+                    : GetFunctionDeclarationReturnType(node);
+                var functionParameterList = GetFunctionParameterList(node) ?? new List<Node.ParameterInfo>();
+                var functionBody = GetFunctionBody(node) ?? new List<Node>();
                 var parameters = functionParameterList.Count == 0
                     ? "void"
                     : string.Join(", ", functionParameterList.Select(FormatFunctionSignatureParameter));
-                sb.AppendLine($"{returnType} {node.FunctionDeclarationNode.FunctionDeclarationName}({parameters})");
+                sb.AppendLine($"{returnType} {GetFunctionDeclarationName(node)}({parameters})");
                 sb.AppendLine("{");
-                if (string.Equals(node.FunctionDeclarationNode.FunctionDeclarationReturnType, "char", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(GetFunctionDeclarationReturnType(node), "char", StringComparison.OrdinalIgnoreCase))
                 {
                     EmitStatementsWithLocalDeclarations(functionBody, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
                 }
@@ -798,8 +1336,8 @@ namespace Puma
         private static void EmitInitializeFinalize(List<Node> ast, StringBuilder sb)
         {
             var hasTypeOrTrait = ast.Any(n => n.Kind == NodeKind.TypeDeclaration
-                && (string.Equals(n.TypeDeclarationNode.DeclarationKind, "type", StringComparison.Ordinal)
-                    || string.Equals(n.TypeDeclarationNode.DeclarationKind, "trait", StringComparison.Ordinal)));
+                && (string.Equals(GetTypeDeclarationKind(n), "type", StringComparison.Ordinal)
+                    || string.Equals(GetTypeDeclarationKind(n), "trait", StringComparison.Ordinal)));
 
             if (!hasTypeOrTrait)
             {
@@ -827,7 +1365,7 @@ namespace Puma
             if (section == Section.Initialize)
             {
                 var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
-                    .Select(n => n.PropertyDeclarationNode.PropertyName)
+                    .Select(GetPropertyName)
                     .Where(n => !string.IsNullOrWhiteSpace(n))
                     .ToHashSet(StringComparer.Ordinal);
                 EmitStatementsWithLocalDeclarations(statements, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
@@ -846,7 +1384,7 @@ namespace Puma
             var (finalIndex, finalSection) = FindSection(ast, Section.Finalize);
             var (startIndex, startSection) = FindSection(ast, Section.Start);
             var globalPropertyNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
-                .Select(n => n.PropertyDeclarationNode.PropertyName)
+                .Select(GetPropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
@@ -879,16 +1417,16 @@ namespace Puma
             var emittedPropertyTypedAssignment = false;
             var heapAllocatedGlobalProperties = ast
                 .Where(n => n.Kind == NodeKind.PropertyDeclaration
-                    && !string.IsNullOrWhiteSpace(n.PropertyDeclarationNode.PropertyName)
-                    && LooksLikeObjectConstructorCall(n.PropertyDeclarationNode.PropertyValue?.Trim() ?? string.Empty))
-                .Select(n => n.PropertyDeclarationNode.PropertyName!)
+                    && !string.IsNullOrWhiteSpace(GetPropertyName(n))
+                    && LooksLikeObjectConstructorCall(GetPropertyValue(n)?.Trim() ?? string.Empty))
+                .Select(n => GetPropertyName(n)!)
                 .ToList();
             var functionsReturningConstructedObject = ast
                 .Where(n => n.Kind == NodeKind.FunctionDeclaration
-                    && ((n.FunctionDeclarationNode.FunctionBody?.Any(s => s.Kind == NodeKind.ReturnStatement
-                        && LooksLikeObjectConstructorCall(GenerateExpression(s.StatementNode.StatementExpression, s.StatementNode.StatementValue)?.Trim() ?? string.Empty)))
+                    && ((GetFunctionBody(n)?.Any(s => s.Kind == NodeKind.ReturnStatement
+                        && LooksLikeObjectConstructorCall(GenerateExpression(GetStatementExpression(s), GetStatementValue(s))?.Trim() ?? string.Empty)))
                         ?? false))
-                .Select(n => n.FunctionDeclarationNode.FunctionDeclarationName)
+                .Select(GetFunctionDeclarationName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
             var propertiesAssignedToNone = new HashSet<string>(StringComparer.Ordinal);
@@ -958,20 +1496,20 @@ namespace Puma
             var (initIndex, _) = FindSection(ast, Section.Initialize);
             var initializeStatements = initIndex >= 0 ? CollectStatements(ast, initIndex + 1) : new List<Node>();
 
-            foreach (var node in typeDeclarations.Where(n => n.TypeDeclarationNode.DeclarationKind == "type"))
+            foreach (var node in typeDeclarations.Where(n => GetTypeDeclarationKind(n) == "type"))
             {
-                var name = ToCppQualifiedName(node.TypeDeclarationNode.DeclarationName) ?? "Type";
+                var name = ToCppQualifiedName(GetTypeDeclarationName(node)) ?? "Type";
                 var bases = new List<string>();
-                if (!string.IsNullOrWhiteSpace(node.TypeDeclarationNode.BaseTypeName))
+                if (!string.IsNullOrWhiteSpace(GetTypeBaseTypeName(node)))
                 {
-                    var baseName = ToCppQualifiedName(node.TypeDeclarationNode.BaseTypeName);
-                    if (!(string.Equals(baseName, "object", StringComparison.OrdinalIgnoreCase) && node.TypeDeclarationNode.TraitNames.Count > 0))
+                    var baseName = ToCppQualifiedName(GetTypeBaseTypeName(node));
+                    if (!(string.Equals(baseName, "object", StringComparison.OrdinalIgnoreCase) && GetTypeTraitNames(node).Count > 0))
                     {
                         bases.Add($"public {baseName}");
                     }
                 }
 
-                foreach (var trait in node.TypeDeclarationNode.TraitNames)
+                foreach (var trait in GetTypeTraitNames(node))
                 {
                     bases.Add($"public {ToCppQualifiedName(trait)}");
                 }
@@ -999,9 +1537,9 @@ namespace Puma
             var (initIndex, _) = FindSection(ast, Section.Initialize);
             var initializeStatements = initIndex >= 0 ? CollectStatements(ast, initIndex + 1) : new List<Node>();
 
-            foreach (var node in typeDeclarations.Where(n => n.TypeDeclarationNode.DeclarationKind == "trait"))
+            foreach (var node in typeDeclarations.Where(n => GetTypeDeclarationKind(n) == "trait"))
             {
-                var name = ToCppQualifiedName(node.TypeDeclarationNode.DeclarationName) ?? "Trait";
+                var name = ToCppQualifiedName(GetTypeDeclarationName(node)) ?? "Trait";
                 sb.AppendLine($"class {name}");
                 sb.AppendLine("{");
                 if (initializeStatements.Count > 0)
@@ -1051,16 +1589,16 @@ namespace Puma
             foreach (var statement in statements)
             {
                 if (statement.Kind == NodeKind.AssignmentStatement
-                    && statement.AssignmentStatementNode.AssignmentOperator == "="
-                    && !string.IsNullOrWhiteSpace(statement.AssignmentStatementNode.AssignmentLeft)
-                    && IsSimpleIdentifier(statement.AssignmentStatementNode.AssignmentLeft)
-                    && !declared.Contains(statement.AssignmentStatementNode.AssignmentLeft)
-                    && !string.IsNullOrWhiteSpace(statement.AssignmentStatementNode.AssignmentRight)
-                    && statement.AssignmentStatementNode.AssignmentRight.StartsWith("\"", StringComparison.Ordinal))
+                    && GetAssignmentOperator(statement) == "="
+                    && !string.IsNullOrWhiteSpace(GetAssignmentLeft(statement))
+                    && IsSimpleIdentifier(GetAssignmentLeft(statement))
+                    && !declared.Contains(GetAssignmentLeft(statement))
+                    && !string.IsNullOrWhiteSpace(GetAssignmentRight(statement))
+                    && GetAssignmentRight(statement)!.StartsWith("\"", StringComparison.Ordinal))
                 {
-                    var value = ToPumaStringLiteral(statement.AssignmentStatementNode.AssignmentRight);
-                    sb.AppendLine($"{indent}auto {statement.AssignmentStatementNode.AssignmentLeft} = {value};");
-                    declared.Add(statement.AssignmentStatementNode.AssignmentLeft);
+                    var value = ToPumaStringLiteral(GetAssignmentRight(statement)!);
+                    sb.AppendLine($"{indent}auto {GetAssignmentLeft(statement)} = {value};");
+                    declared.Add(GetAssignmentLeft(statement)!);
                     continue;
                 }
 
@@ -1076,7 +1614,7 @@ namespace Puma
             }
 
             var declaration = ast.FirstOrDefault(n => n.Kind == NodeKind.FunctionDeclaration
-                && string.Equals(n.FunctionDeclarationNode.FunctionDeclarationName, functionName, StringComparison.Ordinal));
+                && string.Equals(GetFunctionDeclarationName(n), functionName, StringComparison.Ordinal));
             if (declaration == null)
             {
                 return $"{functionName}({string.Join(", ", callExpressionNode.Arguments.Select(a => GenerateExpression(a, null)))})";
@@ -1086,7 +1624,7 @@ namespace Puma
                 .Select(a => GenerateExpression(a, null))
                 .ToList();
 
-            var declarationParameters = declaration.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>();
+            var declarationParameters = GetFunctionParameterList(declaration) ?? new List<Node.ParameterInfo>();
 
             for (var i = arguments.Count; i < declarationParameters.Count; i++)
             {
@@ -1117,9 +1655,9 @@ namespace Puma
             var protectedProperties = new List<Node>();
             var publicProperties = new List<Node>();
 
-            foreach (var property in node.TypeDeclarationNode.TypeProperties)
+            foreach (var property in GetTypeProperties(node))
             {
-                if (property.PropertyDeclarationNode.PropertyModifiers.Contains("public"))
+                if (GetPropertyModifiers(property).Contains("public"))
                 {
                     publicProperties.Add(property);
                 }
@@ -1133,7 +1671,7 @@ namespace Puma
             EmitPropertiesForAccess(protectedProperties, "protected", sb, indent);
             EmitPropertiesForAccess(publicProperties, "public", sb, indent);
 
-            if ((protectedProperties.Count > 0 || publicProperties.Count > 0) && node.TypeDeclarationNode.TypeFunctions.Count > 0)
+            if ((protectedProperties.Count > 0 || publicProperties.Count > 0) && GetTypeFunctions(node).Count > 0)
             {
                 sb.AppendLine();
             }
@@ -1150,9 +1688,9 @@ namespace Puma
             sb.AppendLine($"{indent}{access}:");
             foreach (var property in properties)
             {
-                var value = FormatAutoPropertyInitializer(property.PropertyDeclarationNode.PropertyValue, property.PropertyDeclarationNode.PropertyType);
-                var modifiers = property.PropertyDeclarationNode.PropertyModifiers.Contains("constant") ? "const " : string.Empty;
-                sb.AppendLine($"{indent}{modifiers}auto {property.PropertyDeclarationNode.PropertyName} = {value};");
+                var value = FormatAutoPropertyInitializer(GetPropertyValue(property), GetPropertyType(property));
+                var modifiers = GetPropertyModifiers(property).Contains("constant") ? "const " : string.Empty;
+                sb.AppendLine($"{indent}{modifiers}auto {GetPropertyName(property)} = {value};");
             }
         }
 
@@ -1161,9 +1699,10 @@ namespace Puma
             var protectedFunctions = new List<Node>();
             var publicFunctions = new List<Node>();
 
-            foreach (var function in node.TypeDeclarationNode.TypeFunctions)
+            foreach (var function in GetTypeFunctions(node))
             {
-                if (function.FunctionDeclarationNode.FunctionModifiers.Contains("private") || function.FunctionDeclarationNode.FunctionModifiers.Contains("internal"))
+                if (GetFunctionModifiers(function).Contains("private")
+                    || GetFunctionModifiers(function).Contains("internal"))
                 {
                     protectedFunctions.Add(function);
                 }
@@ -1189,11 +1728,11 @@ namespace Puma
 
             foreach (var function in functions)
             {
-                var returnType = MapType(function.FunctionDeclarationNode.FunctionDeclarationReturnType) ?? "void";
-                var parameters = string.Join(", ", (function.FunctionDeclarationNode.FunctionParameterList ?? new List<Node.ParameterInfo>()).Select(FormatParameter));
-                sb.AppendLine($"{indent}{returnType} {function.FunctionDeclarationNode.FunctionDeclarationName}({parameters})");
+                var returnType = MapType(GetFunctionDeclarationReturnType(function)) ?? "void";
+                var parameters = string.Join(", ", (GetFunctionParameterList(function) ?? new List<Node.ParameterInfo>()).Select(FormatParameter));
+                sb.AppendLine($"{indent}{returnType} {GetFunctionDeclarationName(function)}({parameters})");
                 sb.AppendLine($"{indent}{{");
-                EmitStatements(function.FunctionDeclarationNode.FunctionBody ?? new List<Node>(), sb, indent + "    ");
+                EmitStatements(GetFunctionBody(function) ?? new List<Node>(), sb, indent + "    ");
                 sb.AppendLine($"{indent}}}");
             }
         }
@@ -1217,43 +1756,43 @@ namespace Puma
                 {
                     case NodeKind.AssignmentStatement:
                         {
-                            var leftExpression = GenerateExpression(node.AssignmentStatementNode.AssignmentLeftExpression, node.AssignmentStatementNode.AssignmentLeft);
-                            var rightExpression = GenerateExpression(node.AssignmentStatementNode.AssignmentRightExpression, node.AssignmentStatementNode.AssignmentRight);
-                            if (node.AssignmentStatementNode.AssignmentRightExpression == null
-                                && !string.IsNullOrWhiteSpace(node.AssignmentStatementNode.AssignmentRight)
-                                && node.AssignmentStatementNode.AssignmentRight.Contains('(')
-                                && node.AssignmentStatementNode.AssignmentRight.Contains(')'))
+                            var leftExpression = GenerateExpression(GetAssignmentLeftExpression(node), GetAssignmentLeft(node));
+                            var rightExpression = GenerateExpression(GetAssignmentRightExpression(node), GetAssignmentRight(node));
+                            if (GetAssignmentRightExpression(node) == null
+                                && !string.IsNullOrWhiteSpace(GetAssignmentRight(node))
+                                && GetAssignmentRight(node)!.Contains('(')
+                                && GetAssignmentRight(node)!.Contains(')'))
                             {
-                                rightExpression = node.AssignmentStatementNode.AssignmentRight;
+                                rightExpression = GetAssignmentRight(node);
                             }
 
-                            if (node.AssignmentStatementNode.IsLoweredPostfixMutation && (node.AssignmentStatementNode.AssignmentOperator == "+=" || node.AssignmentStatementNode.AssignmentOperator == "-="))
+                            if (GetIsLoweredPostfixMutation(node) && (GetAssignmentOperator(node) == "+=" || GetAssignmentOperator(node) == "-="))
                             {
-                                var op = node.AssignmentStatementNode.AssignmentOperator == "+=" ? "++" : "--";
+                                var op = GetAssignmentOperator(node) == "+=" ? "++" : "--";
                                 sb.AppendLine($"{indent}{leftExpression}{op};");
                                 break;
                             }
 
-                            if (node.AssignmentStatementNode.AssignmentOperator == "="
-                                && node.AssignmentStatementNode.AssignmentLeftExpression?.Kind == ExpressionKind.Binary && node.AssignmentStatementNode.AssignmentLeftExpression.Value == ","
-                                && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Binary && node.AssignmentStatementNode.AssignmentRightExpression.Value == ",")
+                            if (GetAssignmentOperator(node) == "="
+                                && GetAssignmentLeftExpression(node)?.Kind == ExpressionKind.Binary && GetAssignmentLeftExpression(node)!.Value == ","
+                                && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Binary && GetAssignmentRightExpression(node)!.Value == ",")
                             {
-                                var left0 = GenerateExpression(node.AssignmentStatementNode.AssignmentLeftExpression.Left, null);
-                                var left1 = GenerateExpression(node.AssignmentStatementNode.AssignmentLeftExpression.Right, null);
-                                var right0 = GenerateExpression(node.AssignmentStatementNode.AssignmentRightExpression.Left, null);
-                                var right1 = GenerateExpression(node.AssignmentStatementNode.AssignmentRightExpression.Right, null);
+                                var left0 = GenerateExpression(GetAssignmentLeftExpression(node)!.Left, null);
+                                var left1 = GenerateExpression(GetAssignmentLeftExpression(node)!.Right, null);
+                                var right0 = GenerateExpression(GetAssignmentRightExpression(node)!.Left, null);
+                                var right1 = GenerateExpression(GetAssignmentRightExpression(node)!.Right, null);
                                 sb.AppendLine($"{indent}{left0} = {right0};");
                                 sb.AppendLine($"{indent}{left1} = {right1});");
                                 break;
                             }
 
-                            if (node.AssignmentStatementNode.AssignmentOperator == "=" && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Binary)
+                            if (GetAssignmentOperator(node) == "=" && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Binary)
                             {
                                 rightExpression = UnwrapOutermostParentheses(rightExpression);
                             }
 
-                            if (node.AssignmentStatementNode.AssignmentOperator == "="
-                                && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Literal
+                            if (GetAssignmentOperator(node) == "="
+                                && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal
                                 && !string.IsNullOrWhiteSpace(rightExpression)
                                 && rightExpression.StartsWith("\"", StringComparison.Ordinal)
                                 && !rightExpression.EndsWith("s", StringComparison.Ordinal))
@@ -1261,22 +1800,22 @@ namespace Puma
                                 rightExpression = ToPumaStringLiteral(rightExpression);
                             }
 
-                            if (node.AssignmentStatementNode.AssignmentOperator == "="
-                                && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Literal
+                            if (GetAssignmentOperator(node) == "="
+                                && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal
                                 && IsCharacterLiteralText(rightExpression))
                             {
                                 rightExpression = $"Character({rightExpression})";
                             }
 
                             var emittedTypedPropertyLiteral = false;
-                            if (node.AssignmentStatementNode.AssignmentOperator == "=" && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Literal)
+                            if (GetAssignmentOperator(node) == "=" && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal)
                             {
                                 var propertyNode = ast?.FirstOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
-                                    && string.Equals(n.PropertyDeclarationNode.PropertyName, node.AssignmentStatementNode.AssignmentLeft, StringComparison.Ordinal));
+                                    && string.Equals(GetPropertyName(n), GetAssignmentLeft(node), StringComparison.Ordinal));
                                 if (propertyNode != null
                                     && ast != null
                                     && UsesTypedPropertyReassignmentMode(ast)
-                                    && TryGetTypedLiteralDeclaration(node.AssignmentStatementNode.AssignmentRight ?? string.Empty, out var typedLiteralName, out var typedLiteralValue))
+                                    && TryGetTypedLiteralDeclaration(GetAssignmentRight(node) ?? string.Empty, out var typedLiteralName, out var typedLiteralValue))
                                 {
                                     rightExpression = typedLiteralName switch
                                     {
@@ -1293,11 +1832,11 @@ namespace Puma
                                 onTypedPropertyLiteralAssignment?.Invoke();
                             }
 
-                            if (node.AssignmentStatementNode.AssignmentOperator == "=" && node.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Conditional)
+                            if (GetAssignmentOperator(node) == "=" && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Conditional)
                             {
                                 var allConditionalAssignments = statements.Count > 1
                                     && statements.All(s => s.Kind == NodeKind.AssignmentStatement
-                                        && s.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Conditional);
+                                        && GetAssignmentRightExpression(s)?.Kind == ExpressionKind.Conditional);
 
                                 if (allConditionalAssignments && i == 0)
                                 {
@@ -1310,12 +1849,12 @@ namespace Puma
                                 }
                             }
 
-                            sb.AppendLine($"{indent}{leftExpression} {node.AssignmentStatementNode.AssignmentOperator} {rightExpression};");
+                            sb.AppendLine($"{indent}{leftExpression} {GetAssignmentOperator(node)} {rightExpression};");
                             break;
                         }
                     case NodeKind.FunctionCall:
                         {
-                            var callExpressionNode = node.FunctionCallNode.Expression ?? node.StatementNode.StatementExpression;
+                            var callExpressionNode = GetFunctionCallExpression(node) ?? GetStatementExpression(node);
                             var callExpression = GenerateExpression(callExpressionNode, null);
                             if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
                             {
@@ -1331,88 +1870,88 @@ namespace Puma
                             }
                             else
                             {
-                                sb.AppendLine($"{indent}{node.FunctionCallNode.Name}({node.FunctionCallNode.Arguments});");
+                                sb.AppendLine($"{indent}{GetFunctionCallName(node)}({GetFunctionCallArguments(node)});");
                             }
                             break;
                         }
                     case NodeKind.WriteLine:
-                        if (!string.IsNullOrWhiteSpace(node.WriteLineNode.StringValue))
+                        if (!string.IsNullOrWhiteSpace(GetWriteLineStringValue(node)))
                         {
-                            sb.AppendLine($"{indent}puts({node.WriteLineNode.StringValue});");
+                            sb.AppendLine($"{indent}puts({GetWriteLineStringValue(node)});");
                         }
                         break;
                     case NodeKind.IfStatement:
-                        sb.AppendLine($"{indent}if ({UnwrapOutermostParentheses(GenerateExpression(node.IfStatementNode.ConditionExpression, node.IfStatementNode.IfCondition))})");
+                        sb.AppendLine($"{indent}if ({UnwrapOutermostParentheses(GenerateExpression(GetIfConditionExpression(node), GetIfCondition(node)))})");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
+                        EmitStatements(GetStatementBody(node), sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
-                        if (node.IfStatementNode.ElseBody.Count > 0)
+                        if (GetIfElseBody(node).Count > 0)
                         {
                             sb.AppendLine($"{indent}else");
                             sb.AppendLine($"{indent}{{");
-                            EmitStatements(node.IfStatementNode.ElseBody, sb, indent + "    ");
+                            EmitStatements(GetIfElseBody(node), sb, indent + "    ");
                             sb.AppendLine($"{indent}}}");
                         }
                         break;
                     case NodeKind.MatchStatement:
-                        sb.AppendLine($"{indent}switch ({GenerateExpression(node.MatchStatementNode.ExpressionNode, node.MatchStatementNode.Expression)})");
+                        sb.AppendLine($"{indent}switch ({GenerateExpression(GetMatchExpressionNode(node), GetMatchExpression(node))})");
                         sb.AppendLine($"{indent}{{");
-                        foreach (var when in node.StatementNode.StatementBody.Where(n => n.Kind == NodeKind.WhenStatement))
+                        foreach (var when in GetStatementBody(node).Where(n => n.Kind == NodeKind.WhenStatement))
                         {
-                            sb.AppendLine($"{indent}    case {GenerateExpression(when.WhenStatementNode.WhenExpression, when.WhenStatementNode.WhenCondition)}:");
-                            EmitStatements(when.StatementNode.StatementBody, sb, indent + "        ");
+                            sb.AppendLine($"{indent}    case {GenerateExpression(GetWhenExpression(when), GetWhenCondition(when))}:");
+                            EmitStatements(GetStatementBody(when), sb, indent + "        ");
                             sb.AppendLine($"{indent}        break;");
                         }
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.WhenStatement:
-                        sb.AppendLine($"{indent}/* when {GenerateExpression(node.WhenStatementNode.WhenExpression, node.WhenStatementNode.WhenCondition)} */");
+                        sb.AppendLine($"{indent}/* when {GenerateExpression(GetWhenExpression(node), GetWhenCondition(node))} */");
                         break;
                     case NodeKind.WhileStatement:
-                        sb.AppendLine($"{indent}while ({UnwrapOutermostParentheses(GenerateExpression(node.WhileStatementNode.WhileExpression, node.WhileStatementNode.WhileCondition))})");
+                        sb.AppendLine($"{indent}while ({UnwrapOutermostParentheses(GenerateExpression(GetWhileExpression(node), GetWhileCondition(node)))})");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
+                        EmitStatements(GetStatementBody(node), sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.ForStatement:
                     case NodeKind.ForAllStatement:
-                        sb.AppendLine($"{indent}for (auto {node.ForStatementNode.ForVariable} : {GenerateExpression(node.ForStatementNode.ForContainerExpression, node.ForStatementNode.ForContainer)})");
+                        sb.AppendLine($"{indent}for (auto {GetForVariable(node)} : {GenerateExpression(GetForContainerExpression(node), GetForContainer(node))})");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
+                        EmitStatements(GetStatementBody(node), sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.RepeatStatement:
                         {
-                            var repeatCondition = GenerateExpression(node.RepeatStatementNode.RepeatExpressionNode, node.RepeatStatementNode.RepeatExpression);
+                            var repeatCondition = GenerateExpression(GetRepeatExpressionNode(node), GetRepeatExpression(node));
                             if (string.IsNullOrWhiteSpace(repeatCondition) || repeatCondition == "1")
                             {
                                 repeatCondition = "true";
                             }
                             sb.AppendLine($"{indent}do");
                             sb.AppendLine($"{indent}{{");
-                            EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
+                            EmitStatements(GetStatementBody(node), sb, indent + "    ");
                             sb.AppendLine($"{indent}}} while ({repeatCondition});");
                             break;
                         }
                     case NodeKind.HasStatement:
-                        sb.AppendLine($"{indent}if ({GenerateExpression(node.HasStatementNode.HasExpression, node.HasStatementNode.HasCondition)} != null)");
+                        sb.AppendLine($"{indent}if ({GenerateExpression(GetHasExpression(node), GetHasCondition(node))} != null)");
                         sb.AppendLine($"{indent}{{");
-                        EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
+                        EmitStatements(GetStatementBody(node), sb, indent + "    ");
                         sb.AppendLine($"{indent}}}");
                         break;
                     case NodeKind.HasTraitStatement:
                         {
-                            var variable = node.HasTraitStatementNode.HasTraitVariableName ?? GenerateExpression(node.HasTraitStatementNode.HasTraitExpression, node.HasTraitStatementNode.HasTraitCondition);
-                            var traitType = node.HasTraitStatementNode.HasTraitTypeName ?? "Trait";
+                            var variable = GetHasTraitVariableName(node) ?? GenerateExpression(GetHasTraitExpression(node), GetHasTraitCondition(node));
+                            var traitType = GetHasTraitTypeName(node) ?? "Trait";
                             sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == typeof({traitType}))");
                             sb.AppendLine($"{indent}{{");
-                            EmitStatements(node.StatementNode.StatementBody, sb, indent + "    ");
+                            EmitStatements(GetStatementBody(node), sb, indent + "    ");
                             sb.AppendLine($"{indent}}}");
                             break;
                         }
                     case NodeKind.ReturnStatement:
                         {
-                            var returnExpression = UnwrapOutermostParentheses(GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue));
+                            var returnExpression = UnwrapOutermostParentheses(GenerateExpression(GetStatementExpression(node), GetStatementValue(node)));
                             if (string.IsNullOrWhiteSpace(returnExpression))
                             {
                                 sb.AppendLine($"{indent}return;");
@@ -1425,7 +1964,7 @@ namespace Puma
                             break;
                         }
                     case NodeKind.YieldStatement:
-                        sb.AppendLine($"{indent}/* yield {GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue)} */");
+                        sb.AppendLine($"{indent}/* yield {GenerateExpression(GetStatementExpression(node), GetStatementValue(node))} */");
                         break;
                     case NodeKind.BreakStatement:
                         sb.AppendLine($"{indent}break;");
@@ -1434,10 +1973,10 @@ namespace Puma
                         sb.AppendLine($"{indent}continue;");
                         break;
                     case NodeKind.ErrorStatement:
-                        sb.AppendLine($"{indent}/* error {GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue)} */");
+                        sb.AppendLine($"{indent}/* error {GenerateExpression(GetStatementExpression(node), GetStatementValue(node))} */");
                         break;
                     case NodeKind.CatchStatement:
-                        sb.AppendLine($"{indent}/* catch {GenerateExpression(node.StatementNode.StatementExpression, node.StatementNode.StatementValue)} */");
+                        sb.AppendLine($"{indent}/* catch {GenerateExpression(GetStatementExpression(node), GetStatementValue(node))} */");
                         break;
                 }
             }
@@ -1531,20 +2070,20 @@ namespace Puma
 
         private static bool UsesBool(Node node)
         {
-            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(node.PropertyDeclarationNode.PropertyValue, "true", StringComparison.OrdinalIgnoreCase))
+            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(GetPropertyValue(node), "true", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(node.PropertyDeclarationNode.PropertyValue, "false", StringComparison.OrdinalIgnoreCase))
+            if (node.Kind == NodeKind.PropertyDeclaration && string.Equals(GetPropertyValue(node), "false", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
             return node.Kind == NodeKind.FunctionDeclaration
-                && (node.FunctionDeclarationNode.FunctionParameterList?.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase)) ?? false)
+                && (GetFunctionParameterList(node)?.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase)) ?? false)
                 || (node.Kind == NodeKind.DelegateDeclaration
-                    && (node.DelegateDeclarationNode.DelegateParameterList?.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase)) ?? false));
+                    && (GetDelegateParameterList(node)?.Any(p => string.Equals(p.Type, "bool", StringComparison.OrdinalIgnoreCase)) ?? false));
         }
 
         private static void TrackOwnershipTransfer(
@@ -1556,15 +2095,15 @@ namespace Puma
             HashSet<string> functionsReturningConstructedObject,
             HashSet<string> ownedLocalsToDelete)
         {
-            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentStatementNode.AssignmentOperator != "=")
+            if (statement.Kind != NodeKind.AssignmentStatement || GetAssignmentOperator(statement) != "=")
             {
                 return;
             }
 
-            var leftName = statement.AssignmentStatementNode.AssignmentLeft?.Trim() ?? string.Empty;
+            var leftName = GetAssignmentLeft(statement)?.Trim() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(leftName)
                 && heapAllocatedGlobalProperties.Contains(leftName)
-                && IsNoneExpression(statement.AssignmentStatementNode.AssignmentRightExpression, statement.AssignmentStatementNode.AssignmentRight))
+                && IsNoneExpression(GetAssignmentRightExpression(statement), GetAssignmentRight(statement)))
             {
                 propertiesAssignedToNone.Add(leftName);
                 return;
@@ -1577,9 +2116,9 @@ namespace Puma
                 return;
             }
 
-            if (statement.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Identifier)
+            if (GetAssignmentRightExpression(statement)?.Kind == ExpressionKind.Identifier)
             {
-                var source = statement.AssignmentStatementNode.AssignmentRightExpression.Value ?? string.Empty;
+                var source = GetAssignmentRightExpression(statement)!.Value ?? string.Empty;
                 if (heapAllocatedGlobalProperties.Contains(source))
                 {
                     transferredOwnershipLocals[source] = leftName;
@@ -1589,15 +2128,15 @@ namespace Puma
                 return;
             }
 
-            if (statement.AssignmentStatementNode.AssignmentRightExpression?.Kind != ExpressionKind.Call)
+            if (GetAssignmentRightExpression(statement)?.Kind != ExpressionKind.Call)
             {
                 return;
             }
 
-            if (statement.AssignmentStatementNode.AssignmentRightExpression.Left?.Kind == ExpressionKind.Identifier)
+            if (GetAssignmentRightExpression(statement)!.Left?.Kind == ExpressionKind.Identifier)
             {
-                var functionName = statement.AssignmentStatementNode.AssignmentRightExpression.Left.Value ?? string.Empty;
-                var callText = GenerateExpression(statement.AssignmentStatementNode.AssignmentRightExpression, statement.AssignmentStatementNode.AssignmentRight) ?? string.Empty;
+                var functionName = GetAssignmentRightExpression(statement)!.Left!.Value ?? string.Empty;
+                var callText = GenerateExpression(GetAssignmentRightExpression(statement), GetAssignmentRight(statement)) ?? string.Empty;
                 if (LooksLikeObjectConstructorCall(callText))
                 {
                     ownedLocalsToDelete.Add(leftName);
@@ -1612,7 +2151,7 @@ namespace Puma
                 return;
             }
 
-            var callTarget = statement.AssignmentStatementNode.AssignmentRightExpression.Left;
+            var callTarget = GetAssignmentRightExpression(statement)!.Left;
             if (callTarget?.Kind != ExpressionKind.MemberAccess || callTarget.Left?.Kind != ExpressionKind.Identifier)
             {
                 return;
@@ -1645,11 +2184,11 @@ namespace Puma
             }
 
             var propertyNames = properties
-                .Select(n => n.PropertyDeclarationNode.PropertyName)
+                .Select(GetPropertyName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.Ordinal);
 
-            if (!properties.All(p => TryGetTypedLiteralDeclaration(p.PropertyDeclarationNode.PropertyValue ?? string.Empty, out var typeName, out _)
+            if (!properties.All(p => TryGetTypedLiteralDeclaration(GetPropertyValue(p) ?? string.Empty, out var typeName, out _)
                 && typeName is not "Puma::Type::String" and not "bool"))
             {
                 return false;
@@ -1664,9 +2203,9 @@ namespace Puma
             var startStatements = CollectStatements(ast, startIndex + 1);
             return startStatements.Count > 0
                 && startStatements.All(s => s.Kind == NodeKind.AssignmentStatement
-                    && s.AssignmentStatementNode.AssignmentOperator == "="
-                    && !string.IsNullOrWhiteSpace(s.AssignmentStatementNode.AssignmentLeft)
-                    && propertyNames.Contains(s.AssignmentStatementNode.AssignmentLeft));
+                    && GetAssignmentOperator(s) == "="
+                    && !string.IsNullOrWhiteSpace(GetAssignmentLeft(s))
+                    && propertyNames.Contains(GetAssignmentLeft(s)));
         }
 
         private static bool TryGetExpressionTypeAndInitializer(Node statement, out string typeName, out string initializer)
@@ -1674,26 +2213,26 @@ namespace Puma
             typeName = "int64_t";
             initializer = string.Empty;
 
-            if (statement.AssignmentStatementNode.AssignmentRightExpression == null)
+            if (GetAssignmentRightExpression(statement) == null)
             {
                 return false;
             }
 
-            var expressionText = GenerateExpression(statement.AssignmentStatementNode.AssignmentRightExpression, statement.AssignmentStatementNode.AssignmentRight);
+            var expressionText = GenerateExpression(GetAssignmentRightExpression(statement), GetAssignmentRight(statement));
             if (string.IsNullOrWhiteSpace(expressionText))
             {
                 return false;
             }
 
-            if (ContainsBooleanKeyword(statement.AssignmentStatementNode.AssignmentRightExpression))
+            if (ContainsBooleanKeyword(GetAssignmentRightExpression(statement)))
             {
                 typeName = "bool";
             }
-            else if (ContainsStringLiteral(statement.AssignmentStatementNode.AssignmentRightExpression))
+            else if (ContainsStringLiteral(GetAssignmentRightExpression(statement)))
             {
                 typeName = "Puma::Type::String";
             }
-            else if (ContainsDecimalLiteral(statement.AssignmentStatementNode.AssignmentRightExpression))
+            else if (ContainsDecimalLiteral(GetAssignmentRightExpression(statement)))
             {
                 typeName = "double";
             }
@@ -1878,12 +2417,12 @@ namespace Puma
             usedExpressionFallback = false;
             usedPropertyTypedAssignment = false;
 
-            if (statement.Kind != NodeKind.AssignmentStatement || statement.AssignmentStatementNode.AssignmentOperator != "=")
+            if (statement.Kind != NodeKind.AssignmentStatement || GetAssignmentOperator(statement) != "=")
             {
                 return false;
             }
 
-            var leftName = statement.AssignmentStatementNode.AssignmentLeft;
+            var leftName = GetAssignmentLeft(statement);
             if (string.IsNullOrWhiteSpace(leftName) || !IsSimpleIdentifier(leftName))
             {
                 return false;
@@ -1895,7 +2434,7 @@ namespace Puma
             }
 
             var expressionFallback = false;
-            if (!TryGetTypedLiteralDeclaration(statement.AssignmentStatementNode.AssignmentRight ?? string.Empty, out var typeName, out var value))
+            if (!TryGetTypedLiteralDeclaration(GetAssignmentRight(statement) ?? string.Empty, out var typeName, out var value))
             {
                 if (!TryGetExpressionTypeAndInitializer(statement, out typeName, out value))
                 {
@@ -1908,7 +2447,7 @@ namespace Puma
             if (expressionFallback)
             {
                 usedExpressionFallback = true;
-                var normalized = statement.AssignmentStatementNode.AssignmentRightExpression?.Kind == ExpressionKind.Conditional
+                var normalized = GetAssignmentRightExpression(statement)?.Kind == ExpressionKind.Conditional
                     ? value
                     : UnwrapOutermostParentheses(value);
                 sb.AppendLine($"{indent}auto {leftName} = {normalized};");
@@ -2149,26 +2688,26 @@ namespace Puma
                 yield return node;
 
                 foreach (var functionNode in node.Kind == NodeKind.FunctionDeclaration
-                    ? EnumerateAllNodes(node.FunctionDeclarationNode.FunctionBody ?? new List<Node>())
+                    ? EnumerateAllNodes(GetFunctionBody(node) ?? new List<Node>())
                     : Enumerable.Empty<Node>())
                 {
                     yield return functionNode;
                 }
 
-                foreach (var statementNode in EnumerateAllNodes(node.StatementNode.StatementBody ?? new List<Node>()))
+                foreach (var statementNode in EnumerateAllNodes(GetStatementBody(node) ?? new List<Node>()))
                 {
                     yield return statementNode;
                 }
 
                 foreach (var elseNode in node.Kind == NodeKind.IfStatement
-                    ? EnumerateAllNodes(node.IfStatementNode.ElseBody)
+                    ? EnumerateAllNodes(GetIfElseBody(node))
                     : Enumerable.Empty<Node>())
                 {
                     yield return elseNode;
                 }
 
                 foreach (var typeFunction in node.Kind == NodeKind.TypeDeclaration
-                    ? EnumerateAllNodes(node.TypeDeclarationNode.TypeFunctions)
+                    ? EnumerateAllNodes(GetTypeFunctions(node))
                     : Enumerable.Empty<Node>())
                 {
                     yield return typeFunction;
