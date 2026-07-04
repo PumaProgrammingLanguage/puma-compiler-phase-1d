@@ -2331,29 +2331,34 @@ namespace Puma
 
         private static List<Node> GetStatementBody(Node node)
         {
-            if (node is StatementAstNode typedNode && typedNode.StatementBody.Count > 0)
+            return node.Kind switch
             {
-                return typedNode.StatementBody;
-            }
-
-            return node.StatementNode.StatementBody;
+                NodeKind.IfStatement when node is IfStatementAstNode typedIf => typedIf.IfBody,
+                NodeKind.MatchStatement when node is MatchStatementAstNode typedMatch => typedMatch.StatementBody,
+                NodeKind.WhenStatement when node is WhenStatementAstNode typedWhen => typedWhen.StatementBody,
+                NodeKind.WhileStatement when node is WhileStatementAstNode typedWhile => typedWhile.StatementBody,
+                NodeKind.ForStatement when node is ForStatementAstNode typedFor => typedFor.StatementBody,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedForAll => typedForAll.StatementBody,
+                NodeKind.RepeatStatement when node is RepeatStatementAstNode typedRepeat => typedRepeat.StatementBody,
+                NodeKind.HasStatement when node is HasStatementAstNode typedHas => typedHas.StatementBody,
+                NodeKind.HasTraitStatement when node is HasTraitStatementAstNode typedHasTrait => typedHasTrait.StatementBody,
+                NodeKind.ErrorStatement or NodeKind.CatchStatement or NodeKind.ElseStatement when node is StatementAstNode typedStatement => typedStatement.StatementBody,
+                _ => new List<Node>()
+            };
         }
 
         private static List<Node> GetIfElseBody(Node node)
         {
-            if (node is IfStatementAstNode typedNode && typedNode.ElseBody.Count > 0)
-            {
-                return typedNode.ElseBody;
-            }
-
-            return node.IfStatementNode.ElseBody;
+            return node is IfStatementAstNode typedNode
+                ? typedNode.ElseBody
+                : new List<Node>();
         }
 
         private static ExpressionNode? GetStatementExpression(Node node)
         {
             return node is StatementAstNode typedNode
-                ? typedNode.StatementExpression ?? node.StatementNode.StatementExpression
-                : node.StatementNode.StatementExpression;
+                ? typedNode.StatementExpression
+                : null;
         }
 
         private static void SetStatementExpression(Node node, ExpressionNode? expression)
@@ -2362,8 +2367,6 @@ namespace Puma
             {
                 typedNode.StatementExpression = expression;
             }
-
-            node.StatementNode.StatementExpression = expression;
         }
 
         private static void SetAssignmentExpressions(Node node, ExpressionNode? leftExpression, ExpressionNode? rightExpression, bool isLoweredPostfixMutation)
@@ -2386,8 +2389,6 @@ namespace Puma
             {
                 typedNode.ConditionExpression = expression;
             }
-
-            node.IfStatementNode.ConditionExpression = expression;
         }
 
         private static void SetMatchExpressionNode(Node node, ExpressionNode? expression)
@@ -2396,8 +2397,6 @@ namespace Puma
             {
                 typedNode.ExpressionNode = expression;
             }
-
-            node.MatchStatementNode.ExpressionNode = expression;
         }
 
         private static void SetWhenExpression(Node node, ExpressionNode? expression)
@@ -2406,8 +2405,6 @@ namespace Puma
             {
                 typedNode.WhenExpression = expression;
             }
-
-            node.WhenStatementNode.WhenExpression = expression;
         }
 
         private static void SetWhileExpression(Node node, ExpressionNode? expression)
@@ -2416,8 +2413,6 @@ namespace Puma
             {
                 typedNode.WhileExpression = expression;
             }
-
-            node.WhileStatementNode.WhileExpression = expression;
         }
 
         private static void SetForContainerExpression(Node node, ExpressionNode? expression)
@@ -2430,8 +2425,6 @@ namespace Puma
             {
                 typedForAllNode.ForContainerExpression = expression;
             }
-
-            node.ForStatementNode.ForContainerExpression = expression;
         }
 
         private static void SetRepeatExpressionNode(Node node, ExpressionNode? expression)
@@ -2440,8 +2433,6 @@ namespace Puma
             {
                 typedNode.RepeatExpressionNode = expression;
             }
-
-            node.RepeatStatementNode.RepeatExpressionNode = expression;
         }
 
         private static void SetHasExpression(Node node, ExpressionNode? expression)
@@ -2450,8 +2441,6 @@ namespace Puma
             {
                 typedNode.HasExpression = expression;
             }
-
-            node.HasStatementNode.HasExpression = expression;
         }
 
         private static void SetHasTraitExpression(Node node, ExpressionNode? expression)
@@ -2460,8 +2449,6 @@ namespace Puma
             {
                 typedNode.HasTraitExpression = expression;
             }
-
-            node.HasTraitStatementNode.HasTraitExpression = expression;
         }
 
         private void ParseStatement(LexerTokens firstToken) => ParseStatement(firstToken, ast);

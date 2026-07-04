@@ -123,6 +123,7 @@ namespace Puma
     {
         public string? Expression { get; set; }
         public ExpressionNode? ExpressionNode { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public MatchStatementAstNode()
         {
@@ -134,6 +135,7 @@ namespace Puma
     {
         public string? WhenCondition { get; set; }
         public ExpressionNode? WhenExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public WhenStatementAstNode()
         {
@@ -145,6 +147,7 @@ namespace Puma
     {
         public string? WhileCondition { get; set; }
         public ExpressionNode? WhileExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public WhileStatementAstNode()
         {
@@ -157,6 +160,7 @@ namespace Puma
         public string? ForVariable { get; set; }
         public string? ForContainer { get; set; }
         public ExpressionNode? ForContainerExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public ForStatementAstNode()
         {
@@ -169,6 +173,7 @@ namespace Puma
         public string? ForVariable { get; set; }
         public string? ForContainer { get; set; }
         public ExpressionNode? ForContainerExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public ForAllStatementAstNode()
         {
@@ -180,6 +185,7 @@ namespace Puma
     {
         public string? RepeatExpression { get; set; }
         public ExpressionNode? RepeatExpressionNode { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public RepeatStatementAstNode()
         {
@@ -191,6 +197,7 @@ namespace Puma
     {
         public string? HasCondition { get; set; }
         public ExpressionNode? HasExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public HasStatementAstNode()
         {
@@ -204,6 +211,7 @@ namespace Puma
         public ExpressionNode? HasTraitExpression { get; set; }
         public string? HasTraitTypeName { get; set; }
         public string? HasTraitVariableName { get; set; }
+        public List<Node> StatementBody { get; } = new();
 
         public HasTraitStatementAstNode()
         {
@@ -391,79 +399,6 @@ namespace Puma
         }
         public SectionNodes SectionNode;
 
-        // For IfStatement nodes
-        public struct IfStatementNodes
-        {
-            public IfStatementNodes()
-            {
-            }
-
-            public string? IfCondition { get; set; }
-            public ExpressionNode? ConditionExpression { get; set; }
-            public List<Node> IfBody { get; } = new();
-            public List<Node> ElseBody { get; } = new();
-        }
-        public IfStatementNodes IfStatementNode;
-
-        // For MatchStatement nodes
-        public struct MatchStatementNodes
-        {
-            public string? Expression { get; set; }
-            public ExpressionNode? ExpressionNode { get; set; }
-        }
-        public MatchStatementNodes MatchStatementNode;
-
-        // For WhenStatement nodes
-        public struct WhenStatementNodes
-        {
-            public string? WhenCondition { get; set; }
-            public ExpressionNode? WhenExpression { get; set; }
-        }
-        public WhenStatementNodes WhenStatementNode;
-
-        // For WhileStatement nodes
-        public struct WhileStatementNodes
-        {
-            public string? WhileCondition { get; set; }
-            public ExpressionNode? WhileExpression { get; set; }
-        }
-        public WhileStatementNodes WhileStatementNode;
-
-        // For ForStatement nodes
-        public struct ForStatementNodes
-        {
-            public string? ForVariable { get; set; }
-            public string? ForContainer { get; set; }
-            public ExpressionNode? ForContainerExpression { get; set; }
-        }
-        public ForStatementNodes ForStatementNode;
-
-        // For RepeatStatement nodes
-        public struct RepeatStatementNodes
-        {
-            public string? RepeatExpression { get; set; }
-            public ExpressionNode? RepeatExpressionNode { get; set; }
-        }
-        public RepeatStatementNodes RepeatStatementNode;
-
-        // For HasStatement nodes
-        public struct HasStatementNodes
-        {
-            public string? HasCondition { get; set; }
-            public ExpressionNode? HasExpression { get; set; }
-        }
-        public HasStatementNodes HasStatementNode;
-
-        // For HasTraitStatement nodes
-        public struct HasTraitStatementNodes
-        {
-            public string? HasTraitCondition { get; set; }
-            public ExpressionNode? HasTraitExpression { get; set; }
-            public string? HasTraitTypeName { get; set; }
-            public string? HasTraitVariableName { get; set; }
-        }
-        public HasTraitStatementNodes HasTraitStatementNode;
-
         // For FunctionDeclaration nodes
         public struct FunctionDeclarationNodes
         {
@@ -480,33 +415,8 @@ namespace Puma
         }
         public FunctionDeclarationNodes FunctionDeclarationNode;
 
-        // For DelegateDeclaration nodes
-        public struct DelegateDeclarationNodes
-        {
-            public DelegateDeclarationNodes()
-            {
-            }
-
-            public string? DelegateName { get; set; }
-            public List<ParameterInfo> DelegateParameterList { get; } = new();
-        }
-        public DelegateDeclarationNodes DelegateDeclarationNode;
-
-        // For statement nodes
-        public struct StatementNodes
-        {
-            public StatementNodes()
-            {
-            }
-            public string? StatementValue { get; set; }
-            public List<Node> StatementBody { get; } = new();
-            public ExpressionNode? StatementExpression { get; set; }
-        }
-        public StatementNodes StatementNode;
-
         public Node()
         {
-            StatementNode = new StatementNodes();
         }
 
         public Node(Section section) : this()
@@ -659,11 +569,7 @@ namespace Puma
         {
             return new IfStatementAstNode
             {
-                IfCondition = condition,
-                IfStatementNode = new IfStatementNodes
-                {
-                    IfCondition = condition
-                }
+                IfCondition = condition
             };
         }
 
@@ -671,11 +577,7 @@ namespace Puma
         {
             return new MatchStatementAstNode
             {
-                Expression = expression,
-                MatchStatementNode = new MatchStatementNodes
-                {
-                    Expression = expression
-                }
+                Expression = expression
             };
         }
 
@@ -683,11 +585,7 @@ namespace Puma
         {
             return new WhenStatementAstNode
             {
-                WhenCondition = condition,
-                WhenStatementNode = new WhenStatementNodes
-                {
-                    WhenCondition = condition
-                }
+                WhenCondition = condition
             };
         }
 
@@ -695,11 +593,7 @@ namespace Puma
         {
             return new WhileStatementAstNode
             {
-                WhileCondition = condition,
-                WhileStatementNode = new WhileStatementNodes
-                {
-                    WhileCondition = condition
-                }
+                WhileCondition = condition
             };
         }
 
@@ -708,12 +602,7 @@ namespace Puma
             return new ForStatementAstNode
             {
                 ForVariable = variable,
-                ForContainer = container,
-                ForStatementNode = new ForStatementNodes
-                {
-                    ForVariable = variable,
-                    ForContainer = container
-                }
+                ForContainer = container
             };
         }
 
@@ -722,12 +611,7 @@ namespace Puma
             return new ForAllStatementAstNode
             {
                 ForVariable = variable,
-                ForContainer = container,
-                ForStatementNode = new ForStatementNodes
-                {
-                    ForVariable = variable,
-                    ForContainer = container
-                }
+                ForContainer = container
             };
         }
 
@@ -735,11 +619,7 @@ namespace Puma
         {
             return new RepeatStatementAstNode
             {
-                RepeatExpression = expression,
-                RepeatStatementNode = new RepeatStatementNodes
-                {
-                    RepeatExpression = expression
-                }
+                RepeatExpression = expression
             };
         }
 
@@ -747,11 +627,7 @@ namespace Puma
         {
             return new HasStatementAstNode
             {
-                HasCondition = condition,
-                HasStatementNode = new HasStatementNodes
-                {
-                    HasCondition = condition
-                }
+                HasCondition = condition
             };
         }
 
@@ -761,13 +637,7 @@ namespace Puma
             {
                 HasTraitCondition = condition,
                 HasTraitTypeName = traitTypeName,
-                HasTraitVariableName = traitVariableName,
-                HasTraitStatementNode = new HasTraitStatementNodes
-                {
-                    HasTraitCondition = condition,
-                    HasTraitTypeName = traitTypeName,
-                    HasTraitVariableName = traitVariableName
-                }
+                HasTraitVariableName = traitVariableName
             };
         }
 
@@ -802,11 +672,7 @@ namespace Puma
         {
             return new StatementAstNode(kind)
             {
-                StatementValue = value,
-                StatementNode = new StatementNodes
-                {
-                    StatementValue = value
-                }
+                StatementValue = value
             };
         }
 
@@ -814,15 +680,10 @@ namespace Puma
         {
             var node = new DelegateDeclarationAstNode
             {
-                DelegateName = name,
-                DelegateDeclarationNode = new DelegateDeclarationNodes
-                {
-                    DelegateName = name
-                }
+                DelegateName = name
             };
 
             node.DelegateParameterList.AddRange(parameterList);
-            node.DelegateDeclarationNode.DelegateParameterList.AddRange(parameterList);
             return node;
         }
     }

@@ -601,22 +601,16 @@ namespace Puma
 
         private static string? GetRepeatExpression(Node node)
         {
-            if (node is RepeatStatementAstNode typedNode)
-            {
-                return typedNode.RepeatExpression ?? node.RepeatStatementNode.RepeatExpression;
-            }
-
-            return node.RepeatStatementNode.RepeatExpression;
+            return node is RepeatStatementAstNode typedNode
+                ? typedNode.RepeatExpression
+                : null;
         }
 
         private static ExpressionNode? GetRepeatExpressionNode(Node node)
         {
-            if (node is RepeatStatementAstNode typedNode)
-            {
-                return typedNode.RepeatExpressionNode ?? node.RepeatStatementNode.RepeatExpressionNode;
-            }
-
-            return node.RepeatStatementNode.RepeatExpressionNode;
+            return node is RepeatStatementAstNode typedNode
+                ? typedNode.RepeatExpressionNode
+                : null;
         }
 
         private static string? GetPropertyName(Node? node)
@@ -677,17 +671,9 @@ namespace Puma
 
         private static List<Node.ParameterInfo>? GetDelegateParameterList(Node node)
         {
-            if (node is DelegateDeclarationAstNode typedNode)
-            {
-                if (typedNode.DelegateParameterList.Count > 0)
-                {
-                    return typedNode.DelegateParameterList;
-                }
-
-                return node.DelegateDeclarationNode.DelegateParameterList;
-            }
-
-            return node.DelegateDeclarationNode.DelegateParameterList;
+            return node is DelegateDeclarationAstNode typedNode
+                ? typedNode.DelegateParameterList
+                : null;
         }
 
         private static string? GetUseStatementTarget(Node node)
@@ -726,12 +712,9 @@ namespace Puma
 
         private static string? GetDelegateDeclarationName(Node node)
         {
-            if (node is DelegateDeclarationAstNode typedNode)
-            {
-                return typedNode.DelegateName ?? node.DelegateDeclarationNode.DelegateName;
-            }
-
-            return node.DelegateDeclarationNode.DelegateName;
+            return node is DelegateDeclarationAstNode typedNode
+                ? typedNode.DelegateName
+                : null;
         }
 
         private static List<Node> GetTypeProperties(Node node)
@@ -859,141 +842,106 @@ namespace Puma
 
         private static string? GetStatementValue(Node node)
         {
-            if (node is StatementAstNode typedNode)
-            {
-                return typedNode.StatementValue ?? node.StatementNode.StatementValue;
-            }
-
-            return node.StatementNode.StatementValue;
+            return node is StatementAstNode typedNode
+                ? typedNode.StatementValue
+                : null;
         }
 
         private static ExpressionNode? GetStatementExpression(Node node)
         {
-            if (node is StatementAstNode typedNode)
-            {
-                return typedNode.StatementExpression ?? node.StatementNode.StatementExpression;
-            }
-
-            return node.StatementNode.StatementExpression;
+            return node is StatementAstNode typedNode
+                ? typedNode.StatementExpression
+                : null;
         }
 
         private static List<Node> GetStatementBody(Node node)
         {
-            if (node is StatementAstNode typedNode)
+            return node.Kind switch
             {
-                if (typedNode.StatementBody.Count > 0)
-                {
-                    return typedNode.StatementBody;
-                }
-
-                return node.StatementNode.StatementBody;
-            }
-
-            return node.StatementNode.StatementBody;
+                NodeKind.IfStatement when node is IfStatementAstNode typedIf => typedIf.IfBody,
+                NodeKind.MatchStatement when node is MatchStatementAstNode typedMatch => typedMatch.StatementBody,
+                NodeKind.WhenStatement when node is WhenStatementAstNode typedWhen => typedWhen.StatementBody,
+                NodeKind.WhileStatement when node is WhileStatementAstNode typedWhile => typedWhile.StatementBody,
+                NodeKind.ForStatement when node is ForStatementAstNode typedFor => typedFor.StatementBody,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedForAll => typedForAll.StatementBody,
+                NodeKind.RepeatStatement when node is RepeatStatementAstNode typedRepeat => typedRepeat.StatementBody,
+                NodeKind.HasStatement when node is HasStatementAstNode typedHas => typedHas.StatementBody,
+                NodeKind.HasTraitStatement when node is HasTraitStatementAstNode typedHasTrait => typedHasTrait.StatementBody,
+                NodeKind.ErrorStatement or NodeKind.CatchStatement or NodeKind.ElseStatement when node is StatementAstNode typedStatement => typedStatement.StatementBody,
+                _ => new List<Node>()
+            };
         }
 
         private static string? GetIfCondition(Node node)
         {
-            if (node is IfStatementAstNode typedNode)
-            {
-                return typedNode.IfCondition ?? node.IfStatementNode.IfCondition;
-            }
-
-            return node.IfStatementNode.IfCondition;
+            return node is IfStatementAstNode typedNode
+                ? typedNode.IfCondition
+                : null;
         }
 
         private static ExpressionNode? GetIfConditionExpression(Node node)
         {
-            if (node is IfStatementAstNode typedNode)
-            {
-                return typedNode.ConditionExpression ?? node.IfStatementNode.ConditionExpression;
-            }
-
-            return node.IfStatementNode.ConditionExpression;
+            return node is IfStatementAstNode typedNode
+                ? typedNode.ConditionExpression
+                : null;
         }
 
         private static List<Node> GetIfElseBody(Node node)
         {
-            if (node is IfStatementAstNode typedNode)
-            {
-                if (typedNode.ElseBody.Count > 0)
-                {
-                    return typedNode.ElseBody;
-                }
-
-                return node.IfStatementNode.ElseBody;
-            }
-
-            return node.IfStatementNode.ElseBody;
+            return node is IfStatementAstNode typedNode
+                ? typedNode.ElseBody
+                : new List<Node>();
         }
 
         private static string? GetMatchExpression(Node node)
         {
-            if (node is MatchStatementAstNode typedNode)
-            {
-                return typedNode.Expression ?? node.MatchStatementNode.Expression;
-            }
-
-            return node.MatchStatementNode.Expression;
+            return node is MatchStatementAstNode typedNode
+                ? typedNode.Expression
+                : null;
         }
 
         private static ExpressionNode? GetMatchExpressionNode(Node node)
         {
-            if (node is MatchStatementAstNode typedNode)
-            {
-                return typedNode.ExpressionNode ?? node.MatchStatementNode.ExpressionNode;
-            }
-
-            return node.MatchStatementNode.ExpressionNode;
+            return node is MatchStatementAstNode typedNode
+                ? typedNode.ExpressionNode
+                : null;
         }
 
         private static string? GetWhenCondition(Node node)
         {
-            if (node is WhenStatementAstNode typedNode)
-            {
-                return typedNode.WhenCondition ?? node.WhenStatementNode.WhenCondition;
-            }
-
-            return node.WhenStatementNode.WhenCondition;
+            return node is WhenStatementAstNode typedNode
+                ? typedNode.WhenCondition
+                : null;
         }
 
         private static ExpressionNode? GetWhenExpression(Node node)
         {
-            if (node is WhenStatementAstNode typedNode)
-            {
-                return typedNode.WhenExpression ?? node.WhenStatementNode.WhenExpression;
-            }
-
-            return node.WhenStatementNode.WhenExpression;
+            return node is WhenStatementAstNode typedNode
+                ? typedNode.WhenExpression
+                : null;
         }
 
         private static string? GetWhileCondition(Node node)
         {
-            if (node is WhileStatementAstNode typedNode)
-            {
-                return typedNode.WhileCondition ?? node.WhileStatementNode.WhileCondition;
-            }
-
-            return node.WhileStatementNode.WhileCondition;
+            return node is WhileStatementAstNode typedNode
+                ? typedNode.WhileCondition
+                : null;
         }
 
         private static ExpressionNode? GetWhileExpression(Node node)
         {
-            if (node is WhileStatementAstNode typedNode)
-            {
-                return typedNode.WhileExpression ?? node.WhileStatementNode.WhileExpression;
-            }
-
-            return node.WhileStatementNode.WhileExpression;
+            return node is WhileStatementAstNode typedNode
+                ? typedNode.WhileExpression
+                : null;
         }
 
         private static string? GetForVariable(Node node)
         {
             return node.Kind switch
             {
-                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForVariable ?? node.ForStatementNode.ForVariable,
-                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForVariable ?? node.ForStatementNode.ForVariable,
-                _ => node.ForStatementNode.ForVariable
+                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForVariable,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForVariable,
+                _ => null
             };
         }
 
@@ -1001,9 +949,9 @@ namespace Puma
         {
             return node.Kind switch
             {
-                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForContainer ?? node.ForStatementNode.ForContainer,
-                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForContainer ?? node.ForStatementNode.ForContainer,
-                _ => node.ForStatementNode.ForContainer
+                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForContainer,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForContainer,
+                _ => null
             };
         }
 
@@ -1011,70 +959,52 @@ namespace Puma
         {
             return node.Kind switch
             {
-                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForContainerExpression ?? node.ForStatementNode.ForContainerExpression,
-                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForContainerExpression ?? node.ForStatementNode.ForContainerExpression,
-                _ => node.ForStatementNode.ForContainerExpression
+                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForContainerExpression,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForContainerExpression,
+                _ => null
             };
         }
 
         private static string? GetHasCondition(Node node)
         {
-            if (node is HasStatementAstNode typedNode)
-            {
-                return typedNode.HasCondition ?? node.HasStatementNode.HasCondition;
-            }
-
-            return node.HasStatementNode.HasCondition;
+            return node is HasStatementAstNode typedNode
+                ? typedNode.HasCondition
+                : null;
         }
 
         private static ExpressionNode? GetHasExpression(Node node)
         {
-            if (node is HasStatementAstNode typedNode)
-            {
-                return typedNode.HasExpression ?? node.HasStatementNode.HasExpression;
-            }
-
-            return node.HasStatementNode.HasExpression;
+            return node is HasStatementAstNode typedNode
+                ? typedNode.HasExpression
+                : null;
         }
 
         private static string? GetHasTraitTypeName(Node node)
         {
-            if (node is HasTraitStatementAstNode typedNode)
-            {
-                return typedNode.HasTraitTypeName ?? node.HasTraitStatementNode.HasTraitTypeName;
-            }
-
-            return node.HasTraitStatementNode.HasTraitTypeName;
+            return node is HasTraitStatementAstNode typedNode
+                ? typedNode.HasTraitTypeName
+                : null;
         }
 
         private static string? GetHasTraitVariableName(Node node)
         {
-            if (node is HasTraitStatementAstNode typedNode)
-            {
-                return typedNode.HasTraitVariableName ?? node.HasTraitStatementNode.HasTraitVariableName;
-            }
-
-            return node.HasTraitStatementNode.HasTraitVariableName;
+            return node is HasTraitStatementAstNode typedNode
+                ? typedNode.HasTraitVariableName
+                : null;
         }
 
         private static string? GetHasTraitCondition(Node node)
         {
-            if (node is HasTraitStatementAstNode typedNode)
-            {
-                return typedNode.HasTraitCondition ?? node.HasTraitStatementNode.HasTraitCondition;
-            }
-
-            return node.HasTraitStatementNode.HasTraitCondition;
+            return node is HasTraitStatementAstNode typedNode
+                ? typedNode.HasTraitCondition
+                : null;
         }
 
         private static ExpressionNode? GetHasTraitExpression(Node node)
         {
-            if (node is HasTraitStatementAstNode typedNode)
-            {
-                return typedNode.HasTraitExpression ?? node.HasTraitStatementNode.HasTraitExpression;
-            }
-
-            return node.HasTraitStatementNode.HasTraitExpression;
+            return node is HasTraitStatementAstNode typedNode
+                ? typedNode.HasTraitExpression
+                : null;
         }
 
         private static string FormatAutoPropertyInitializer(string? value, string? declaredType)
@@ -1283,7 +1213,7 @@ namespace Puma
             foreach (var node in ast.Where(n => n.Kind == NodeKind.DelegateDeclaration))
             {
                 var parameters = string.Join(", ", (GetDelegateParameterList(node) ?? new List<Node.ParameterInfo>()).Select(FormatParameter));
-                sb.AppendLine($"typedef void (*{(node is DelegateDeclarationAstNode typedDelegate ? typedDelegate.DelegateName ?? node.DelegateDeclarationNode.DelegateName : node.DelegateDeclarationNode.DelegateName)})({parameters});");
+                sb.AppendLine($"typedef void (*{GetDelegateDeclarationName(node)})({parameters});");
             }
 
             if (ast.Any(n => n.Kind == NodeKind.DelegateDeclaration))
