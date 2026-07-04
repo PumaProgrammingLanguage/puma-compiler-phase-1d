@@ -1408,9 +1408,9 @@ int main()
         {
             var ast = new List<Node>
             {
-                new Node(Puma.Parser.Section.Properties),
+                Node.CreateSection(Puma.Parser.Section.Properties),
                 Node.CreatePropertyDeclaration("p", "mysteryType", null),
-                new Node(Puma.Parser.Section.Start)
+                Node.CreateSection(Puma.Parser.Section.Start)
             };
 
             var codegen = new Puma.Codegen();

@@ -84,7 +84,7 @@ namespace Puma
                 || allNodes.Any(n => (n.Kind == NodeKind.FunctionDeclaration
                         && (GetFunctionParameterList(n)?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
                     || (n.Kind == NodeKind.Section
-                        && (n.SectionNode.SectionParameterList?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false))
+                        && GetSectionParameterList(n).Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)))
                     || (n.Kind == NodeKind.DelegateDeclaration
                         && (GetDelegateParameterList(n)?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false)));
             if (needsCharacter)
@@ -93,7 +93,7 @@ namespace Puma
             }
 
             var needsStdBoolForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .SelectMany(n => n.RecordDeclarationNode.RecordMembers)
+                .SelectMany(GetRecordMembers)
                 .Any(m =>
                 {
                     var value = GetRecordMemberValue(m);
@@ -105,7 +105,7 @@ namespace Puma
             }
 
             var needsStringForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .SelectMany(n => n.RecordDeclarationNode.RecordMembers)
+                .SelectMany(GetRecordMembers)
                 .Any(m =>
                 {
                     var value = GetRecordMemberValue(m);
@@ -117,13 +117,13 @@ namespace Puma
             }
 
             var needsCStdIntForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .Any(record => record.RecordDeclarationNode.RecordMembers.Any(member =>
+                .Any(record => GetRecordMembers(record).Any(member =>
                 {
                     var value = GetRecordMemberValue(member);
                     var memberName = member.Contains('=', StringComparison.Ordinal)
                         ? member[..member.IndexOf('=')]
                         : member;
-                    record.RecordDeclarationNode.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
+                    TryGetRecordMemberType(record, memberName, out var declaredType);
                     return RequiresFixedWidthIntegerCast(value, declaredType);
                 }));
             if (needsCStdIntForRecords)
@@ -308,9 +308,9 @@ namespace Puma
             foreach (var node in ast.Where(n => n.Kind == NodeKind.EnumDeclaration))
             {
                 sb.AppendLine("// enums");
-                sb.AppendLine($"Enums {node.EnumDeclarationNode.EnumName}");
+                sb.AppendLine($"Enums {GetEnumName(node)}");
                 sb.AppendLine("{");
-                foreach (var member in node.EnumDeclarationNode.EnumMembers)
+                foreach (var member in GetEnumMembers(node))
                 {
                     sb.AppendLine($"    {member},");
                 }
@@ -323,21 +323,22 @@ namespace Puma
         {
             foreach (var node in ast.Where(n => n.Kind == NodeKind.RecordDeclaration))
             {
-                var hasAssignedMembers = node.RecordDeclarationNode.RecordMembers.Any(m => m.Contains('=', StringComparison.Ordinal));
-                var packedSuffix = node.RecordDeclarationNode.RecordPackSize.HasValue ? " [[gnu::packed]]" : string.Empty;
+                var recordMembers = GetRecordMembers(node);
+                var hasAssignedMembers = recordMembers.Any(m => m.Contains('=', StringComparison.Ordinal));
+                var packedSuffix = GetRecordPackSize(node).HasValue ? " [[gnu::packed]]" : string.Empty;
                 if (hasAssignedMembers)
                 {
                     sb.AppendLine("// records");
-                    sb.AppendLine($"struct {node.RecordDeclarationNode.RecordName}{packedSuffix}");
+                    sb.AppendLine($"struct {GetRecordName(node)}{packedSuffix}");
                     sb.AppendLine("{");
-                    foreach (var member in node.RecordDeclarationNode.RecordMembers)
+                    foreach (var member in recordMembers)
                     {
                         var equalsIndex = member.IndexOf('=');
                         if (equalsIndex > 0)
                         {
                             var memberName = member[..equalsIndex];
                             var value = member[(equalsIndex + 1)..];
-                            node.RecordDeclarationNode.RecordMemberTypes.TryGetValue(memberName, out var declaredType);
+                            TryGetRecordMemberType(node, memberName, out var declaredType);
                             var initializer = FormatAutoPropertyInitializer(value, declaredType);
                             sb.AppendLine($"    auto {memberName} = {initializer};");
                         }
@@ -351,13 +352,13 @@ namespace Puma
                     continue;
                 }
 
-                sb.AppendLine($"typedef struct {node.RecordDeclarationNode.RecordName} {{");
-                foreach (var member in node.RecordDeclarationNode.RecordMembers)
+                sb.AppendLine($"typedef struct {GetRecordName(node)} {{");
+                foreach (var member in recordMembers)
                 {
                     var memberType = string.Equals(member, "Name", StringComparison.Ordinal) ? "stdstr" : "int";
                     sb.AppendLine($"    {memberType} {member};");
                 }
-                sb.AppendLine($"}} {node.RecordDeclarationNode.RecordName};");
+                sb.AppendLine($"}} {GetRecordName(node)};");
                 sb.AppendLine();
             }
         }
@@ -540,6 +541,68 @@ namespace Puma
             return text.Length >= 3
                 && text.StartsWith("'", StringComparison.Ordinal)
                 && text.EndsWith("'", StringComparison.Ordinal);
+        }
+
+        private static List<Node.ParameterInfo> GetSectionParameterList(Node node)
+        {
+            return node is SectionAstNode typedNode
+                ? typedNode.SectionParameterList
+                : new List<Node.ParameterInfo>();
+        }
+
+        private static int GetSectionLeadingBlankLines(Node node)
+        {
+            return node is SectionAstNode typedNode
+                ? typedNode.LeadingBlankLines
+                : 0;
+        }
+
+        private static string? GetEnumName(Node node)
+        {
+            return node is EnumDeclarationAstNode typedNode
+                ? typedNode.EnumName
+                : null;
+        }
+
+        private static List<string> GetEnumMembers(Node node)
+        {
+            return node is EnumDeclarationAstNode typedNode
+                ? typedNode.EnumMembers
+                : new List<string>();
+        }
+
+        private static string? GetRecordName(Node node)
+        {
+            return node is RecordDeclarationAstNode typedNode
+                ? typedNode.RecordName
+                : null;
+        }
+
+        private static int? GetRecordPackSize(Node node)
+        {
+            return node is RecordDeclarationAstNode typedNode
+                ? typedNode.RecordPackSize
+                : null;
+        }
+
+        private static List<string> GetRecordMembers(Node node)
+        {
+            return node is RecordDeclarationAstNode typedNode
+                ? typedNode.RecordMembers
+                : new List<string>();
+        }
+
+        private static bool TryGetRecordMemberType(Node node, string memberName, out string? declaredType)
+        {
+            if (node is RecordDeclarationAstNode typedNode
+                && typedNode.RecordMemberTypes.TryGetValue(memberName, out var recordType))
+            {
+                declaredType = recordType;
+                return true;
+            }
+
+            declaredType = null;
+            return false;
         }
 
         private static string? GetAssignmentOperator(Node node)
@@ -1214,7 +1277,7 @@ namespace Puma
                 return;
             }
 
-            var sectionParameters = sectionNode.SectionNode.SectionParameterList ?? new List<Node.ParameterInfo>();
+            var sectionParameters = GetSectionParameterList(sectionNode);
             var parameters = sectionParameters.Count == 0
                 ? "void"
                 : string.Join(", ", sectionParameters.Select(FormatParameter));
@@ -1255,7 +1318,7 @@ namespace Puma
 
             if (startSection != null)
             {
-                for (var i = 0; i < startSection.SectionNode.LeadingBlankLines; i++)
+                for (var i = 0; i < GetSectionLeadingBlankLines(startSection); i++)
                 {
                     sb.AppendLine();
                 }
@@ -1266,7 +1329,7 @@ namespace Puma
             sb.AppendLine("{");
             if (initIndex >= 0 && initSection != null)
             {
-                sb.AppendLine($"    initialize({FormatArguments(initSection.SectionNode.SectionParameterList ?? new List<Node.ParameterInfo>())});");
+                sb.AppendLine($"    initialize({FormatArguments(GetSectionParameterList(initSection))});");
             }
             var statements = startIndex >= 0 ? CollectStatements(ast, startIndex + 1) : new List<Node>();
             var numericPropertyReassignmentMode = UsesTypedPropertyReassignmentMode(ast);
@@ -1324,7 +1387,7 @@ namespace Puma
 
             if (finalIndex >= 0 && finalSection != null)
             {
-                sb.AppendLine($"    finalize({FormatArguments(finalSection.SectionNode.SectionParameterList ?? new List<Node.ParameterInfo>())});");
+                sb.AppendLine($"    finalize({FormatArguments(GetSectionParameterList(finalSection))});");
             }
 
             foreach (var propertyName in heapAllocatedGlobalProperties)

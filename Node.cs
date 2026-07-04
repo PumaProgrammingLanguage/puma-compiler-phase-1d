@@ -82,6 +82,30 @@ namespace Puma
         }
     }
 
+    internal sealed class EnumDeclarationAstNode : Node
+    {
+        public string? EnumName { get; set; }
+        public List<string> EnumMembers { get; } = new();
+
+        public EnumDeclarationAstNode()
+        {
+            Kind = NodeKind.EnumDeclaration;
+        }
+    }
+
+    internal sealed class RecordDeclarationAstNode : Node
+    {
+        public string? RecordName { get; set; }
+        public int? RecordPackSize { get; set; }
+        public List<string> RecordMembers { get; } = new();
+        public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
+
+        public RecordDeclarationAstNode()
+        {
+            Kind = NodeKind.RecordDeclaration;
+        }
+    }
+
     internal sealed class UseStatementAstNode : Node
     {
         public string? Target { get; set; }
@@ -303,6 +327,21 @@ namespace Puma
         }
     }
 
+    internal sealed class SectionAstNode : Node
+    {
+        public string? SectionName { get; set; }
+        public string? SectionParameters { get; set; }
+        public List<Node.ParameterInfo> SectionParameterList { get; } = new();
+        public int LeadingBlankLines { get; set; }
+
+        public SectionAstNode(Section section)
+        {
+            Kind = NodeKind.Section;
+            Section = section;
+            SectionName = section.ToString();
+        }
+    }
+
     internal class Node
     {
         internal sealed class ParameterInfo
@@ -315,46 +354,6 @@ namespace Puma
         public NodeKind Kind { get; set; } = NodeKind.Section;
         public Section Section { get; set; } = Section.None;
 
-        // For EnumDeclaration nodes
-        public struct EnumDeclarationNodes
-        {
-            public EnumDeclarationNodes()
-            {
-            }
-
-            public string? EnumName { get; set; }
-            public List<string> EnumMembers { get; } = new();
-        }
-        public EnumDeclarationNodes EnumDeclarationNode;
-
-        // For RecordDeclaration nodes
-        public struct RecordDeclarationNodes
-        {
-            public RecordDeclarationNodes()
-            {
-            }
-
-            public string? RecordName { get; set; }
-            public int? RecordPackSize { get; set; }
-            public List<string> RecordMembers { get; } = new();
-            public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
-        }
-        public RecordDeclarationNodes RecordDeclarationNode;
-
-        // For Section nodes
-        public struct SectionNodes
-        {
-            public SectionNodes()
-            {
-            }
-
-            public string? SectionName { get; set; }
-            public string? SectionParameters { get; set; }
-            public List<ParameterInfo> SectionParameterList { get; } = new();
-            public int LeadingBlankLines { get; set; }
-        }
-        public SectionNodes SectionNode;
-
         public Node()
         {
         }
@@ -363,9 +362,13 @@ namespace Puma
         {
             Kind = NodeKind.Section;
             Section = section;
-            SectionNode = new SectionNodes
+        }
+
+        public static Node CreateSection(Section section, int leadingBlankLines = 0)
+        {
+            return new SectionAstNode(section)
             {
-                SectionName = section.ToString()
+                LeadingBlankLines = leadingBlankLines
             };
         }
 
@@ -409,35 +412,27 @@ namespace Puma
 
         public static Node CreateEnumDeclaration(string name, IEnumerable<string> members)
         {
-            var node = new Node
+            var node = new EnumDeclarationAstNode
             {
-                Kind = NodeKind.EnumDeclaration,
-                EnumDeclarationNode = new EnumDeclarationNodes
-                {
-                    EnumName = name
-                }
+                EnumName = name
             };
             foreach (var member in members)
             {
-                node.EnumDeclarationNode.EnumMembers.Add(member);
+                node.EnumMembers.Add(member);
             }
             return node;
         }
 
         public static Node CreateRecordDeclaration(string name, int? packSize, IEnumerable<string> members)
         {
-            var node = new Node
+            var node = new RecordDeclarationAstNode
             {
-                Kind = NodeKind.RecordDeclaration,
-                RecordDeclarationNode = new RecordDeclarationNodes
-                {
-                    RecordName = name,
-                    RecordPackSize = packSize
-                }
+                RecordName = name,
+                RecordPackSize = packSize
             };
             foreach (var member in members)
             {
-                node.RecordDeclarationNode.RecordMembers.Add(member);
+                node.RecordMembers.Add(member);
             }
             return node;
         }

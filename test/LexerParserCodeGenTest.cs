@@ -943,8 +943,8 @@ auto f = (uint8_t)6;
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var record = ast.Single(n => n.Kind == NodeKind.RecordDeclaration && n.RecordDeclarationNode.RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "a=false", "b=true", "c=bool", "d=\"\"", "e=str" }, record.RecordDeclarationNode.RecordMembers.ToArray());
+            var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
+            CollectionAssert.AreEqual(new[] { "a=false", "b=true", "c=bool", "d=\"\"", "e=str" }, record.RecordMembers.ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -999,8 +999,8 @@ struct MyRecord
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var record = ast.Single(n => n.Kind == NodeKind.RecordDeclaration && n.RecordDeclarationNode.RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "a=1", "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordDeclarationNode.RecordMembers.ToArray());
+            var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
+            CollectionAssert.AreEqual(new[] { "a=1", "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1054,8 +1054,8 @@ struct MyRecord
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var record = ast.Single(n => n.Kind == NodeKind.RecordDeclaration && n.RecordDeclarationNode.RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordDeclarationNode.RecordMembers.ToArray());
+            var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
+            CollectionAssert.AreEqual(new[] { "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1104,8 +1104,8 @@ struct MyRecord
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumDeclarationNode.EnumName == "MyEnum");
-            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.EnumDeclarationNode.EnumMembers.ToArray());
+            var enumNode = (EnumDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.EnumDeclaration && ((EnumDeclarationAstNode)n).EnumName == "MyEnum");
+            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.EnumMembers.ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1150,8 +1150,8 @@ Enums MyEnum
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var enumNode = ast.Single(n => n.Kind == NodeKind.EnumDeclaration && n.EnumDeclarationNode.EnumName == "MyEnum");
-            CollectionAssert.AreEqual(new[] { "A=1", "B=3", "C=5" }, enumNode.EnumDeclarationNode.EnumMembers.ToArray());
+            var enumNode = (EnumDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.EnumDeclaration && ((EnumDeclarationAstNode)n).EnumName == "MyEnum");
+            CollectionAssert.AreEqual(new[] { "A=1", "B=3", "C=5" }, enumNode.EnumMembers.ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =

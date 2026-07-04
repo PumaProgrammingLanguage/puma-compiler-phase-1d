@@ -681,13 +681,7 @@ namespace Puma
                     var leadingBlankLines = ast.Count == 0
                         ? _pendingLeadingBlankLines
                         : Math.Max(0, _pendingLeadingBlankLines - 1);
-                    _currentSectionNode = new Node(next)
-                    {
-                        SectionNode =
-                        {
-                            LeadingBlankLines = leadingBlankLines
-                        }
-                    };
+                    _currentSectionNode = Node.CreateSection(next, leadingBlankLines);
                     _pendingLeadingBlankLines = 0;
                     ast.Add(_currentSectionNode);
                     return true;
@@ -937,7 +931,7 @@ namespace Puma
             _implicitStartSection = true;
             CurrentSection = Section.Start;
             _currentFileKind = FileDeclarationKind.Module;
-            _currentSectionNode = new Node(Section.Start);
+            _currentSectionNode = Node.CreateSection(Section.Start);
             ast.Add(_currentSectionNode);
             ParseStart(token);
         }
@@ -1258,7 +1252,10 @@ namespace Puma
 
             if (!_startHeaderParsed && TryParseSectionParameters(token, out var parameters))
             {
-                _currentSectionNode!.SectionNode.SectionParameters = parameters;
+                if (_currentSectionNode is SectionAstNode sectionNode)
+                {
+                    sectionNode.SectionParameters = parameters;
+                }
                 _startHeaderParsed = true;
                 return;
             }
@@ -1296,7 +1293,10 @@ namespace Puma
 
             if (!_initializeHeaderParsed && TryParseSectionParameters(token, out var parameters))
             {
-                _currentSectionNode!.SectionNode.SectionParameters = parameters;
+                if (_currentSectionNode is SectionAstNode sectionNode)
+                {
+                    sectionNode.SectionParameters = parameters;
+                }
                 _initializeHeaderParsed = true;
                 return;
             }
@@ -2151,9 +2151,12 @@ namespace Puma
             }
 
             var node = Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers);
-            foreach (var pair in _currentRecordMemberTypes)
+            if (node is RecordDeclarationAstNode typedRecordNode)
             {
-                node.RecordDeclarationNode.RecordMemberTypes[pair.Key] = pair.Value;
+                foreach (var pair in _currentRecordMemberTypes)
+                {
+                    typedRecordNode.RecordMemberTypes[pair.Key] = pair.Value;
+                }
             }
 
             ast.Add(node);
@@ -3352,14 +3355,14 @@ namespace Puma
             }
 
             parameters = BuildQualifiedName(parameterTokens);
-            if (_currentSectionNode != null)
+            if (_currentSectionNode is SectionAstNode sectionNode)
             {
-                _currentSectionNode.SectionNode.SectionParameterList.Clear();
-                _currentSectionNode.SectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
+                sectionNode.SectionParameterList.Clear();
+                sectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
 
                 _readonlySectionParameters.Clear();
                 _readwriteSectionParameters.Clear();
-                foreach (var parameter in _currentSectionNode.SectionNode.SectionParameterList)
+                foreach (var parameter in sectionNode.SectionParameterList)
                 {
                     if (!string.IsNullOrWhiteSpace(parameter.Name) && parameter.Modifiers.Contains("readonly"))
                     {
