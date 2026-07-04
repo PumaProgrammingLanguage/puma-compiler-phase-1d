@@ -85,6 +85,8 @@ namespace Puma
                 var tokens = lexer.Tokenize(source);
                 var ast = parser.Parse(tokens);
                 var cCode = codegen.Generate(ast);
+                var needsStringRuntime = cCode.Contains("#include <String.hpp>", StringComparison.Ordinal);
+                var needsCharacterRuntime = cCode.Contains("#include <Character.hpp>", StringComparison.Ordinal);
 
                 if (Verbose)
                 {
@@ -108,6 +110,20 @@ namespace Puma
                 string Quote(string s) => $"\"{s}\"";
                 var sb = new StringBuilder();
                 sb.Append(Quote(cppSourceFileName));
+
+                if (needsStringRuntime || needsCharacterRuntime)
+                {
+                    var pumaTypeDirectory = FindPumaTypeDirectory();
+                    if (string.IsNullOrWhiteSpace(pumaTypeDirectory))
+                    {
+                        throw new InvalidOperationException("Unable to locate the PumaType runtime directory.");
+                    }
+
+                    sb.Append(" -I ").Append(Quote(pumaTypeDirectory));
+                    sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "String.cpp")));
+                    sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "Character.cpp")));
+                    sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "StringIterator.cpp")));
+                }
 
                 if (!string.IsNullOrEmpty(OutputFileName))
                 {
@@ -241,6 +257,46 @@ namespace Puma
             {
                 Console.Error.WriteLine($"clang++ exit code: {process.ExitCode}");
             }
+        }
+
+        private static string? FindPumaTypeDirectory()
+        {
+            foreach (var root in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+            {
+                var directory = FindPumaTypeDirectory(root);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    return directory;
+                }
+            }
+
+            return null;
+        }
+
+        private static string? FindPumaTypeDirectory(string? startDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(startDirectory))
+            {
+                return null;
+            }
+
+            var directory = new DirectoryInfo(startDirectory);
+            while (directory != null)
+            {
+                var candidate = Path.Combine(directory.FullName, "PumaType");
+                if (Directory.Exists(candidate)
+                    && File.Exists(Path.Combine(candidate, "String.hpp"))
+                    && File.Exists(Path.Combine(candidate, "String.cpp"))
+                    && File.Exists(Path.Combine(candidate, "Character.cpp"))
+                    && File.Exists(Path.Combine(candidate, "StringIterator.cpp")))
+                {
+                    return candidate;
+                }
+
+                directory = directory.Parent;
+            }
+
+            return null;
         }
 
         private static void PrintHelp()

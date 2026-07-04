@@ -1,6 +1,4 @@
 // PumaType/StringIterator.cpp
-#include "pch.h"
-#include "framework.h"
 #include "StringIterator.hpp"
 #include "String.hpp"
 
@@ -55,9 +53,9 @@ namespace Type
     }
 
     // Dereference operator - returns current character
-    const Charactor StringIterator::operator*() const noexcept
+    const Character StringIterator::operator*() const noexcept
     {
-        return Charactor(_current);
+        return Character(_current);
     }
 
     // Add raw byte offset (no UTF-8 awareness)
@@ -77,7 +75,7 @@ namespace Type
         if (_current != nullptr)
         {
             const std::uint8_t firstByte = *_current;
-            const std::uint8_t charSize  = Charactor::GetCharSize(firstByte);
+            const std::uint8_t charSize  = Character::GetCharSize(firstByte);
             _current += charSize;
             if (_limit && _current > _limit)
             {
