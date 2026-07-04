@@ -287,8 +287,11 @@ namespace Puma
                 if (Directory.Exists(candidate)
                     && File.Exists(Path.Combine(candidate, "String.hpp"))
                     && File.Exists(Path.Combine(candidate, "String.cpp"))
+                    && File.Exists(Path.Combine(candidate, "Character.hpp"))
                     && File.Exists(Path.Combine(candidate, "Character.cpp"))
-                    && File.Exists(Path.Combine(candidate, "StringIterator.cpp")))
+                    && File.Exists(Path.Combine(candidate, "StringIterator.hpp"))
+                    && File.Exists(Path.Combine(candidate, "StringIterator.cpp"))
+                    )
                 {
                     return candidate;
                 }
