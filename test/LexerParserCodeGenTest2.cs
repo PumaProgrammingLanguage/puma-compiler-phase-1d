@@ -381,16 +381,16 @@ char Pick(Puma::Type::Character a, Puma::Type::Character b)
             var ast = parser.Parse(tokens);
             var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
             Assert.AreEqual(2, functions.Count);
-            Assert.AreEqual("Hello", functions[0].FunctionDeclarationName);
-            Assert.AreEqual("Add", functions[1].FunctionDeclarationName);
-            Assert.AreEqual("int", functions[1].FunctionDeclarationReturnType);
+            Assert.AreEqual("Hello", ((FunctionDeclarationAstNode)functions[0]).FunctionDeclarationName);
+            Assert.AreEqual("Add", ((FunctionDeclarationAstNode)functions[1]).FunctionDeclarationName);
+            Assert.AreEqual("int", ((FunctionDeclarationAstNode)functions[1]).FunctionDeclarationReturnType);
 
-            var helloBody = functions[0].FunctionBody;
+            var helloBody = ((FunctionDeclarationAstNode)functions[0]).FunctionBody;
             Assert.AreEqual(2, helloBody.Count);
             Assert.AreEqual(NodeKind.AssignmentStatement, helloBody[0].Kind);
             Assert.AreEqual(NodeKind.FunctionCall, helloBody[1].Kind);
 
-            var addBody = functions[1].FunctionBody;
+            var addBody = ((FunctionDeclarationAstNode)functions[1]).FunctionBody;
             Assert.AreEqual(1, addBody.Count);
             Assert.AreEqual(NodeKind.ReturnStatement, addBody[0].Kind);
 
@@ -536,9 +536,9 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(4, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
 
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(14, function.FunctionBody.Count);
             Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
 
@@ -621,13 +621,13 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(3, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "myList" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "myList" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
 
             var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
             Assert.AreEqual(2, functions.Count);
-            CollectionAssert.AreEqual(new[] { "F", "G" }, functions.Select(f => f.FunctionDeclarationName).ToArray());
-            Assert.AreEqual(NodeKind.ForStatement, functions[0].FunctionBody[0].Kind);
-            Assert.AreEqual(NodeKind.ForStatement, functions[1].FunctionBody[0].Kind);
+            CollectionAssert.AreEqual(new[] { "F", "G" }, functions.Select(f => ((FunctionDeclarationAstNode)f).FunctionDeclarationName).ToArray());
+            Assert.AreEqual(NodeKind.ForStatement, ((FunctionDeclarationAstNode)functions[0]).FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.ForStatement, ((FunctionDeclarationAstNode)functions[1]).FunctionBody[0].Kind);
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -734,14 +734,14 @@ functions
             var ast = parser.Parse(tokens);
             var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
             Assert.AreEqual(4, functions.Count);
-            Assert.AreEqual("F", functions[0].FunctionDeclarationName);
-            Assert.AreEqual("G", functions[1].FunctionDeclarationName);
-            Assert.AreEqual("H", functions[2].FunctionDeclarationName);
-            Assert.AreEqual("I", functions[3].FunctionDeclarationName);
-            Assert.AreEqual(NodeKind.MatchStatement, functions[0].FunctionBody[0].Kind);
-            Assert.AreEqual(NodeKind.WhileStatement, functions[1].FunctionBody[0].Kind);
-            Assert.AreEqual(NodeKind.RepeatStatement, functions[2].FunctionBody[0].Kind);
-            Assert.AreEqual(NodeKind.RepeatStatement, functions[3].FunctionBody[0].Kind);
+            Assert.AreEqual("F", ((FunctionDeclarationAstNode)functions[0]).FunctionDeclarationName);
+            Assert.AreEqual("G", ((FunctionDeclarationAstNode)functions[1]).FunctionDeclarationName);
+            Assert.AreEqual("H", ((FunctionDeclarationAstNode)functions[2]).FunctionDeclarationName);
+            Assert.AreEqual("I", ((FunctionDeclarationAstNode)functions[3]).FunctionDeclarationName);
+            Assert.AreEqual(NodeKind.MatchStatement, ((FunctionDeclarationAstNode)functions[0]).FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.WhileStatement, ((FunctionDeclarationAstNode)functions[1]).FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.RepeatStatement, ((FunctionDeclarationAstNode)functions[2]).FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.RepeatStatement, ((FunctionDeclarationAstNode)functions[3]).FunctionBody[0].Kind);
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -841,7 +841,7 @@ functions
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(1, function.FunctionBody.Count);
             Assert.AreEqual(NodeKind.MatchStatement, function.FunctionBody[0].Kind);
 
@@ -925,14 +925,14 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(2, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
 
             var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
             Assert.AreEqual(3, functions.Count);
-            CollectionAssert.AreEqual(new[] { "F", "G", "H" }, functions.Select(f => f.FunctionDeclarationName).ToArray());
-            Assert.AreEqual(NodeKind.IfStatement, functions[0].FunctionBody[0].Kind);
-            Assert.AreEqual(NodeKind.IfStatement, functions[1].FunctionBody[0].Kind);
-            Assert.AreEqual(NodeKind.IfStatement, functions[2].FunctionBody[0].Kind);
+            CollectionAssert.AreEqual(new[] { "F", "G", "H" }, functions.Select(f => ((FunctionDeclarationAstNode)f).FunctionDeclarationName).ToArray());
+            Assert.AreEqual(NodeKind.IfStatement, ((FunctionDeclarationAstNode)functions[0]).FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.IfStatement, ((FunctionDeclarationAstNode)functions[1]).FunctionBody[0].Kind);
+            Assert.AreEqual(NodeKind.IfStatement, ((FunctionDeclarationAstNode)functions[2]).FunctionBody[0].Kind);
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1201,7 +1201,7 @@ void H(void)
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(0, function.FunctionParameterList.Count);
 
             var generated = codegen.Generate(ast);
@@ -1241,7 +1241,7 @@ int F(void)
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(0, function.FunctionParameterList.Count);
             Assert.IsTrue(string.IsNullOrWhiteSpace(function.FunctionDeclarationReturnType));
 
@@ -1288,7 +1288,7 @@ void F(void)
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var logValues = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "LogValues");
+            var logValues = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "LogValues");
             Assert.AreEqual(3, logValues.FunctionParameterList.Count);
             Assert.AreEqual("10", logValues.FunctionParameterList[1].DefaultValue);
             Assert.AreEqual("20", logValues.FunctionParameterList[2].DefaultValue);
@@ -1408,9 +1408,9 @@ int main()
         {
             var ast = new List<Node>
             {
-                new Node(Puma.Parser.Section.Properties),
+                Node.CreateSection(Puma.Parser.Section.Properties),
                 Node.CreatePropertyDeclaration("p", "mysteryType", null),
-                new Node(Puma.Parser.Section.Start)
+                Node.CreateSection(Puma.Parser.Section.Start)
             };
 
             var codegen = new Puma.Codegen();

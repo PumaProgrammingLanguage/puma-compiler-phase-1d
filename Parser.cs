@@ -1,4 +1,4 @@
-﻿// LLVM Compiler for the Puma programming language
+// LLVM Compiler for the Puma programming language
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //
@@ -251,9 +251,9 @@ namespace Puma
             }
 
             var property = ast.LastOrDefault(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, identifier, StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(n.PropertyType));
-            if (property != null && TryMapConvertionType(property.PropertyType, out type))
+                && string.Equals(GetPropertyName(n), identifier, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(GetPropertyType(n)));
+            if (property != null && TryMapConvertionType(GetPropertyType(property), out type))
             {
                 return true;
             }
@@ -356,13 +356,13 @@ namespace Puma
         private Node? GetFunctionDeclarationForCall(string functionName)
         {
             if (_currentFunctionNode != null
-                && string.Equals(_currentFunctionNode.FunctionDeclarationName, functionName, StringComparison.Ordinal))
+                && string.Equals(GetFunctionDeclarationName(_currentFunctionNode), functionName, StringComparison.Ordinal))
             {
                 return _currentFunctionNode;
             }
 
             return ast.LastOrDefault(n => n.Kind == NodeKind.FunctionDeclaration
-                && string.Equals(n.FunctionDeclarationName, functionName, StringComparison.Ordinal));
+                && string.Equals(GetFunctionDeclarationName(n), functionName, StringComparison.Ordinal));
         }
 
         private static List<string> SplitCallArgumentTexts(List<LexerTokens> argumentTokens)
@@ -429,10 +429,13 @@ namespace Puma
             }
 
             var argumentTexts = SplitCallArgumentTexts(argumentTokens);
-            var max = Math.Min(Math.Min(callExpression.Arguments.Count, declaration.FunctionParameterList.Count), argumentTexts.Count);
+            var declarationParameters = declaration is FunctionDeclarationAstNode typedDeclaration
+                ? typedDeclaration.FunctionParameterList
+                : new List<Node.ParameterInfo>();
+            var max = Math.Min(Math.Min(callExpression.Arguments.Count, declarationParameters.Count), argumentTexts.Count);
             for (var i = 0; i < max; i++)
             {
-                var parameter = declaration.FunctionParameterList[i];
+                var parameter = declarationParameters[i];
                 if (!TryMapConvertionType(parameter.Type, out var toType))
                 {
                     continue;
@@ -591,17 +594,17 @@ namespace Puma
             if (_currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait)
             {
                 var typeNode = ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
-                    (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
+                    (GetTypeDeclarationKind(n) == "type" || GetTypeDeclarationKind(n) == "trait"));
                 if (typeNode != null)
                 {
-                    if (typeNode.TypeProperties.Count == 0)
+                    if (GetTypeProperties(typeNode).Count == 0)
                     {
-                        typeNode.TypeProperties.AddRange(ast.Where(n => n.Kind == NodeKind.PropertyDeclaration));
+                        GetTypeProperties(typeNode).AddRange(ast.Where(n => n.Kind == NodeKind.PropertyDeclaration));
                     }
 
-                    if (typeNode.TypeFunctions.Count == 0)
+                    if (GetTypeFunctions(typeNode).Count == 0)
                     {
-                        typeNode.TypeFunctions.AddRange(ast.Where(n => n.Kind == NodeKind.FunctionDeclaration));
+                        GetTypeFunctions(typeNode).AddRange(ast.Where(n => n.Kind == NodeKind.FunctionDeclaration));
                     }
                 }
             }
@@ -678,10 +681,7 @@ namespace Puma
                     var leadingBlankLines = ast.Count == 0
                         ? _pendingLeadingBlankLines
                         : Math.Max(0, _pendingLeadingBlankLines - 1);
-                    _currentSectionNode = new Node(next)
-                    {
-                        LeadingBlankLines = leadingBlankLines
-                    };
+                    _currentSectionNode = Node.CreateSection(next, leadingBlankLines);
                     _pendingLeadingBlankLines = 0;
                     ast.Add(_currentSectionNode);
                     return true;
@@ -879,7 +879,7 @@ namespace Puma
                 return;
             }
 
-            _currentFunctionNode.FunctionBody.AddRange(_currentFunctionBody);
+            GetFunctionBody(_currentFunctionNode).AddRange(_currentFunctionBody);
             ast.Add(_currentFunctionNode);
             _currentFunctionNode = null;
             _currentFunctionBody = new List<Node>();
@@ -931,7 +931,7 @@ namespace Puma
             _implicitStartSection = true;
             CurrentSection = Section.Start;
             _currentFileKind = FileDeclarationKind.Module;
-            _currentSectionNode = new Node(Section.Start);
+            _currentSectionNode = Node.CreateSection(Section.Start);
             ast.Add(_currentSectionNode);
             ParseStart(token);
         }
@@ -981,7 +981,7 @@ namespace Puma
             ParseTypeDeclaration(token.Value, "type");
             _typeHeaderParsed = true;
             _currentFileKind = FileDeclarationKind.Type;
-            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.DeclarationKind == "type");
+            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && GetTypeDeclarationKind(n) == "type");
         }
 
         private void ParseTrait(LexerTokens? token)
@@ -1004,7 +1004,7 @@ namespace Puma
             ParseSimpleDeclaration(token.Value, "trait");
             _traitHeaderParsed = true;
             _currentFileKind = FileDeclarationKind.Trait;
-            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && n.DeclarationKind == "trait");
+            _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration && GetTypeDeclarationKind(n) == "trait");
         }
 
         private void ParseModule(LexerTokens? token)
@@ -1230,7 +1230,10 @@ namespace Puma
                 if (propertyNode != null && _currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait)
                 {
                     var owner = _typeOrTraitNode ?? GetTypeOrTraitOwner();
-                    owner?.TypeProperties.Add(propertyNode);
+                    if (owner != null)
+                    {
+                        GetTypeProperties(owner).Add(propertyNode);
+                    }
                     return;
                 }
             }
@@ -1249,7 +1252,10 @@ namespace Puma
 
             if (!_startHeaderParsed && TryParseSectionParameters(token, out var parameters))
             {
-                _currentSectionNode!.SectionParameters = parameters;
+                if (_currentSectionNode is SectionAstNode sectionNode)
+                {
+                    sectionNode.SectionParameters = parameters;
+                }
                 _startHeaderParsed = true;
                 return;
             }
@@ -1287,7 +1293,10 @@ namespace Puma
 
             if (!_initializeHeaderParsed && TryParseSectionParameters(token, out var parameters))
             {
-                _currentSectionNode!.SectionParameters = parameters;
+                if (_currentSectionNode is SectionAstNode sectionNode)
+                {
+                    sectionNode.SectionParameters = parameters;
+                }
                 _initializeHeaderParsed = true;
                 return;
             }
@@ -1337,7 +1346,7 @@ namespace Puma
             if (_currentFileKind is FileDeclarationKind.Type or FileDeclarationKind.Trait && _typeOrTraitNode == null)
             {
                 _typeOrTraitNode = ast.LastOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
-                    (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
+                    (GetTypeDeclarationKind(n) == "type" || GetTypeDeclarationKind(n) == "trait"));
             }
 
             if (UpdateIndentation(token.Value))
@@ -1689,7 +1698,7 @@ namespace Puma
                 return;
             }
 
-            _pendingBlockTarget = node.StatementBody;
+            _pendingBlockTarget = GetStatementBody(node);
         }
 
         private static bool SupportsStatementBlock(NodeKind kind)
@@ -2142,9 +2151,12 @@ namespace Puma
             }
 
             var node = Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers);
-            foreach (var pair in _currentRecordMemberTypes)
+            if (node is RecordDeclarationAstNode typedRecordNode)
             {
-                node.RecordMemberTypes[pair.Key] = pair.Value;
+                foreach (var pair in _currentRecordMemberTypes)
+                {
+                    typedRecordNode.RecordMemberTypes[pair.Key] = pair.Value;
+                }
             }
 
             ast.Add(node);
@@ -2230,7 +2242,202 @@ namespace Puma
         private Node? GetTypeOrTraitOwner()
         {
             return ast.FirstOrDefault(n => n.Kind == NodeKind.TypeDeclaration &&
-                (n.DeclarationKind == "type" || n.DeclarationKind == "trait"));
+                (GetTypeDeclarationKind(n) == "type" || GetTypeDeclarationKind(n) == "trait"));
+        }
+
+        private static string? GetTypeDeclarationKind(Node node)
+        {
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.DeclarationKind
+                : null;
+        }
+
+        private static string? GetTypeDeclarationName(Node node)
+        {
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.DeclarationName
+                : null;
+        }
+
+        private static List<string> GetTypeTraitNames(Node node)
+        {
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TraitNames
+                : new List<string>();
+        }
+
+        private static List<Node> GetTypeProperties(Node node)
+        {
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TypeProperties
+                : new List<Node>();
+        }
+
+        private static List<Node> GetTypeFunctions(Node node)
+        {
+            return node is TypeDeclarationAstNode typedNode
+                ? typedNode.TypeFunctions
+                : new List<Node>();
+        }
+
+        private static string? GetPropertyName(Node node)
+        {
+            return node is PropertyDeclarationAstNode typedNode
+                ? typedNode.PropertyName
+                : null;
+        }
+
+        private static string? GetPropertyType(Node node)
+        {
+            return node is PropertyDeclarationAstNode typedNode
+                ? typedNode.PropertyType
+                : null;
+        }
+
+        private static string? GetFunctionDeclarationName(Node node)
+        {
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionDeclarationName
+                : null;
+        }
+
+        private static string? GetFunctionDeclarationReturnType(Node node)
+        {
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionDeclarationReturnType
+                : null;
+        }
+
+        private static List<Node> GetFunctionBody(Node node)
+        {
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionBody
+                : new List<Node>();
+        }
+
+        private static List<Node.ParameterInfo> GetFunctionParameterList(Node node)
+        {
+            return node is FunctionDeclarationAstNode typedNode
+                ? typedNode.FunctionParameterList
+                : new List<Node.ParameterInfo>();
+        }
+
+        private static List<Node> GetStatementBody(Node node)
+        {
+            return node.Kind switch
+            {
+                NodeKind.IfStatement when node is IfStatementAstNode typedIf => typedIf.IfBody,
+                NodeKind.MatchStatement when node is MatchStatementAstNode typedMatch => typedMatch.StatementBody,
+                NodeKind.WhenStatement when node is WhenStatementAstNode typedWhen => typedWhen.StatementBody,
+                NodeKind.WhileStatement when node is WhileStatementAstNode typedWhile => typedWhile.StatementBody,
+                NodeKind.ForStatement when node is ForStatementAstNode typedFor => typedFor.StatementBody,
+                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedForAll => typedForAll.StatementBody,
+                NodeKind.RepeatStatement when node is RepeatStatementAstNode typedRepeat => typedRepeat.StatementBody,
+                NodeKind.HasStatement when node is HasStatementAstNode typedHas => typedHas.StatementBody,
+                NodeKind.HasTraitStatement when node is HasTraitStatementAstNode typedHasTrait => typedHasTrait.StatementBody,
+                NodeKind.ErrorStatement or NodeKind.CatchStatement or NodeKind.ElseStatement when node is StatementAstNode typedStatement => typedStatement.StatementBody,
+                _ => new List<Node>()
+            };
+        }
+
+        private static List<Node> GetIfElseBody(Node node)
+        {
+            return node is IfStatementAstNode typedNode
+                ? typedNode.ElseBody
+                : new List<Node>();
+        }
+
+        private static ExpressionNode? GetStatementExpression(Node node)
+        {
+            return node is StatementAstNode typedNode
+                ? typedNode.StatementExpression
+                : null;
+        }
+
+        private static void SetStatementExpression(Node node, ExpressionNode? expression)
+        {
+            if (node is StatementAstNode typedNode)
+            {
+                typedNode.StatementExpression = expression;
+            }
+        }
+
+        private static void SetAssignmentExpressions(Node node, ExpressionNode? leftExpression, ExpressionNode? rightExpression, bool isLoweredPostfixMutation)
+        {
+            if (node is AssignmentStatementAstNode typedNode)
+            {
+                typedNode.AssignmentLeftExpression = leftExpression;
+                typedNode.AssignmentRightExpression = rightExpression;
+                typedNode.IsLoweredPostfixMutation = isLoweredPostfixMutation;
+            }
+        }
+
+        private static void SetIfConditionExpression(Node node, ExpressionNode? expression)
+        {
+            if (node is IfStatementAstNode typedNode)
+            {
+                typedNode.ConditionExpression = expression;
+            }
+        }
+
+        private static void SetMatchExpressionNode(Node node, ExpressionNode? expression)
+        {
+            if (node is MatchStatementAstNode typedNode)
+            {
+                typedNode.ExpressionNode = expression;
+            }
+        }
+
+        private static void SetWhenExpression(Node node, ExpressionNode? expression)
+        {
+            if (node is WhenStatementAstNode typedNode)
+            {
+                typedNode.WhenExpression = expression;
+            }
+        }
+
+        private static void SetWhileExpression(Node node, ExpressionNode? expression)
+        {
+            if (node is WhileStatementAstNode typedNode)
+            {
+                typedNode.WhileExpression = expression;
+            }
+        }
+
+        private static void SetForContainerExpression(Node node, ExpressionNode? expression)
+        {
+            if (node is ForStatementAstNode typedForNode)
+            {
+                typedForNode.ForContainerExpression = expression;
+            }
+            else if (node is ForAllStatementAstNode typedForAllNode)
+            {
+                typedForAllNode.ForContainerExpression = expression;
+            }
+        }
+
+        private static void SetRepeatExpressionNode(Node node, ExpressionNode? expression)
+        {
+            if (node is RepeatStatementAstNode typedNode)
+            {
+                typedNode.RepeatExpressionNode = expression;
+            }
+        }
+
+        private static void SetHasExpression(Node node, ExpressionNode? expression)
+        {
+            if (node is HasStatementAstNode typedNode)
+            {
+                typedNode.HasExpression = expression;
+            }
+        }
+
+        private static void SetHasTraitExpression(Node node, ExpressionNode? expression)
+        {
+            if (node is HasTraitStatementAstNode typedNode)
+            {
+                typedNode.HasTraitExpression = expression;
+            }
         }
 
         private void ParseStatement(LexerTokens firstToken) => ParseStatement(firstToken, ast);
@@ -2428,8 +2635,7 @@ namespace Puma
             }
 
             var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
-            node.AssignmentLeftExpression = leftExpression;
-            node.AssignmentRightExpression = rightExpression;
+            SetAssignmentExpressions(node, leftExpression, rightExpression, isLoweredPostfixMutation: false);
             target.Add(node);
 
             if (assignmentOperator == "="
@@ -2516,7 +2722,7 @@ namespace Puma
             }
 
             return ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, name, StringComparison.Ordinal));
+                && string.Equals(GetPropertyName(n), name, StringComparison.Ordinal));
         }
 
         private void EnsureReadonlyLocalScope()
@@ -2542,7 +2748,7 @@ namespace Puma
                 return false;
             }
 
-            return _currentFunctionNode.FunctionParameterList.Any(p =>
+            return GetFunctionParameterList(_currentFunctionNode).Any(p =>
                 string.Equals(p.Name, name, StringComparison.Ordinal)
                 && p.Modifiers.Contains("const"));
         }
@@ -2555,7 +2761,7 @@ namespace Puma
             }
 
             if (_currentFunctionNode != null
-                && _currentFunctionNode.FunctionParameterList.Any(p =>
+                && GetFunctionParameterList(_currentFunctionNode).Any(p =>
                     string.Equals(p.Name, name, StringComparison.Ordinal)
                     && p.Modifiers.Contains("readonly")))
             {
@@ -2578,7 +2784,7 @@ namespace Puma
             }
 
             if (_currentFunctionNode != null
-                && _currentFunctionNode.FunctionParameterList.Any(p =>
+                && GetFunctionParameterList(_currentFunctionNode).Any(p =>
                     string.Equals(p.Name, name, StringComparison.Ordinal)
                     && p.Modifiers.Contains("readwrite")))
             {
@@ -2631,7 +2837,7 @@ namespace Puma
             }
 
             return ast.Any(n => n.Kind == NodeKind.PropertyDeclaration
-                && string.Equals(n.PropertyName, name, StringComparison.Ordinal));
+                && string.Equals(GetPropertyName(n), name, StringComparison.Ordinal));
         }
 
         private bool TryParseIncrementDecrementStatement(List<LexerTokens> tokens, List<Node> target)
@@ -2656,9 +2862,7 @@ namespace Puma
 
             var assignmentOperator = last.TokenText == "++" ? "+=" : "-=";
             var node = Node.CreateAssignmentStatement(left, "1", assignmentOperator);
-            node.AssignmentLeftExpression = ParseExpression(leftTokens);
-            node.AssignmentRightExpression = new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" };
-            node.IsLoweredPostfixMutation = true;
+            SetAssignmentExpressions(node, ParseExpression(leftTokens), new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" }, isLoweredPostfixMutation: true);
             target.Add(node);
             return true;
         }
@@ -2680,7 +2884,7 @@ namespace Puma
             {
                 if (index > 0 && _tokens[index - 1].Category == TokenCategory.Indent)
                 {
-                    ParseIndentedBlock(node.StatementBody);
+                    ParseIndentedBlock(GetStatementBody(node));
                     return;
                 }
 
@@ -2689,7 +2893,7 @@ namespace Puma
                     var next = GetNextToken(_tokens);
                     if (next != null && !IsIgnorable(next.Value))
                     {
-                        ParseStatement(next.Value, node.StatementBody);
+                        ParseStatement(next.Value, GetStatementBody(node));
                     }
                 }
                 return;
@@ -2787,7 +2991,7 @@ namespace Puma
             var expression = BuildQualifiedName(expressionTokens);
 
             var node = Node.CreateRepeatStatement(expression);
-            node.RepeatExpressionNode = ParseExpression(expressionTokens);
+            SetRepeatExpressionNode(node, ParseExpression(expressionTokens));
             target.Add(node);
             return true;
         }
@@ -2824,7 +3028,7 @@ namespace Puma
             }
 
             var node = Node.CreateHasStatement(condition);
-            node.HasExpression = ParseExpression(conditionTokens);
+            SetHasExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -2868,7 +3072,7 @@ namespace Puma
             }
 
             var node = Node.CreateHasTraitStatement(condition, traitType, traitVariable);
-            node.HasTraitExpression = ParseExpression(variableTokens);
+            SetHasTraitExpression(node, ParseExpression(variableTokens));
             target.Add(node);
             return true;
         }
@@ -2900,7 +3104,7 @@ namespace Puma
             var callExpression = ParseExpression(tokens);
             ValidateImplicitFunctionCallArguments(name, callExpression, argsTokens);
             var callNode = Node.CreateFunctionCall(name, args, callExpression);
-            callNode.StatementExpression = callExpression;
+            SetStatementExpression(callNode, callExpression);
             target.Add(callNode);
             return true;
         }
@@ -2925,7 +3129,7 @@ namespace Puma
             }
 
             var node = Node.CreateIfStatement(condition);
-            node.ConditionExpression = ParseExpression(conditionTokens);
+            SetIfConditionExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -2962,11 +3166,11 @@ namespace Puma
                 return;
             }
 
-            previous.ElseBody.AddRange(elseNode.StatementBody);
+            GetIfElseBody(previous).AddRange(GetStatementBody(elseNode));
             target.RemoveAt(startCount);
-            if (_pendingBlockTarget == elseNode.StatementBody)
+            if (_pendingBlockTarget == GetStatementBody(elseNode))
             {
-                _pendingBlockTarget = previous.ElseBody;
+                _pendingBlockTarget = GetIfElseBody(previous);
             }
         }
 
@@ -2990,7 +3194,7 @@ namespace Puma
             }
 
             var node = Node.CreateMatchStatement(expression);
-            node.MatchExpressionNode = ParseExpression(expressionTokens);
+            SetMatchExpressionNode(node, ParseExpression(expressionTokens));
             target.Add(node);
             return true;
         }
@@ -3015,7 +3219,7 @@ namespace Puma
             }
 
             var node = Node.CreateWhenStatement(condition);
-            node.WhenExpression = ParseExpression(conditionTokens);
+            SetWhenExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -3040,7 +3244,7 @@ namespace Puma
             }
 
             var node = Node.CreateWhileStatement(condition);
-            node.WhileExpression = ParseExpression(conditionTokens);
+            SetWhileExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -3073,13 +3277,13 @@ namespace Puma
             if (tokens[0].TokenText == "for")
             {
                 var node = Node.CreateForStatement(variable, container);
-                node.ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList());
+                SetForContainerExpression(node, ParseExpression(tokens.Skip(inIndex + 1).ToList()));
                 target.Add(node);
             }
             else
             {
                 var node = Node.CreateForAllStatement(variable, container);
-                node.ForContainerExpression = ParseExpression(tokens.Skip(inIndex + 1).ToList());
+                SetForContainerExpression(node, ParseExpression(tokens.Skip(inIndex + 1).ToList()));
                 target.Add(node);
             }
 
@@ -3151,14 +3355,14 @@ namespace Puma
             }
 
             parameters = BuildQualifiedName(parameterTokens);
-            if (_currentSectionNode != null)
+            if (_currentSectionNode is SectionAstNode sectionNode)
             {
-                _currentSectionNode.SectionParameterList.Clear();
-                _currentSectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
+                sectionNode.SectionParameterList.Clear();
+                sectionNode.SectionParameterList.AddRange(ParseParameterList(parameterTokens));
 
                 _readonlySectionParameters.Clear();
                 _readwriteSectionParameters.Clear();
-                foreach (var parameter in _currentSectionNode.SectionParameterList)
+                foreach (var parameter in sectionNode.SectionParameterList)
                 {
                     if (!string.IsNullOrWhiteSpace(parameter.Name) && parameter.Modifiers.Contains("readonly"))
                     {
@@ -3184,12 +3388,12 @@ namespace Puma
             var valueTokens = tokens.Skip(1).ToList();
             var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
             var node = Node.CreateStatement(NodeKind.ReturnStatement, value);
-            node.StatementExpression = ParseExpression(valueTokens);
+            SetStatementExpression(node, ParseExpression(valueTokens));
 
             if (_currentFunctionNode != null
-                && TryMapConvertionType(_currentFunctionNode.FunctionDeclarationReturnType, out var returnType))
+                && TryMapConvertionType(GetFunctionDeclarationReturnType(_currentFunctionNode), out var returnType))
             {
-                ValidateImplicitExpressionConversion(node.StatementExpression, returnType, value);
+                ValidateImplicitExpressionConversion(GetStatementExpression(node), returnType, value);
             }
 
             target.Add(node);
@@ -3206,7 +3410,7 @@ namespace Puma
             var valueTokens = tokens.Skip(1).ToList();
             var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
             var node = Node.CreateStatement(NodeKind.YieldStatement, value);
-            node.StatementExpression = ParseExpression(valueTokens);
+            SetStatementExpression(node, ParseExpression(valueTokens));
             target.Add(node);
             return true;
         }
@@ -3224,7 +3428,7 @@ namespace Puma
                 var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
                 var kind = tokens[0].TokenText == "break" ? NodeKind.BreakStatement : NodeKind.ContinueStatement;
                 var node = Node.CreateStatement(kind, value);
-                node.StatementExpression = ParseExpression(valueTokens);
+                SetStatementExpression(node, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
@@ -3244,7 +3448,7 @@ namespace Puma
                 var valueTokens = tokens.Skip(1).ToList();
                 var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
                 var node = Node.CreateStatement(NodeKind.ErrorStatement, value);
-                node.StatementExpression = ParseExpression(valueTokens);
+                SetStatementExpression(node, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
@@ -3254,7 +3458,7 @@ namespace Puma
                 var valueTokens = tokens.Skip(1).ToList();
                 var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
                 var node = Node.CreateStatement(NodeKind.CatchStatement, value);
-                node.StatementExpression = ParseExpression(valueTokens);
+                SetStatementExpression(node, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
@@ -3263,3 +3467,5 @@ namespace Puma
         }
     }
 }
+
+

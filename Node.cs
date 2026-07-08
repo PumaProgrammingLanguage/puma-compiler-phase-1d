@@ -1,4 +1,4 @@
-﻿// LLVM Compiler for the Puma programming language
+// LLVM Compiler for the Puma programming language
 //   as defined in the document "The Puma Programming Language Specification"
 //   available at https://github.com/ThePumaProgrammingLanguage
 //
@@ -72,6 +72,276 @@ namespace Puma
         public List<ExpressionNode> Arguments { get; } = new();
     }
 
+    internal sealed class WriteLineAstNode : Node
+    {
+        public string? StringValue { get; set; }
+
+        public WriteLineAstNode()
+        {
+            Kind = NodeKind.WriteLine;
+        }
+    }
+
+    internal sealed class EnumDeclarationAstNode : Node
+    {
+        public string? EnumName { get; set; }
+        public List<string> EnumMembers { get; } = new();
+
+        public EnumDeclarationAstNode()
+        {
+            Kind = NodeKind.EnumDeclaration;
+        }
+    }
+
+    internal sealed class RecordDeclarationAstNode : Node
+    {
+        public string? RecordName { get; set; }
+        public int? RecordPackSize { get; set; }
+        public List<string> RecordMembers { get; } = new();
+        public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
+
+        public RecordDeclarationAstNode()
+        {
+            Kind = NodeKind.RecordDeclaration;
+        }
+    }
+
+    internal sealed class UseStatementAstNode : Node
+    {
+        public string? Target { get; set; }
+        public string? Alias { get; set; }
+        public bool IsFilePath { get; set; }
+
+        public UseStatementAstNode()
+        {
+            Kind = NodeKind.UseStatement;
+        }
+    }
+
+    internal sealed class FunctionCallAstNode : Node
+    {
+        public string? Name { get; set; }
+        public string? Arguments { get; set; }
+        public ExpressionNode? Expression { get; set; }
+
+        public FunctionCallAstNode()
+        {
+            Kind = NodeKind.FunctionCall;
+        }
+    }
+
+    internal sealed class IfStatementAstNode : Node
+    {
+        public string? IfCondition { get; set; }
+        public ExpressionNode? ConditionExpression { get; set; }
+        public List<Node> IfBody { get; } = new();
+        public List<Node> ElseBody { get; } = new();
+
+        public IfStatementAstNode()
+        {
+            Kind = NodeKind.IfStatement;
+        }
+    }
+
+    internal sealed class MatchStatementAstNode : Node
+    {
+        public string? Expression { get; set; }
+        public ExpressionNode? ExpressionNode { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public MatchStatementAstNode()
+        {
+            Kind = NodeKind.MatchStatement;
+        }
+    }
+
+    internal sealed class WhenStatementAstNode : Node
+    {
+        public string? WhenCondition { get; set; }
+        public ExpressionNode? WhenExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public WhenStatementAstNode()
+        {
+            Kind = NodeKind.WhenStatement;
+        }
+    }
+
+    internal sealed class WhileStatementAstNode : Node
+    {
+        public string? WhileCondition { get; set; }
+        public ExpressionNode? WhileExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public WhileStatementAstNode()
+        {
+            Kind = NodeKind.WhileStatement;
+        }
+    }
+
+    internal sealed class ForStatementAstNode : Node
+    {
+        public string? ForVariable { get; set; }
+        public string? ForContainer { get; set; }
+        public ExpressionNode? ForContainerExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public ForStatementAstNode()
+        {
+            Kind = NodeKind.ForStatement;
+        }
+    }
+
+    internal sealed class ForAllStatementAstNode : Node
+    {
+        public string? ForVariable { get; set; }
+        public string? ForContainer { get; set; }
+        public ExpressionNode? ForContainerExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public ForAllStatementAstNode()
+        {
+            Kind = NodeKind.ForAllStatement;
+        }
+    }
+
+    internal sealed class RepeatStatementAstNode : Node
+    {
+        public string? RepeatExpression { get; set; }
+        public ExpressionNode? RepeatExpressionNode { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public RepeatStatementAstNode()
+        {
+            Kind = NodeKind.RepeatStatement;
+        }
+    }
+
+    internal sealed class HasStatementAstNode : Node
+    {
+        public string? HasCondition { get; set; }
+        public ExpressionNode? HasExpression { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public HasStatementAstNode()
+        {
+            Kind = NodeKind.HasStatement;
+        }
+    }
+
+    internal sealed class HasTraitStatementAstNode : Node
+    {
+        public string? HasTraitCondition { get; set; }
+        public ExpressionNode? HasTraitExpression { get; set; }
+        public string? HasTraitTypeName { get; set; }
+        public string? HasTraitVariableName { get; set; }
+        public List<Node> StatementBody { get; } = new();
+
+        public HasTraitStatementAstNode()
+        {
+            Kind = NodeKind.HasTraitStatement;
+        }
+    }
+
+    internal sealed class AssignmentStatementAstNode : Node
+    {
+        public string? Left { get; set; }
+        public string? Right { get; set; }
+        public string? Operator { get; set; }
+        public string? AssignmentLeft { get; set; }
+        public string? AssignmentRight { get; set; }
+        public string? AssignmentOperator { get; set; }
+        public ExpressionNode? AssignmentLeftExpression { get; set; }
+        public ExpressionNode? AssignmentRightExpression { get; set; }
+        public bool IsLoweredPostfixMutation { get; set; }
+
+        public AssignmentStatementAstNode()
+        {
+            Kind = NodeKind.AssignmentStatement;
+        }
+    }
+
+    internal sealed class TypeDeclarationAstNode : Node
+    {
+        public string? DeclarationKind { get; set; }
+        public string? DeclarationName { get; set; }
+        public string? BaseTypeName { get; set; }
+        public List<string> TraitNames { get; } = new();
+        public List<Node> TypeProperties { get; } = new();
+        public List<Node> TypeFunctions { get; } = new();
+
+        public TypeDeclarationAstNode()
+        {
+            Kind = NodeKind.TypeDeclaration;
+        }
+    }
+
+    internal sealed class PropertyDeclarationAstNode : Node
+    {
+        public string? PropertyName { get; set; }
+        public string? PropertyValue { get; set; }
+        public string? PropertyType { get; set; }
+        public List<string> PropertyModifiers { get; } = new();
+
+        public PropertyDeclarationAstNode()
+        {
+            Kind = NodeKind.PropertyDeclaration;
+        }
+    }
+
+    internal sealed class FunctionDeclarationAstNode : Node
+    {
+        public string? FunctionDeclarationName { get; set; }
+        public string? FunctionDeclarationParameters { get; set; }
+        public string? FunctionDeclarationReturnType { get; set; }
+        public List<string> FunctionModifiers { get; } = new();
+        public List<Node> FunctionBody { get; } = new();
+        public List<Node.ParameterInfo> FunctionParameterList { get; } = new();
+
+        public FunctionDeclarationAstNode()
+        {
+            Kind = NodeKind.FunctionDeclaration;
+        }
+    }
+
+    internal sealed class DelegateDeclarationAstNode : Node
+    {
+        public string? DelegateName { get; set; }
+        public List<Node.ParameterInfo> DelegateParameterList { get; } = new();
+
+        public DelegateDeclarationAstNode()
+        {
+            Kind = NodeKind.DelegateDeclaration;
+        }
+    }
+
+    internal sealed class StatementAstNode : Node
+    {
+        public string? StatementValue { get; set; }
+        public List<Node> StatementBody { get; } = new();
+        public ExpressionNode? StatementExpression { get; set; }
+
+        public StatementAstNode(NodeKind kind)
+        {
+            Kind = kind;
+        }
+    }
+
+    internal sealed class SectionAstNode : Node
+    {
+        public string? SectionName { get; set; }
+        public string? SectionParameters { get; set; }
+        public List<Node.ParameterInfo> SectionParameterList { get; } = new();
+        public int LeadingBlankLines { get; set; }
+
+        public SectionAstNode(Section section)
+        {
+            Kind = NodeKind.Section;
+            Section = section;
+            SectionName = section.ToString();
+        }
+    }
+
     internal class Node
     {
         internal sealed class ParameterInfo
@@ -84,158 +354,40 @@ namespace Puma
         public NodeKind Kind { get; set; } = NodeKind.Section;
         public Section Section { get; set; } = Section.None;
 
-        // For WriteLine nodes
-        public struct WriteLineNodes
-        {
-            public string? StringValue { get; set; }
-        }
-        public WriteLineNodes WriteLineNode;
-
-        // For UseStatement nodes
-        public struct UseStatementNodes
-        {
-            public string? Target { get; set; }
-            public string? Alias { get; set; }
-            public bool IsFilePath { get; set; }
-        }
-        public UseStatementNodes UseStatementNode;
-
-        // For TypeDeclaration nodes
-        public string? DeclarationKind { get; set; }
-        public string? DeclarationName { get; set; }
-        public string? BaseTypeName { get; set; }
-        public List<string> TraitNames { get; } = new();
-        public List<Node> TypeProperties { get; } = new();
-        public List<Node> TypeFunctions { get; } = new();
-
-        // For EnumDeclaration nodes
-        public string? EnumName { get; set; }
-        public List<string> EnumMembers { get; } = new();
-
-        // For RecordDeclaration nodes
-        public string? RecordName { get; set; }
-        public int? RecordPackSize { get; set; }
-        public List<string> RecordMembers { get; } = new();
-        public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
-
-        // For PropertyDeclaration nodes
-        public string? PropertyName { get; set; }
-        public string? PropertyValue { get; set; }
-        public string? PropertyType { get; set; }
-        public List<string> PropertyModifiers { get; } = new();
-
-        // For AssignmentStatement nodes
-        public string? AssignmentLeft { get; set; }
-        public string? AssignmentRight { get; set; }
-        public string? AssignmentOperator { get; set; }
-        public ExpressionNode? AssignmentLeftExpression { get; set; }
-        public ExpressionNode? AssignmentRightExpression { get; set; }
-        public bool IsLoweredPostfixMutation { get; set; }
-
-        // For Section nodes
-        public string? SectionParameters { get; set; }
-        public List<ParameterInfo> SectionParameterList { get; } = new();
-        public int LeadingBlankLines { get; set; }
-
-        // For FunctionCall nodes
-        public string? FunctionName { get; set; }
-        public string? FunctionArguments { get; set; }
-        public ExpressionNode? FunctionCallExpression { get; set; }
-
-        // For IfStatement nodes
-        public string? IfCondition { get; set; }
-        public List<Node> ElseBody { get; } = new();
-        public ExpressionNode? ConditionExpression { get; set; }
-
-        // For MatchStatement nodes
-        public string? MatchExpression { get; set; }
-        public ExpressionNode? MatchExpressionNode { get; set; }
-
-        // For WhenStatement nodes
-        public string? WhenCondition { get; set; }
-        public ExpressionNode? WhenExpression { get; set; }
-
-        // For WhileStatement nodes
-        public string? WhileCondition { get; set; }
-        public ExpressionNode? WhileExpression { get; set; }
-
-        // For ForStatement nodes
-        public string? ForVariable { get; set; }
-        public string? ForContainer { get; set; }
-        public ExpressionNode? ForContainerExpression { get; set; }
-
-        // For RepeatStatement nodes
-        public string? RepeatExpression { get; set; }
-        public ExpressionNode? RepeatExpressionNode { get; set; }
-
-        // For HasStatement nodes
-        public string? HasCondition { get; set; }
-        public ExpressionNode? HasExpression { get; set; }
-
-        // For HasTraitStatement nodes
-        public string? HasTraitCondition { get; set; }
-        public ExpressionNode? HasTraitExpression { get; set; }
-        public string? HasTraitTypeName { get; set; }
-        public string? HasTraitVariableName { get; set; }
-
-        // For FunctionDeclaration nodes
-        public string? FunctionDeclarationName { get; set; }
-        public string? FunctionDeclarationParameters { get; set; }
-        public string? FunctionDeclarationReturnType { get; set; }
-        public List<string> FunctionModifiers { get; } = new();
-        public List<Node> FunctionBody { get; } = new();
-        public List<ParameterInfo> FunctionParameterList { get; } = new();
-
-        // For DelegateDeclaration nodes
-        public string? DelegateName { get; set; }
-        public List<ParameterInfo> DelegateParameterList { get; } = new();
-
-        // For statement nodes
-        public string? StatementValue { get; set; }
-        public List<Node> StatementBody { get; } = new();
-        public ExpressionNode? StatementExpression { get; set; }
-
         public Node()
         {
         }
 
-        public Node(Section section)
+        public static Node CreateSection(Section section, int leadingBlankLines = 0)
         {
-            Kind = NodeKind.Section;
-            Section = section;
+            return new SectionAstNode(section)
+            {
+                LeadingBlankLines = leadingBlankLines
+            };
         }
 
         public static Node CreateWriteLine(string literal)
         {
-            return new Node
+            return new WriteLineAstNode
             {
-                Kind = NodeKind.WriteLine,
-                WriteLineNode = new WriteLineNodes
-                {
-                    StringValue = literal
-                }
+                StringValue = literal
             };
         }
 
         public static Node CreateUseStatement(string target, string? alias, bool isFilePath)
         {
-            return new Node
+            return new UseStatementAstNode
             {
-                Kind = NodeKind.UseStatement,
-                UseStatementNode = new UseStatementNodes
-                {
-                    Target = target,
-                    Alias = alias,
-                    IsFilePath = isFilePath
-                }
+                Target = target,
+                Alias = alias,
+                IsFilePath = isFilePath
             };
         }
 
         public static Node CreateTypeDeclaration(string declarationKind, string name, string? baseType, IEnumerable<string>? traits = null)
         {
-            var node = new Node
+            var node = new TypeDeclarationAstNode
             {
-                Kind = NodeKind.TypeDeclaration,
                 DeclarationKind = declarationKind,
                 DeclarationName = name,
                 BaseTypeName = baseType
@@ -243,7 +395,10 @@ namespace Puma
 
             if (traits != null)
             {
-                node.TraitNames.AddRange(traits);
+                foreach (var trait in traits)
+                {
+                    node.TraitNames.Add(trait);
+                }
             }
 
             return node;
@@ -251,32 +406,35 @@ namespace Puma
 
         public static Node CreateEnumDeclaration(string name, IEnumerable<string> members)
         {
-            var node = new Node
+            var node = new EnumDeclarationAstNode
             {
-                Kind = NodeKind.EnumDeclaration,
                 EnumName = name
             };
-            node.EnumMembers.AddRange(members);
+            foreach (var member in members)
+            {
+                node.EnumMembers.Add(member);
+            }
             return node;
         }
 
         public static Node CreateRecordDeclaration(string name, int? packSize, IEnumerable<string> members)
         {
-            var node = new Node
+            var node = new RecordDeclarationAstNode
             {
-                Kind = NodeKind.RecordDeclaration,
                 RecordName = name,
                 RecordPackSize = packSize
             };
-            node.RecordMembers.AddRange(members);
+            foreach (var member in members)
+            {
+                node.RecordMembers.Add(member);
+            }
             return node;
         }
 
         public static Node CreatePropertyDeclaration(string name, string? value, string? type, IEnumerable<string>? modifiers = null)
         {
-            var node = new Node
+            var node = new PropertyDeclarationAstNode
             {
-                Kind = NodeKind.PropertyDeclaration,
                 PropertyName = name,
                 PropertyValue = value,
                 PropertyType = type
@@ -292,67 +450,63 @@ namespace Puma
 
         public static Node CreateAssignmentStatement(string left, string right, string assignmentOperator)
         {
-            return new Node
+            return new AssignmentStatementAstNode
             {
-                Kind = NodeKind.AssignmentStatement,
                 AssignmentLeft = left,
                 AssignmentRight = right,
-                AssignmentOperator = assignmentOperator
+                AssignmentOperator = assignmentOperator,
+                Left = left,
+                Right = right,
+                Operator = assignmentOperator
             };
         }
 
         public static Node CreateFunctionCall(string name, string arguments, ExpressionNode? expression = null)
         {
-            return new Node
+            return new FunctionCallAstNode
             {
-                Kind = NodeKind.FunctionCall,
-                FunctionName = name,
-                FunctionArguments = arguments,
-                FunctionCallExpression = expression
+                Name = name,
+                Arguments = arguments,
+                Expression = expression
             };
         }
 
         public static Node CreateIfStatement(string condition)
         {
-            return new Node
+            return new IfStatementAstNode
             {
-                Kind = NodeKind.IfStatement,
                 IfCondition = condition
             };
         }
 
         public static Node CreateMatchStatement(string expression)
         {
-            return new Node
+            return new MatchStatementAstNode
             {
-                Kind = NodeKind.MatchStatement,
-                MatchExpression = expression
+                Expression = expression
             };
         }
 
         public static Node CreateWhenStatement(string condition)
         {
-            return new Node
+            return new WhenStatementAstNode
             {
-                Kind = NodeKind.WhenStatement,
                 WhenCondition = condition
             };
         }
 
         public static Node CreateWhileStatement(string condition)
         {
-            return new Node
+            return new WhileStatementAstNode
             {
-                Kind = NodeKind.WhileStatement,
                 WhileCondition = condition
             };
         }
 
         public static Node CreateForStatement(string variable, string container)
         {
-            return new Node
+            return new ForStatementAstNode
             {
-                Kind = NodeKind.ForStatement,
                 ForVariable = variable,
                 ForContainer = container
             };
@@ -360,9 +514,8 @@ namespace Puma
 
         public static Node CreateForAllStatement(string variable, string container)
         {
-            return new Node
+            return new ForAllStatementAstNode
             {
-                Kind = NodeKind.ForAllStatement,
                 ForVariable = variable,
                 ForContainer = container
             };
@@ -370,27 +523,24 @@ namespace Puma
 
         public static Node CreateRepeatStatement(string expression)
         {
-            return new Node
+            return new RepeatStatementAstNode
             {
-                Kind = NodeKind.RepeatStatement,
                 RepeatExpression = expression
             };
         }
 
         public static Node CreateHasStatement(string condition)
         {
-            return new Node
+            return new HasStatementAstNode
             {
-                Kind = NodeKind.HasStatement,
                 HasCondition = condition
             };
         }
 
         public static Node CreateHasTraitStatement(string condition, string? traitTypeName = null, string? traitVariableName = null)
         {
-            return new Node
+            return new HasTraitStatementAstNode
             {
-                Kind = NodeKind.HasTraitStatement,
                 HasTraitCondition = condition,
                 HasTraitTypeName = traitTypeName,
                 HasTraitVariableName = traitVariableName
@@ -399,9 +549,8 @@ namespace Puma
 
         public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList, IEnumerable<string>? modifiers = null)
         {
-            var node = new Node
+            var node = new FunctionDeclarationAstNode
             {
-                Kind = NodeKind.FunctionDeclaration,
                 FunctionDeclarationName = name,
                 FunctionDeclarationParameters = parameters,
                 FunctionDeclarationReturnType = returnType
@@ -418,18 +567,16 @@ namespace Puma
 
         public static Node CreateStatement(NodeKind kind, string? value = null)
         {
-            return new Node
+            return new StatementAstNode(kind)
             {
-                Kind = kind,
                 StatementValue = value
             };
         }
 
         public static Node CreateDelegateDeclaration(string name, IEnumerable<ParameterInfo> parameterList)
         {
-            var node = new Node
+            var node = new DelegateDeclarationAstNode
             {
-                Kind = NodeKind.DelegateDeclaration,
                 DelegateName = name
             };
 

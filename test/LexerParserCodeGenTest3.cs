@@ -161,9 +161,9 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(8, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f", "g", "h" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f", "g", "h" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
 
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(22, function.FunctionBody.Count);
             Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
 
@@ -407,8 +407,8 @@ start
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var property = ast.Single(n => n.Kind == NodeKind.PropertyDeclaration && n.PropertyName == "total");
-            CollectionAssert.Contains(property.PropertyModifiers, "readwrite");
+            var property = ast.Single(n => n.Kind == NodeKind.PropertyDeclaration && ((PropertyDeclarationAstNode)n).PropertyName == "total");
+            CollectionAssert.Contains(((PropertyDeclarationAstNode)property).PropertyModifiers, "readwrite");
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -444,7 +444,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Increment");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "Increment");
             CollectionAssert.Contains(function.FunctionParameterList[0].Modifiers, "readwrite");
 
             var generated = codegen.Generate(ast);
@@ -477,7 +477,7 @@ int Increment(int64_t value)
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Echo");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "Echo");
             CollectionAssert.Contains(function.FunctionParameterList[0].Modifiers, "const");
 
             var generated = codegen.Generate(ast);
@@ -601,7 +601,7 @@ int Echo(int64_t value)
             var tokens = lexer.Tokenize(src);
 
             var ast = parser.Parse(tokens);
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "Update");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "Update");
             CollectionAssert.Contains(function.FunctionParameterList[0].Modifiers, "readwrite");
         }
 
@@ -1529,9 +1529,9 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(2, properties.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
 
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(11, function.FunctionBody.Count);
             Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
 
@@ -1607,9 +1607,9 @@ functions
             var ast = parser.Parse(tokens);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(2, properties.Count);
-            CollectionAssert.AreEqual(new[] { "counter", "obj" }, properties.Select(p => p.PropertyName).ToArray());
+            CollectionAssert.AreEqual(new[] { "counter", "obj" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
 
-            var function = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var function = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(5, function.FunctionBody.Count);
             Assert.IsTrue(function.FunctionBody.All(n => n.Kind == NodeKind.AssignmentStatement));
 
@@ -2180,7 +2180,7 @@ functions
             }, significant);
 
             var ast = parser.Parse(tokens);
-            var fn = ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && n.FunctionDeclarationName == "F");
+            var fn = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "F");
             Assert.AreEqual(3, fn.FunctionBody.Count);
 
             var generated = codegen.Generate(ast);
