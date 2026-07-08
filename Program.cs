@@ -87,6 +87,7 @@ namespace Puma
                 var cCode = codegen.Generate(ast);
                 var needsStringRuntime = cCode.Contains("#include <String.hpp>", StringComparison.Ordinal);
                 var needsCharacterRuntime = cCode.Contains("#include <Character.hpp>", StringComparison.Ordinal);
+                var needsStringIteratorRuntime = cCode.Contains("#include <StringIterator.hpp>", StringComparison.Ordinal);
 
                 if (Verbose)
                 {
@@ -111,7 +112,7 @@ namespace Puma
                 var sb = new StringBuilder();
                 sb.Append(Quote(cppSourceFileName));
 
-                if (needsStringRuntime || needsCharacterRuntime)
+                if (needsStringRuntime || needsCharacterRuntime || needsStringIteratorRuntime)
                 {
                     var pumaTypeDirectory = FindPumaTypeDirectory();
                     if (string.IsNullOrWhiteSpace(pumaTypeDirectory))
@@ -120,9 +121,18 @@ namespace Puma
                     }
 
                     sb.Append(" -I ").Append(Quote(pumaTypeDirectory));
-                    sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "String.cpp")));
-                    sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "Character.cpp")));
-                    sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "StringIterator.cpp")));
+                    if (needsStringRuntime)
+                    {
+                        sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "String.cpp")));
+                    }
+                    if (needsCharacterRuntime)
+                    {
+                        sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "Character.cpp")));
+                    }
+                    if (needsStringIteratorRuntime)
+                    {
+                        sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "StringIterator.cpp")));
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(OutputFileName))
