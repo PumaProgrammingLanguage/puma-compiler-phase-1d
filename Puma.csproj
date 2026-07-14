@@ -16,7 +16,7 @@
     <Title>Puma Programming Language</Title>
     <Company>Puma Programming Language Project</Company>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>compiler, translator</PackageTags>
+    <PackageTags>compiler; translator</PackageTags>
     <Version>0.1.0</Version>
   </PropertyGroup>
 
