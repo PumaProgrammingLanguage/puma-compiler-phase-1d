@@ -32,8 +32,11 @@ namespace Puma
         protected static bool Output = false;
         protected static string SourceFileName = "";
         protected static string OutputFileName = "";
+        protected static readonly string[] RuntimeLibraryLinkOrder = ["PumaConsole", "PumaFile", "PumaType"];
         // variable to store the source code.
         protected static string source = "";
+
+        private sealed record InstalledPumaRuntime(string IncludeDirectory, string LibraryDirectory);
 
         /// <summary>
         /// // Main method of the Puma compiler.
@@ -85,9 +88,7 @@ namespace Puma
                 var tokens = lexer.Tokenize(source);
                 var ast = parser.Parse(tokens);
                 var cCode = codegen.Generate(ast);
-                var needsStringRuntime = cCode.Contains("#include <String.hpp>", StringComparison.Ordinal);
-                var needsCharacterRuntime = cCode.Contains("#include <Character.hpp>", StringComparison.Ordinal);
-                var needsStringIteratorRuntime = cCode.Contains("#include <StringIterator.hpp>", StringComparison.Ordinal);
+                var requiredRuntimeLibraries = GetRequiredRuntimeLibraries(cCode);
 
                 if (Verbose)
                 {
@@ -112,26 +113,19 @@ namespace Puma
                 var sb = new StringBuilder();
                 sb.Append(Quote(cppSourceFileName));
 
-                if (needsStringRuntime || needsCharacterRuntime || needsStringIteratorRuntime)
+                if (requiredRuntimeLibraries.Count > 0)
                 {
-                    var pumaTypeDirectory = FindPumaTypeDirectory();
-                    if (string.IsNullOrWhiteSpace(pumaTypeDirectory))
+                    var installedRuntime = FindInstalledPumaRuntime();
+                    if (installedRuntime == null)
                     {
-                        throw new InvalidOperationException("Unable to locate the PumaType runtime directory.");
+                        throw new InvalidOperationException("Unable to locate the installed Puma runtime under PUMA_HOME or %USERPROFILE%\\Puma.");
                     }
 
-                    sb.Append(" -I ").Append(Quote(pumaTypeDirectory));
-                    if (needsStringRuntime)
+                    sb.Append(" -I ").Append(Quote(installedRuntime.IncludeDirectory));
+                    sb.Append(" -L ").Append(Quote(installedRuntime.LibraryDirectory));
+                    foreach (var libraryPath in GetRuntimeLibraryPaths(installedRuntime, requiredRuntimeLibraries))
                     {
-                        sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "String.cpp")));
-                    }
-                    if (needsCharacterRuntime)
-                    {
-                        sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "Character.cpp")));
-                    }
-                    if (needsStringIteratorRuntime)
-                    {
-                        sb.Append(' ').Append(Quote(Path.Combine(pumaTypeDirectory, "StringIterator.cpp")));
+                        sb.Append(' ').Append(Quote(libraryPath));
                     }
                 }
 
@@ -269,58 +263,79 @@ namespace Puma
             }
         }
 
-        private static string? FindPumaTypeDirectory()
+        private static List<string> GetRequiredRuntimeLibraries(string cCode)
         {
-            var packagedDirectory = Path.Combine(AppContext.BaseDirectory, "PumaType");
-            if (IsPumaTypeDirectory(packagedDirectory))
+            var requiredLibraries = new HashSet<string>(StringComparer.Ordinal);
+
+            if (cCode.Contains("#include <PumaConsole/", StringComparison.Ordinal))
             {
-                return packagedDirectory;
+                requiredLibraries.Add("PumaConsole");
+                requiredLibraries.Add("PumaType");
             }
 
-            foreach (var root in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+            if (cCode.Contains("#include <PumaFile/", StringComparison.Ordinal))
             {
-                var directory = FindPumaTypeDirectory(root);
-                if (!string.IsNullOrWhiteSpace(directory))
+                requiredLibraries.Add("PumaFile");
+                requiredLibraries.Add("PumaType");
+            }
+
+            if (cCode.Contains("#include <PumaType/", StringComparison.Ordinal))
+            {
+                requiredLibraries.Add("PumaType");
+            }
+
+            return RuntimeLibraryLinkOrder.Where(requiredLibraries.Contains).ToList();
+        }
+
+        private static InstalledPumaRuntime? FindInstalledPumaRuntime()
+        {
+            var candidateRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pumaHome = Environment.GetEnvironmentVariable("PUMA_HOME");
+            if (!string.IsNullOrWhiteSpace(pumaHome))
+            {
+                candidateRoots.Add(pumaHome);
+            }
+
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrWhiteSpace(userProfile))
+            {
+                candidateRoots.Add(Path.Combine(userProfile, "Puma"));
+            }
+
+            foreach (var candidateRoot in candidateRoots)
+            {
+                var includeDirectory = Path.Combine(candidateRoot, "include");
+                var libraryDirectory = Path.Combine(candidateRoot, "lib", "x64", "Release");
+                if (IsInstalledPumaRuntime(includeDirectory, libraryDirectory))
                 {
-                    return directory;
+                    return new InstalledPumaRuntime(includeDirectory, libraryDirectory);
                 }
             }
 
             return null;
         }
 
-        private static string? FindPumaTypeDirectory(string? startDirectory)
+        private static bool IsInstalledPumaRuntime(string includeDirectory, string libraryDirectory)
         {
-            if (string.IsNullOrWhiteSpace(startDirectory))
-            {
-                return null;
-            }
-
-            var directory = new DirectoryInfo(startDirectory);
-            while (directory != null)
-            {
-                var candidate = Path.Combine(directory.FullName, "PumaType");
-                if (IsPumaTypeDirectory(candidate))
-                {
-                    return candidate;
-                }
-
-                directory = directory.Parent;
-            }
-
-            return null;
+            return Directory.Exists(includeDirectory)
+                && Directory.Exists(libraryDirectory)
+                && Directory.Exists(Path.Combine(includeDirectory, "PumaType"))
+                && Directory.Exists(Path.Combine(includeDirectory, "PumaConsole"))
+                && Directory.Exists(Path.Combine(includeDirectory, "PumaFile"));
         }
 
-        private static bool IsPumaTypeDirectory(string? candidate)
+        private static IEnumerable<string> GetRuntimeLibraryPaths(InstalledPumaRuntime runtime, IEnumerable<string> requiredLibraries)
         {
-            return !string.IsNullOrWhiteSpace(candidate)
-                && Directory.Exists(candidate)
-                && File.Exists(Path.Combine(candidate, "String.hpp"))
-                && File.Exists(Path.Combine(candidate, "String.cpp"))
-                && File.Exists(Path.Combine(candidate, "Character.hpp"))
-                && File.Exists(Path.Combine(candidate, "Character.cpp"))
-                && File.Exists(Path.Combine(candidate, "StringIterator.hpp"))
-                && File.Exists(Path.Combine(candidate, "StringIterator.cpp"));
+            foreach (var libraryName in requiredLibraries)
+            {
+                var libraryPath = Path.Combine(runtime.LibraryDirectory, $"{libraryName}.lib");
+                if (!File.Exists(libraryPath))
+                {
+                    throw new InvalidOperationException($"Unable to locate the installed Puma runtime library '{libraryName}.lib' in '{runtime.LibraryDirectory}'.");
+                }
+
+                yield return libraryPath;
+            }
         }
 
         private static void PrintHelp()

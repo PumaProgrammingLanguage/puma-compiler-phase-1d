@@ -220,7 +220,7 @@ initialize
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdint>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 // properties
 auto a = (int64_t)0;
@@ -389,7 +389,7 @@ properties
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 class MyTrait
 {
@@ -680,7 +680,7 @@ public:
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 // initialize
 void initialize(void)
@@ -734,7 +734,7 @@ initialize
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 class MyType : public object
 {
@@ -792,7 +792,7 @@ public:
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 // properties
 auto a = false;
@@ -949,7 +949,7 @@ auto f = (uint8_t)6;
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 // records
 struct MyRecord
@@ -1210,7 +1210,7 @@ finalize
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <String.hpp>
+@"#include <PumaType/String.hpp>
 
 // properties
 auto s = String(""Hello, World!\n"");
@@ -1264,7 +1264,7 @@ start
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <cstdint>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 auto a = (int64_t)0;
 auto b = (double)0.0;

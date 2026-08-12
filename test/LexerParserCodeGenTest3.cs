@@ -2236,7 +2236,7 @@ void F(void)
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdbool>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 // records
 struct MyRecord [[gnu::packed]]
