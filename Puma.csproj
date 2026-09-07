@@ -31,10 +31,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
-    <PackageReference Include="MSTest" Version="3.1.1" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.1.1" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.1.1" />
+    <InternalsVisibleTo Include="Puma.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Puma.Tests\**" />
+    <Compile Remove="test\**" />
+    <None Remove="Puma.Tests\**" />
+    <None Remove="test\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,6 +58,7 @@
     <None Include=".github\DOCOWNERS" />
     <None Include=".github\FUNDING.yml" />
     <None Include=".github\upgrades\scenarios\new-dotnet-version_7f6cdd\plan.md" />
+    <None Include="Puma.Tests\Puma.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
