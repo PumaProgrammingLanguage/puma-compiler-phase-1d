@@ -396,7 +396,7 @@ char Pick(Puma::Type::Character a, Puma::Type::Character b)
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 #include <PumaType/String.hpp>
 
 // functions
@@ -450,7 +450,7 @@ int Add(int64_t a, int64_t b)
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // functions
 void Consume(int32_t a, int32_t b, int32_t c)
@@ -544,7 +544,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 #include <stdbool>
 
 // properties
@@ -631,7 +631,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // properties
 auto a = (int64_t)-20;
@@ -745,7 +745,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 #include <stdbool>
 
 // properties
@@ -847,7 +847,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // properties
 auto a = (int64_t)1;
@@ -936,7 +936,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // properties
 auto a = (int64_t)1;
@@ -1295,7 +1295,7 @@ void F(void)
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // functions
 void LogValues(int64_t a, int64_t b, int64_t c)

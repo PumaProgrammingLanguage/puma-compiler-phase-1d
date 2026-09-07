@@ -138,7 +138,7 @@ namespace Puma
             {
                 if (propertyDeclarations.Any(p => RequiresFixedWidthIntegerCast(GetPropertyValue(p), GetPropertyType(p))))
                 {
-                    includes.Add("<stdint>");
+                    includes.Add("<cstdint>");
                 }
 
                 if (propertyDeclarations.Any(p => IsBooleanPropertyValue(GetPropertyValue(p))))
@@ -156,7 +156,7 @@ namespace Puma
                 && (GetFunctionParameterList(n)?.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t") ?? false));
             if (needsStdIntForFunctionParameters)
             {
-                includes.Add("<stdint>");
+                includes.Add("<cstdint>");
             }
 
             var propertyNames = propertyDeclarations
@@ -283,7 +283,6 @@ namespace Puma
             return include switch
             {
                 "<cstdint>" => 10,
-                "<stdint>" => 10,
                 "<stdbool>" => 20,
                 "<PumaType/Character.hpp>" => 30,
                 "<PumaType/StringIterator.hpp>" => 31,

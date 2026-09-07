@@ -169,7 +169,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 #include <stdbool>
 
 // properties
@@ -449,7 +449,7 @@ int main()
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // functions
 int Increment(int64_t value)
@@ -482,7 +482,7 @@ int Increment(int64_t value)
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // functions
 int Echo(int64_t value)
@@ -624,7 +624,7 @@ int Echo(int64_t value)
             var generated = codegen.Generate(ast);
 
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // functions
 int Update(int64_t value)
@@ -1341,7 +1341,7 @@ functions
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 class DemoType : public object
 {
@@ -1395,7 +1395,7 @@ functions
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 class DemoType : public object
 {
@@ -1537,7 +1537,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // properties
 auto a = (int64_t)64;
@@ -1615,7 +1615,7 @@ functions
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // properties
 auto counter = (int64_t)0;
@@ -1701,7 +1701,7 @@ functions
 ";
 
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 class Shape : public object
 {

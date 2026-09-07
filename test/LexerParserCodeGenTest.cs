@@ -141,7 +141,7 @@ initialize
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 namespace MyModule
 {
@@ -219,7 +219,7 @@ initialize
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 #include <PumaType/String.hpp>
 
 // properties
@@ -845,7 +845,7 @@ auto e = String("""");
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // properties
 auto a = (int64_t)1;
@@ -897,7 +897,7 @@ auto f = (int8_t)6;
 
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <stdint>
+@"#include <cstdint>
 
 // properties
 auto b = (uint64_t)2;
