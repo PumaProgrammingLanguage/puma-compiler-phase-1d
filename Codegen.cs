@@ -33,7 +33,7 @@ namespace Puma
             var hasWriteLine = ast.Any(n => n.Kind == NodeKind.WriteLine);
             if (hasWriteLine)
             {
-                includes.Add("<stdio>");
+                includes.Add("<PumaConsole/Console.hpp>");
             }
 
             var allNodes = EnumerateAllNodes(ast).ToList();
@@ -61,7 +61,7 @@ namespace Puma
                         || GetAssignmentRight(n).StartsWith("\"", StringComparison.Ordinal))));
             if (needsString)
             {
-                includes.Add("<String.hpp>");
+                includes.Add("<PumaType/String.hpp>");
             }
 
             var needsStringH = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration)
@@ -72,7 +72,7 @@ namespace Puma
                         && GetAssignmentRight(n).StartsWith("\"", StringComparison.Ordinal)));
             if (needsStringH)
             {
-                includes.Add("<String.hpp>");
+                includes.Add("<PumaType/String.hpp>");
             }
 
             var needsCharacter = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
@@ -89,7 +89,7 @@ namespace Puma
                         && (GetDelegateParameterList(n)?.Any(p => string.Equals(p.Type, "char", StringComparison.OrdinalIgnoreCase)) ?? false)));
             if (needsCharacter)
             {
-                includes.Add("<Character.hpp>");
+                includes.Add("<PumaType/Character.hpp>");
             }
 
             var needsStdBoolForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
@@ -113,7 +113,7 @@ namespace Puma
                 });
             if (needsStringForRecords)
             {
-                includes.Add("<String.hpp>");
+                includes.Add("<PumaType/String.hpp>");
             }
 
             var needsCStdIntForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
@@ -148,7 +148,7 @@ namespace Puma
 
                 if (propertyDeclarations.Any(p => IsStringPropertyValue(GetPropertyValue(p))))
                 {
-                    includes.Add("<String.hpp>");
+                    includes.Add("<PumaType/String.hpp>");
                 }
             }
 
@@ -173,7 +173,7 @@ namespace Puma
             var shouldIncludeCStdIntForAssignments = needsCStdIntForAssignments
                 && (numericPropertyReassignmentMode
                     || !propertyDeclarations.Any()
-                    || includes.Contains("<String.hpp>")
+                    || includes.Contains("<PumaType/String.hpp>")
                     || !string.IsNullOrWhiteSpace(GetPropertyName(propertyDeclarations.FirstOrDefault())));
             if (shouldIncludeCStdIntForAssignments && !autoPropertiesMode)
             {
@@ -192,9 +192,13 @@ namespace Puma
 
                     includes.Add($"\"{includeTarget}\"");
                 }
-                else if (!string.IsNullOrWhiteSpace(GetUseStatementTarget(node)))
+                else
                 {
-                    includes.Add($"<{GetUseStatementTarget(node)!.Replace('.', '/')}>");
+                    var include = GetUseInclude(node);
+                    if (!string.IsNullOrWhiteSpace(include))
+                    {
+                        includes.Add(include);
+                    }
                 }
             }
 
@@ -281,8 +285,12 @@ namespace Puma
                 "<cstdint>" => 10,
                 "<stdint>" => 10,
                 "<stdbool>" => 20,
-                "<String.hpp>" => 30,
-                "<stdio>" => 40,
+                "<PumaType/Character.hpp>" => 30,
+                "<PumaType/StringIterator.hpp>" => 31,
+                "<PumaType/String.hpp>" => 32,
+                "<PumaConsole/Console.hpp>" => 40,
+                "<PumaFile/Directory.hpp>" => 50,
+                "<PumaFile/Text.hpp>" => 51,
                 _ => 100
             };
         }
@@ -720,6 +728,40 @@ namespace Puma
             return node is UseStatementAstNode typedNode
                 ? typedNode.IsFilePath
                 : false;
+        }
+
+        private static string GetUseInclude(Node node)
+        {
+            var target = GetUseStatementTarget(node);
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                return string.Empty;
+            }
+
+            if (GetUseStatementIsFilePath(node))
+            {
+                var includeTarget = target;
+                if (includeTarget.EndsWith(".puma", StringComparison.OrdinalIgnoreCase))
+                {
+                    includeTarget = includeTarget[..^5] + ".h";
+                }
+
+                return $"\"{includeTarget}\"";
+            }
+
+            var normalizedTarget = target.Replace('.', '/');
+            if (normalizedTarget.StartsWith("PumaType/", StringComparison.Ordinal)
+                || normalizedTarget.StartsWith("PumaConsole/", StringComparison.Ordinal)
+                || normalizedTarget.StartsWith("PumaFile/", StringComparison.Ordinal))
+            {
+                if (!normalizedTarget.EndsWith(".hpp", StringComparison.OrdinalIgnoreCase)
+                    && !normalizedTarget.EndsWith(".h", StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedTarget += ".hpp";
+                }
+            }
+
+            return $"<{normalizedTarget}>";
         }
 
         private static List<string> GetPropertyModifiers(Node node)
@@ -1800,7 +1842,7 @@ namespace Puma
                     case NodeKind.WriteLine:
                         if (!string.IsNullOrWhiteSpace(GetWriteLineStringValue(node)))
                         {
-                            sb.AppendLine($"{indent}puts({GetWriteLineStringValue(node)});");
+                            sb.AppendLine($"{indent}Puma::Console::WriteLn({GetWriteLineStringValue(node)});");
                         }
                         break;
                     case NodeKind.IfStatement:

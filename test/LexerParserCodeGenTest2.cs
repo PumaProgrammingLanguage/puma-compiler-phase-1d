@@ -68,7 +68,7 @@ namespace test
             var generated = codegen.Generate(ast);
 
             var expected =
-@"#include <Character.hpp>
+@"#include <PumaType/Character.hpp>
 
 // start
 int main()
@@ -110,7 +110,7 @@ int main()
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <Character.hpp>
+@"#include <PumaType/Character.hpp>
 
 // functions
 void DoNothing(Puma::Type::Character c)
@@ -183,7 +183,7 @@ void DoNothing(Puma::Type::Character c)
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <Character.hpp>
+@"#include <PumaType/Character.hpp>
 
 // properties
 auto first = Character('A');
@@ -223,7 +223,7 @@ initialize
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <Character.hpp>
+@"#include <PumaType/Character.hpp>
 
 // properties
 auto current = Character('A');
@@ -269,7 +269,7 @@ void initialize(void)
             var ast = parser.Parse(tokens);
             var generated = codegen.Generate(ast);
             var expected =
-@"#include <Character.hpp>
+@"#include <PumaType/Character.hpp>
 
 // functions
 char Pick(Puma::Type::Character a, Puma::Type::Character b)
@@ -397,7 +397,7 @@ char Pick(Puma::Type::Character a, Puma::Type::Character b)
             var generated = codegen.Generate(ast);
             var expected =
 @"#include <stdint>
-#include <String.hpp>
+#include <PumaType/String.hpp>
 
 // functions
 void Hello(void)
