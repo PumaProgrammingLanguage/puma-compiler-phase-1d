@@ -690,9 +690,11 @@ namespace Puma
             return false;
         }
 
-        private static InvalidOperationException CreateParserException(string message, LexerTokens token)
+        private static InvalidOperationException CreateParserException(string message, LexerTokens? token = null)
         {
-            return new InvalidOperationException($"Line {token.StartLine}, column {token.StartColumn}: {message}");
+            return token is LexerTokens location && location.StartLine > 0 && location.StartColumn > 0
+                ? new InvalidOperationException($"Line {location.StartLine}, column {location.StartColumn}: {message}")
+                : new InvalidOperationException(message);
         }
 
         private static (string Value, List<string> Modifiers) SplitTrailingModifiers(List<LexerTokens> tokens, HashSet<string> allowedModifiers)
@@ -738,7 +740,7 @@ namespace Puma
                 {
                     if (current.Count == 0)
                     {
-                        throw new InvalidOperationException("Parameter is missing the name and type.");
+                        throw CreateParserException("Parameter is missing the name and type.", token);
                     }
 
                     AddParameterFromTokens(parameters, current);
@@ -751,7 +753,7 @@ namespace Puma
 
             if (current.Count == 0 && tokens.Any(t => t.Category == TokenCategory.Punctuation && t.TokenText == ","))
             {
-                throw new InvalidOperationException("Parameter is missing the name and type.");
+                throw CreateParserException("Parameter is missing the name and type.", tokens[^1]);
             }
 
             AddParameterFromTokens(parameters, current);
@@ -779,10 +781,10 @@ namespace Puma
                 var single = nameAndTypeTokens[0];
                 if (single.Category == TokenCategory.Keyword)
                 {
-                    throw new InvalidOperationException($"Parameter of type '{single.TokenText}' is missing the name.");
+                    throw CreateParserException($"Parameter of type '{single.TokenText}' is missing the name.", single);
                 }
 
-                throw new InvalidOperationException($"Parameter '{single.TokenText}' is missing the type.");
+                throw CreateParserException($"Parameter '{single.TokenText}' is missing the type.", single);
             }
 
             var name = nameAndTypeTokens[0].TokenText;
@@ -790,7 +792,7 @@ namespace Puma
             var (type, modifiers) = SplitTrailingModifiers(typeTokens, ParameterModifiers);
             if (string.IsNullOrWhiteSpace(type))
             {
-                throw new InvalidOperationException($"Parameter '{name}' is missing the type.");
+                throw CreateParserException($"Parameter '{name}' is missing the type.", nameAndTypeTokens[0]);
             }
 
             var defaultValue = defaultTokens.Count > 0 ? BuildQualifiedName(defaultTokens) : null;
@@ -830,14 +832,14 @@ namespace Puma
             var closeIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == ")");
             if (openIndex < 0 || closeIndex < openIndex)
             {
-                throw new InvalidOperationException("Function declarations require a parameter list.");
+                throw CreateParserException("Function declarations require a parameter list.", firstToken);
             }
 
             var nameTokens = tokens.Skip(tokenIndex).Take(openIndex - tokenIndex).ToList();
             var name = BuildQualifiedName(nameTokens);
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new InvalidOperationException("Function declarations require a name.");
+                throw CreateParserException("Function declarations require a name.", firstToken);
             }
 
             var parameterTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();

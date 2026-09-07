@@ -32,7 +32,6 @@ namespace Puma
         protected static bool Output = false;
         protected static string SourceFileName = "";
         protected static string OutputFileName = "";
-        protected static readonly string[] RuntimeLibraryLinkOrder = ["PumaConsole", "PumaFile", "PumaType"];
         // variable to store the source code.
         protected static string source = "";
 
@@ -87,8 +86,9 @@ namespace Puma
 
                 var tokens = lexer.Tokenize(source);
                 var ast = parser.Parse(tokens);
-                var cCode = codegen.Generate(ast);
-                var requiredRuntimeLibraries = GetRequiredRuntimeLibraries(cCode);
+                var generated = codegen.GenerateResult(ast);
+                var cCode = generated.SourceCode;
+                var requiredRuntimeLibraries = generated.RequiredRuntimeLibraries;
 
                 if (Verbose)
                 {
@@ -283,30 +283,6 @@ namespace Puma
             }
 
             return process.ExitCode;
-        }
-
-        private static List<string> GetRequiredRuntimeLibraries(string cCode)
-        {
-            var requiredLibraries = new HashSet<string>(StringComparer.Ordinal);
-
-            if (cCode.Contains("#include <PumaConsole/", StringComparison.Ordinal))
-            {
-                requiredLibraries.Add("PumaConsole");
-                requiredLibraries.Add("PumaType");
-            }
-
-            if (cCode.Contains("#include <PumaFile/", StringComparison.Ordinal))
-            {
-                requiredLibraries.Add("PumaFile");
-                requiredLibraries.Add("PumaType");
-            }
-
-            if (cCode.Contains("#include <PumaType/", StringComparison.Ordinal))
-            {
-                requiredLibraries.Add("PumaType");
-            }
-
-            return RuntimeLibraryLinkOrder.Where(requiredLibraries.Contains).ToList();
         }
 
         private static InstalledPumaRuntime? FindInstalledPumaRuntime()

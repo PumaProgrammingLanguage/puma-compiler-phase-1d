@@ -20,13 +20,17 @@ using static Puma.Parser;
 
 namespace Puma
 {
+    internal sealed record CodeGenerationResult(string SourceCode, IReadOnlyList<string> RequiredRuntimeLibraries);
+
     internal partial class Codegen
     {
         public Codegen()
         {
         }
 
-        internal string Generate(List<Node> ast)
+        internal string Generate(List<Node> ast) => GenerateResult(ast).SourceCode;
+
+        internal CodeGenerationResult GenerateResult(List<Node> ast)
         {
             var sb = new StringBuilder();
             var includes = new HashSet<string>(StringComparer.Ordinal);
@@ -251,7 +255,7 @@ namespace Puma
                     : wrappedModule;
             }
 
-            return output;
+            return new CodeGenerationResult(output, GetRequiredRuntimeLibraries(includes));
         }
 
         private static string IndentBlock(string text)
@@ -281,6 +285,33 @@ namespace Puma
                 "<PumaFile/Text.hpp>" => 51,
                 _ => 100
             };
+        }
+
+        private static IReadOnlyList<string> GetRequiredRuntimeLibraries(IEnumerable<string> includes)
+        {
+            var requiredLibraries = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var include in includes)
+            {
+                if (include.StartsWith("<PumaConsole/", StringComparison.Ordinal))
+                {
+                    requiredLibraries.Add("PumaConsole");
+                    requiredLibraries.Add("PumaType");
+                }
+
+                if (include.StartsWith("<PumaFile/", StringComparison.Ordinal))
+                {
+                    requiredLibraries.Add("PumaFile");
+                    requiredLibraries.Add("PumaType");
+                }
+
+                if (include.StartsWith("<PumaType/", StringComparison.Ordinal))
+                {
+                    requiredLibraries.Add("PumaType");
+                }
+            }
+
+            return [.. new[] { "PumaConsole", "PumaFile", "PumaType" }.Where(requiredLibraries.Contains)];
         }
 
         private static string SectionToString(Section section) => section switch

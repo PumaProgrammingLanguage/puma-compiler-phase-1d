@@ -84,6 +84,33 @@ int main()
         }
 
         [TestMethod]
+        public void StringAssignment_CodegenDependencies_AreExplicit()
+        {
+            const string src =
+@"start
+    value = ""Hello""
+";
+            const string expected =
+@"#include <PumaType/String.hpp>
+
+// start
+int main()
+{
+    auto value = String(""Hello"");
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var result = codegen.GenerateResult(parser.Parse(lexer.Tokenize(src)));
+
+            CollectionAssert.AreEqual(new[] { "PumaType" }, result.RequiredRuntimeLibraries.ToArray());
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(result.SourceCode).Trim());
+        }
+
+        [TestMethod]
         public void FunctionsExample_CharParameter_LexerParserCodegen_AreConsistent()
         {
             const string src =
