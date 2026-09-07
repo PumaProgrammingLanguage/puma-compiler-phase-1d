@@ -54,23 +54,12 @@ namespace Puma
                 includes.Add("<stdbool>");
             }
 
-            var needsString = ast.Any(n => n.Kind == NodeKind.AssignmentStatement
+            var needsString = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
                 && GetAssignmentOperator(n) == "="
                 && (!string.IsNullOrWhiteSpace(GetAssignmentRight(n))
                     && (string.Equals(GetAssignmentRight(n), "str", StringComparison.OrdinalIgnoreCase)
                         || (GetAssignmentRight(n) is string rightStr && rightStr.StartsWith("\"", StringComparison.Ordinal)))));
             if (needsString)
-            {
-                includes.Add("<PumaType/String.hpp>");
-            }
-
-            var needsStringH = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration)
-                .Any(fn => EnumerateAllNodes(GetFunctionBody(fn) ?? new List<Node>())
-                    .Any(n => n.Kind == NodeKind.AssignmentStatement
-                        && GetAssignmentOperator(n) == "="
-                        && !string.IsNullOrWhiteSpace(GetAssignmentRight(n))
-                        && (GetAssignmentRight(n) is string rightFnStr && rightFnStr.StartsWith("\"", StringComparison.Ordinal))));
-            if (needsStringH)
             {
                 includes.Add("<PumaType/String.hpp>");
             }

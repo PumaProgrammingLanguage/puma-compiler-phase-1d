@@ -38,6 +38,26 @@ namespace test
         }
 
         [TestMethod]
+        public void EmptySource_LexerParserCodegen_AreConsistent()
+        {
+            const string src = "";
+            const string expected = "";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(0, significantTokens.Count);
+            Assert.AreEqual(0, ast.Count);
+            Assert.AreEqual(Normalize(expected), Normalize(generated));
+        }
+
+        [TestMethod]
         public void StartExample_Integers_LexerParserCodegen_AreConsistent()
         {
             const string src =

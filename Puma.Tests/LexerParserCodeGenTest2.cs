@@ -980,6 +980,39 @@ void H(void)
         }
 
         [TestMethod]
+        public void StartIf_StringAssignment_IncludesStringHeader()
+        {
+            const string src =
+@"start
+    if 1 == 1
+        message = ""Hello""
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <PumaType/String.hpp>
+
+// start
+int main()
+{
+    if (1 == 1)
+    {
+        message = String(""Hello"");
+    }
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void FunctionsExample_MissingParameterType_Parser_ThrowsCompilerError()
         {
             const string src =

@@ -135,9 +135,7 @@ namespace Puma
             var indentStack = new Stack<int>();
             indentStack.Push(0);
 
-            // TODO: check if the last character is an end of line marker
-            // if last character is not an end of line marker, add one
-            if (!_eol.Contains(source[^1..]))
+            if (source.Length == 0 || !_eol.Contains(source[^1..]))
             {
                 source += "\n";
             }

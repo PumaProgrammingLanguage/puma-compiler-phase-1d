@@ -2,6 +2,9 @@ General notes
 
 Recent updates
 
+- Hardened compiler CLI execution: explicit success/failure exit codes, clean source/tool-launch error reporting, and concurrent `clang++` output/error draining prevent redirected-stream deadlocks.
+- Consolidated generated string-header detection on the full AST traversal and added regression coverage for string assignments nested in `start` conditionals.
+- Added empty-source lexer/parser/codegen regression coverage; tokenization now safely normalizes empty input before checking for a trailing end-of-line marker.
 - Invalid implicit conversion validation now rejects incompatible assignments for property-to-property, property-to-local, local-to-property, and local-to-local cases.
 - `InvalidImplicitConvertionTest` was expanded and is currently passing after parser updates.
 - Added compiler-module coverage for invalid implicit conversions in non-assignment contexts (return statements, function-call arguments, and conditional expressions), and parser validation now rejects those invalid implicit conversions.
