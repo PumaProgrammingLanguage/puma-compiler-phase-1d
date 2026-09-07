@@ -20,7 +20,7 @@ using static Puma.Parser;
 
 namespace Puma
 {
-    internal class Codegen
+    internal partial class Codegen
     {
         public Codegen()
         {
@@ -58,7 +58,7 @@ namespace Puma
                 && GetAssignmentOperator(n) == "="
                 && (!string.IsNullOrWhiteSpace(GetAssignmentRight(n))
                     && (string.Equals(GetAssignmentRight(n), "str", StringComparison.OrdinalIgnoreCase)
-                        || GetAssignmentRight(n).StartsWith("\"", StringComparison.Ordinal))));
+                        || (GetAssignmentRight(n) is string rightStr && rightStr.StartsWith("\"", StringComparison.Ordinal)))));
             if (needsString)
             {
                 includes.Add("<PumaType/String.hpp>");
@@ -69,7 +69,7 @@ namespace Puma
                     .Any(n => n.Kind == NodeKind.AssignmentStatement
                         && GetAssignmentOperator(n) == "="
                         && !string.IsNullOrWhiteSpace(GetAssignmentRight(n))
-                        && GetAssignmentRight(n).StartsWith("\"", StringComparison.Ordinal)));
+                        && (GetAssignmentRight(n) is string rightFnStr && rightFnStr.StartsWith("\"", StringComparison.Ordinal))));
             if (needsStringH)
             {
                 includes.Add("<PumaType/String.hpp>");
@@ -1392,6 +1392,7 @@ namespace Puma
                         ?? false))
                 .Select(GetFunctionDeclarationName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
                 .ToHashSet(StringComparer.Ordinal);
             var propertiesAssignedToNone = new HashSet<string>(StringComparer.Ordinal);
             var transferredOwnershipLocals = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1552,17 +1553,19 @@ namespace Puma
             var declared = new HashSet<string>(StringComparer.Ordinal);
             foreach (var statement in statements)
             {
+                var left = GetAssignmentLeft(statement);
+                var right = GetAssignmentRight(statement);
                 if (statement.Kind == NodeKind.AssignmentStatement
                     && GetAssignmentOperator(statement) == "="
-                    && !string.IsNullOrWhiteSpace(GetAssignmentLeft(statement))
-                    && IsSimpleIdentifier(GetAssignmentLeft(statement))
-                    && !declared.Contains(GetAssignmentLeft(statement))
-                    && !string.IsNullOrWhiteSpace(GetAssignmentRight(statement))
-                    && GetAssignmentRight(statement)!.StartsWith("\"", StringComparison.Ordinal))
+                    && !string.IsNullOrWhiteSpace(left)
+                    && IsSimpleIdentifier(left)
+                    && !declared.Contains(left)
+                    && !string.IsNullOrWhiteSpace(right)
+                    && right.StartsWith("\"", StringComparison.Ordinal))
                 {
-                    var value = ToPumaStringLiteral(GetAssignmentRight(statement)!);
-                    sb.AppendLine($"{indent}auto {GetAssignmentLeft(statement)} = {value};");
-                    declared.Add(GetAssignmentLeft(statement)!);
+                    var value = ToPumaStringLiteral(right);
+                    sb.AppendLine($"{indent}auto {left} = {value};");
+                    declared.Add(left);
                     continue;
                 }
 

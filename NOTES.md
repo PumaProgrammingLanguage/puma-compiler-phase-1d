@@ -37,6 +37,8 @@ Recent updates
 - Added initialize/functions local-source propagation coverage: readonly local->local assignment now rejects target mutation, and functions readwrite local-source override (`target = source readwrite`) is explicitly validated as mutable.
 - Added final override/precedence coverage: explicit `readonly` target override from readwrite local sources now rejects mutation in `initialize`/`functions`, and mixed local/parameter/property chains enforce readonly at the terminal assignment.
 - Converted readonly/readwrite propagation tests from value-type literals to object/reference (`Shape`) scenarios, fixed function-body indentation in readonly-parameter propagation coverage, and validated the targeted propagation suite (18/18 passing).
+- Extracted unit tests into a dedicated `Puma.Tests` project; removed test dependencies and compile files from `Puma.csproj` to maintain clean AOT publishing.
+- Fixed nullable reference warnings in `Codegen.cs`, resolved all compiler warnings, and enabled `TreatWarningsAsErrors=True` in `Puma.csproj`.
 
 1) Unit test TODO list
 
