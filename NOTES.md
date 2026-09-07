@@ -2,6 +2,7 @@ General notes
 
 Recent updates
 
+- Added one-based lexer token positions and location-aware section diagnostics, with exact compiler-module assertions for source positions, generated C++ output, and diagnostic messages.
 - Hardened compiler CLI execution: explicit success/failure exit codes, clean source/tool-launch error reporting, and concurrent `clang++` output/error draining prevent redirected-stream deadlocks.
 - Consolidated generated string-header detection on the full AST traversal and added regression coverage for string assignments nested in `start` conditionals.
 - Added empty-source lexer/parser/codegen regression coverage; tokenization now safely normalizes empty input before checking for a trailing end-of-line marker.

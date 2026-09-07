@@ -154,6 +154,42 @@ void DoNothing(Puma::Type::Character c)
         }
 
         [TestMethod]
+        public void LexerTokenPositions_AreOneBased_AndCodegenIsConsistent()
+        {
+            const string src =
+@"start
+    value = 42
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto value = (int64_t)42;
+    return 0;
+}
+";
+
+            Assert.AreEqual(1, significantTokens[0].StartLine);
+            Assert.AreEqual(1, significantTokens[0].StartColumn);
+            Assert.AreEqual(2, significantTokens[1].StartLine);
+            Assert.AreEqual(5, significantTokens[1].StartColumn);
+            Assert.AreEqual(2, significantTokens[3].StartLine);
+            Assert.AreEqual(13, significantTokens[3].StartColumn);
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesExample_CharacterLiterals_LexerParserCodegen_AreConsistent()
         {
             const string src =
@@ -1148,13 +1184,13 @@ int main()
             {
                 (
                     "properties\n    a = 1\nproperties\n    b = 2\n",
-                    "Duplicate section 'properties'. Remove the extra 'properties' section."),
+                    "Line 3, column 1: Duplicate section 'properties'. Remove the extra 'properties' section."),
                 (
                     "start\n    a = 1\nproperties\n    b = 2\n",
-                    "Section 'properties' is out of order after 'start'. Fix: move 'properties' to match this order (all optional): use, type/trait/module, enums, records, properties, start/initialize, finalize, functions."),
+                    "Line 3, column 1: Section 'properties' is out of order after 'start'. Fix: move 'properties' to match this order (all optional): use, type/trait/module, enums, records, properties, start/initialize, finalize, functions."),
                 (
                     "initialize\n    a = 1\nstart\n    b = 2\n",
-                    "Only one of 'start' or 'initialize' sections may appear in a file.")
+                    "Line 3, column 1: Only one of 'start' or 'initialize' sections may appear in a file.")
             };
 
             foreach (var (source, expectedMessage) in cases)

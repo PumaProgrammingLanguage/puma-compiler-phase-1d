@@ -64,6 +64,8 @@ namespace Puma
         {
             public string TokenText;
             public TokenCategory Category;
+            public int StartLine;
+            public int StartColumn;
         }
 
 
@@ -255,9 +257,77 @@ namespace Puma
                 tokens.Add(new LexerTokens() { TokenText = "0", Category = TokenCategory.Dedent });
             }
 
+            AnnotateTokenLocations(tokens, source);
             NormalizeFunctionHeaderModifierOrder(tokens);
 
             return tokens;
+        }
+
+        private static void AnnotateTokenLocations(List<LexerTokens> tokens, string source)
+        {
+            var sourceIndex = 0;
+            var line = 1;
+            var column = 1;
+
+            for (var tokenIndex = 0; tokenIndex < tokens.Count; tokenIndex++)
+            {
+                var token = tokens[tokenIndex];
+                if (token.Category is TokenCategory.Indent or TokenCategory.Dedent)
+                {
+                    token.StartLine = line;
+                    token.StartColumn = 1;
+                    tokens[tokenIndex] = token;
+                    continue;
+                }
+
+                var tokenStart = token.Category == TokenCategory.EndOfLine
+                    ? source.IndexOfAny(['\r', '\n'], sourceIndex)
+                    : source.IndexOf(token.TokenText, sourceIndex, StringComparison.Ordinal);
+                if (tokenStart < 0)
+                {
+                    token.StartLine = line;
+                    token.StartColumn = column;
+                    tokens[tokenIndex] = token;
+                    continue;
+                }
+
+                AdvancePosition(source, ref sourceIndex, tokenStart, ref line, ref column);
+                token.StartLine = line;
+                token.StartColumn = column;
+                tokens[tokenIndex] = token;
+                var sourceTokenLength = token.Category == TokenCategory.EndOfLine
+                    && tokenStart + 1 < source.Length
+                    && ((source[tokenStart] == '\r' && source[tokenStart + 1] == '\n')
+                        || (source[tokenStart] == '\n' && source[tokenStart + 1] == '\r'))
+                    ? 2
+                    : token.TokenText.Length;
+                AdvancePosition(source, ref sourceIndex, tokenStart + sourceTokenLength, ref line, ref column);
+            }
+        }
+
+        private static void AdvancePosition(string source, ref int sourceIndex, int targetIndex, ref int line, ref int column)
+        {
+            while (sourceIndex < targetIndex)
+            {
+                if (source[sourceIndex] == '\r' || source[sourceIndex] == '\n')
+                {
+                    if (sourceIndex + 1 < targetIndex
+                        && ((source[sourceIndex] == '\r' && source[sourceIndex + 1] == '\n')
+                            || (source[sourceIndex] == '\n' && source[sourceIndex + 1] == '\r')))
+                    {
+                        sourceIndex++;
+                    }
+
+                    line++;
+                    column = 1;
+                }
+                else
+                {
+                    column++;
+                }
+
+                sourceIndex++;
+            }
         }
 
         private static void NormalizeFunctionHeaderModifierOrder(List<LexerTokens> tokens)

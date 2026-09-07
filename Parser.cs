@@ -621,40 +621,40 @@ namespace Puma
                 {
                     if (_implicitStartSection)
                     {
-                        throw new InvalidOperationException("Sections are not allowed after implicit start statements.");
+                        throw CreateParserException("Sections are not allowed after implicit start statements.", t);
                     }
 
                     if ((next == Section.Start && _seen.Contains(Section.Initialize))
                         || (next == Section.Initialize && _seen.Contains(Section.Start)))
                     {
-                        throw new InvalidOperationException("Only one of 'start' or 'initialize' sections may appear in a file.");
+                        throw CreateParserException("Only one of 'start' or 'initialize' sections may appear in a file.", t);
                     }
 
                     if ((next == Section.Module || next == Section.Type || next == Section.Trait)
                         && (_seen.Contains(Section.Module) || _seen.Contains(Section.Type) || _seen.Contains(Section.Trait)))
                     {
-                        throw new InvalidOperationException("Only one of 'module', 'type', or 'trait' sections may appear in a file.");
+                        throw CreateParserException("Only one of 'module', 'type', or 'trait' sections may appear in a file.", t);
                     }
 
                     // Duplicate check
                     if (_seen.Contains(next))
                     {
-                        throw new InvalidOperationException(
-                            $"Duplicate section '{DisplayName(next)}'. Remove the extra '{DisplayName(next)}' section.");
+                        throw CreateParserException(
+                            $"Duplicate section '{DisplayName(next)}'. Remove the extra '{DisplayName(next)}' section.", t);
                     }
 
                     // Order check
                     if (!SectionRank.TryGetValue(next, out var rank))
                     {
-                        throw new InvalidOperationException(
-                            $"Section '{DisplayName(next)}' is not allowed here. Sections must appear in this order (all optional): {ExpectedOrderText}.");
+                        throw CreateParserException(
+                            $"Section '{DisplayName(next)}' is not allowed here. Sections must appear in this order (all optional): {ExpectedOrderText}.", t);
                     }
 
                     if (rank < _lastRank)
                     {
-                        throw new InvalidOperationException(
+                        throw CreateParserException(
                             $"Section '{DisplayName(next)}' is out of order after '{DisplayName(_lastSection)}'. " +
-                            $"Fix: move '{DisplayName(next)}' to match this order (all optional): {ExpectedOrderText}.");
+                            $"Fix: move '{DisplayName(next)}' to match this order (all optional): {ExpectedOrderText}.", t);
                     }
 
                     _lastRank = rank;
@@ -688,6 +688,11 @@ namespace Puma
                 }
             }
             return false;
+        }
+
+        private static InvalidOperationException CreateParserException(string message, LexerTokens token)
+        {
+            return new InvalidOperationException($"Line {token.StartLine}, column {token.StartColumn}: {message}");
         }
 
         private static (string Value, List<string> Modifiers) SplitTrailingModifiers(List<LexerTokens> tokens, HashSet<string> allowedModifiers)
