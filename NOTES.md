@@ -2,6 +2,7 @@ General notes
 
 Recent updates
 
+- Added runtime-independent native C++ integration coverage that compiles generated output with the discovered LLVM `clang++` toolchain.
 - Added explicit code-generation runtime dependency metadata, updated the CLI to consume it, and expanded location-aware function/parameter diagnostics with compiler-module coverage.
 - Added one-based lexer token positions and location-aware section diagnostics, with exact compiler-module assertions for source positions, generated C++ output, and diagnostic messages.
 - Hardened compiler CLI execution: explicit success/failure exit codes, clean source/tool-launch error reporting, and concurrent `clang++` output/error draining prevent redirected-stream deadlocks.

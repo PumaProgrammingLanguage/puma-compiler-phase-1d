@@ -15,6 +15,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
+using System.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Puma;
 
@@ -108,6 +109,47 @@ int main()
 
             CollectionAssert.AreEqual(new[] { "PumaType" }, result.RequiredRuntimeLibraries.ToArray());
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(result.SourceCode).Trim());
+        }
+
+        [TestMethod]
+        public void GeneratedRuntimeIndependentCpp_CompilesWithClang()
+        {
+            const string src =
+@"start
+    value = 42
+";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
+            var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            try
+            {
+                Assert.IsTrue(File.Exists(compilerPath), $"clang++ was not found at '{compilerPath}'.");
+                var sourcePath = Path.Combine(directory, "generated.cpp");
+                var objectPath = Path.Combine(directory, "generated.obj");
+                File.WriteAllText(sourcePath, generated);
+                using var process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = compilerPath,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    ArgumentList = { "-std=c++20", "-c", sourcePath, "-o", objectPath }
+                });
+                Assert.IsNotNull(process);
+                var standardError = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                Assert.AreEqual(0, process.ExitCode, standardError);
+                Assert.IsTrue(File.Exists(objectPath));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
         }
 
         [TestMethod]

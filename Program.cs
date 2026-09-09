@@ -239,7 +239,7 @@ namespace Puma
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "clang++", // use the LLVM C++ compiler
+                    FileName = FindClangPlusPlus(),
                     Arguments = ClangArguments,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,   // capture errors
@@ -283,6 +283,18 @@ namespace Puma
             }
 
             return process.ExitCode;
+        }
+
+        private static string FindClangPlusPlus()
+        {
+            var configuredCompiler = Environment.GetEnvironmentVariable("PUMA_CLANGXX");
+            if (!string.IsNullOrWhiteSpace(configuredCompiler))
+            {
+                return configuredCompiler;
+            }
+
+            var installedCompiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
+            return File.Exists(installedCompiler) ? installedCompiler : "clang++";
         }
 
         private static InstalledPumaRuntime? FindInstalledPumaRuntime()
