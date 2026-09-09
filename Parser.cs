@@ -1267,8 +1267,9 @@ namespace Puma
                 return;
             }
 
-            // Recognize built-in WriteLine in start section: WriteLine("...") [EOL]
-            if (token is LexerTokens t && t.Category == TokenCategory.Identifier && t.TokenText == "WriteLine")
+            // Recognize built-in WriteLn in start section: WriteLn("...") [EOL]
+            if (token is LexerTokens t && t.Category == TokenCategory.Identifier && t.TokenText == "WriteLn"
+                && ReferenceEquals(GetStatementTarget(ast), ast))
             {
                 ParseWriteLineCall();
                 return;
@@ -1398,20 +1399,20 @@ namespace Puma
             var open = GetNextToken(_tokens);
             if (open == null || open.Value.Category != TokenCategory.Delimiter || open.Value.TokenText != "(")
             {
-                throw new InvalidOperationException("Expected '(' after WriteLine.");
+                throw new InvalidOperationException("Expected '(' after WriteLn.");
             }
 
             var textTok = GetNextToken(_tokens);
             if (textTok == null || textTok.Value.Category != TokenCategory.StringLiteral)
             {
-                throw new InvalidOperationException("Expected string literal in WriteLine(...)");
+                throw new InvalidOperationException("Expected string literal in WriteLn(...)");
             }
             var literal = textTok.Value.TokenText; // keep quotes
 
             var close = GetNextToken(_tokens);
             if (close == null || close.Value.Category != TokenCategory.Delimiter || close.Value.TokenText != ")")
             {
-                throw new InvalidOperationException("Expected ')' after WriteLine argument.");
+                throw new InvalidOperationException("Expected ')' after WriteLn argument.");
             }
 
             ast.Add(Node.CreateWriteLine(literal));

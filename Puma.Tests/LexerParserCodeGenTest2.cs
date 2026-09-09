@@ -157,7 +157,7 @@ int main()
         {
             const string src =
 @"start
-    WriteLine(""Hello"")
+    WriteLn(""Hello"")
 ";
             const string expected =
 @"#include <PumaConsole/Console.hpp>
@@ -1269,9 +1269,9 @@ int main()
                 ("start\n    a = 1\nproperties\n    b = 2\n", "is out of order after 'start'"),
                 ("a = 1\nfunctions\n    F()\n", "Sections are not allowed after implicit start statements"),
                 ("type\n    MyType is object\nstart\n    a = 1\n", "start section is only allowed in module files"),
-                ("start\n    WriteLine \"x\")\n", "Expected '(' after WriteLine."),
-                ("start\n    WriteLine(1)\n", "Expected string literal in WriteLine"),
-                ("start\n    WriteLine(\"x\"\n", "Expected ')' after WriteLine argument."),
+                ("start\n    WriteLn \"x\")\n", "Expected '(' after WriteLn."),
+                ("start\n    WriteLn(1)\n", "Expected string literal in WriteLn"),
+                ("start\n    WriteLn(\"x\"\n", "Expected ')' after WriteLn argument."),
                 ("trait\n    MyTrait is object\n", "Unexpected inheritance in trait declaration"),
                 ("type\n    MyType object\n", "must include an 'is' base type"),
                 ("type\n    MyType is\n", "Missing base type after 'is'."),
@@ -1342,7 +1342,7 @@ int main()
                 "properties\n    a = 1\nstart\n    b = 2\n",
                 "functions\n    F()\n",
                 "module\n    M\nstart\n    a = 1\n",
-                "start\n    WriteLine(\"x\")\n",
+                "start\n    WriteLn(\"x\")\n",
                 "trait\n    MyTrait\n",
                 "type\n    MyType is object\n",
                 "type\n    MyType is object has IPrintable\n",
