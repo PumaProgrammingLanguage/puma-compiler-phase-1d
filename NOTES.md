@@ -2,6 +2,7 @@ General notes
 
 Recent updates
 
+- Added runtime-backed native compilation coverage and corrected `WriteLine` output to use the runtime's `PumaConsole` namespace; installed `/GL` runtime libraries must be rebuilt before LLVM linking can succeed.
 - Added runtime-independent native C++ integration coverage that compiles generated output with the discovered LLVM `clang++` toolchain.
 - Added explicit code-generation runtime dependency metadata, updated the CLI to consume it, and expanded location-aware function/parameter diagnostics with compiler-module coverage.
 - Added one-based lexer token positions and location-aware section diagnostics, with exact compiler-module assertions for source positions, generated C++ output, and diagnostic messages.

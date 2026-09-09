@@ -153,6 +153,65 @@ int main()
         }
 
         [TestMethod]
+        public void GeneratedRuntimeBackedCpp_CompilesAndLinksWithClang()
+        {
+            const string src =
+@"start
+    WriteLine(""Hello"")
+";
+            const string expected =
+@"#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{
+    PumaConsole::WriteLn(""Hello"");
+    return 0;
+}
+";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
+            var runtimeRoot = Environment.GetEnvironmentVariable("PUMA_HOME")
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Puma");
+            var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
+            var includePath = Path.Combine(runtimeRoot, "include");
+            var consoleLibrary = Path.Combine(runtimeRoot, "lib", "x64", "Release", "PumaConsole.lib");
+            var typeLibrary = Path.Combine(runtimeRoot, "lib", "x64", "Release", "PumaType.lib");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            try
+            {
+                Assert.IsTrue(File.Exists(compilerPath), $"clang++ was not found at '{compilerPath}'.");
+                Assert.IsTrue(Directory.Exists(includePath), $"Puma headers were not found at '{includePath}'.");
+                Assert.IsTrue(File.Exists(consoleLibrary), $"PumaConsole library was not found at '{consoleLibrary}'.");
+                Assert.IsTrue(File.Exists(typeLibrary), $"PumaType library was not found at '{typeLibrary}'.");
+                var sourcePath = Path.Combine(directory, "generated.cpp");
+                var executablePath = Path.Combine(directory, "generated.exe");
+                File.WriteAllText(sourcePath, generated);
+                using var process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = compilerPath,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    ArgumentList = { "-std=c++20", "-I", includePath, sourcePath, consoleLibrary, typeLibrary, "-o", executablePath }
+                });
+                Assert.IsNotNull(process);
+                var standardError = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                Assert.AreEqual(0, process.ExitCode, standardError);
+                Assert.IsTrue(File.Exists(executablePath));
+                Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [TestMethod]
         public void FunctionsExample_CharParameter_LexerParserCodegen_AreConsistent()
         {
             const string src =

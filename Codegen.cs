@@ -1864,7 +1864,7 @@ namespace Puma
                     case NodeKind.WriteLine:
                         if (!string.IsNullOrWhiteSpace(GetWriteLineStringValue(node)))
                         {
-                            sb.AppendLine($"{indent}Puma::Console::WriteLn({GetWriteLineStringValue(node)});");
+                            sb.AppendLine($"{indent}PumaConsole::WriteLn({GetWriteLineStringValue(node)});");
                         }
                         break;
                     case NodeKind.IfStatement:
