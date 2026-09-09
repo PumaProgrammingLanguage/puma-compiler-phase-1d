@@ -203,6 +203,17 @@ int main()
                 process.WaitForExit();
                 Assert.AreEqual(0, process.ExitCode, standardError);
                 Assert.IsTrue(File.Exists(executablePath));
+                using var executable = Process.Start(new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false
+                });
+                Assert.IsNotNull(executable);
+                var standardOutput = executable.StandardOutput.ReadToEnd();
+                executable.WaitForExit();
+                Assert.AreEqual(0, executable.ExitCode);
+                Assert.AreEqual("Hello" + Environment.NewLine, standardOutput);
                 Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
             }
             finally
