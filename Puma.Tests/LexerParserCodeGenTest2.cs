@@ -196,7 +196,7 @@ int main()
                     FileName = compilerPath,
                     RedirectStandardError = true,
                     UseShellExecute = false,
-                    ArgumentList = { "-std=c++20", "-I", includePath, sourcePath, consoleLibrary, typeLibrary, "-o", executablePath }
+                    ArgumentList = { "-std=c++20", "-fms-runtime-lib=dll", "-I", includePath, sourcePath, consoleLibrary, typeLibrary, "-o", executablePath }
                 });
                 Assert.IsNotNull(process);
                 var standardError = process.StandardError.ReadToEnd();

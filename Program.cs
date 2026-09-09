@@ -112,6 +112,7 @@ namespace Puma
                 string Quote(string s) => $"\"{s}\"";
                 var sb = new StringBuilder();
                 sb.Append(Quote(cppSourceFileName));
+                sb.Append(" -fms-runtime-lib=dll");
 
                 if (requiredRuntimeLibraries.Count > 0)
                 {

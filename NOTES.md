@@ -2,6 +2,7 @@ General notes
 
 Recent updates
 
+- Matched clang++ native builds to the Puma runtime's dynamic MSVC runtime with `-fms-runtime-lib=dll`; runtime-backed compilation and linking coverage now passes.
 - Added runtime-backed native compilation coverage and corrected `WriteLine` output to use the runtime's `PumaConsole` namespace; installed `/GL` runtime libraries must be rebuilt before LLVM linking can succeed.
 - Added runtime-independent native C++ integration coverage that compiles generated output with the discovered LLVM `clang++` toolchain.
 - Added explicit code-generation runtime dependency metadata, updated the CLI to consume it, and expanded location-aware function/parameter diagnostics with compiler-module coverage.
