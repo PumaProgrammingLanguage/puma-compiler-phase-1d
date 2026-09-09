@@ -2,6 +2,7 @@ General notes
 
 Recent updates
 
+- Added post-build installation of Puma.exe, Puma.dll, and required .NET runtime metadata to `%USERPROFILE%\Puma`.
 - Matched clang++ native builds to the Puma runtime's dynamic MSVC runtime with `-fms-runtime-lib=dll`; runtime-backed compilation and linking coverage now passes.
 - Added runtime-backed native compilation coverage and corrected `WriteLine` output to use the runtime's `PumaConsole` namespace; installed `/GL` runtime libraries must be rebuilt before LLVM linking can succeed.
 - Added runtime-independent native C++ integration coverage that compiles generated output with the discovered LLVM `clang++` toolchain.

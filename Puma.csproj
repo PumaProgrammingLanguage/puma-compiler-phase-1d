@@ -18,6 +18,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>compiler; translator</PackageTags>
     <Version>0.1.0</Version>
+    <PumaInstallDirectory>$(USERPROFILE)\Puma</PumaInstallDirectory>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -64,5 +65,16 @@
   <ItemGroup>
     <Folder Include="tmp\" />
   </ItemGroup>
+
+  <Target Name="InstallPumaCompiler" AfterTargets="Build">
+    <MakeDir Directories="$(PumaInstallDirectory)" />
+    <ItemGroup>
+      <PumaCompilerArtifacts Include="$(TargetPath)" />
+      <PumaCompilerArtifacts Include="$(TargetDir)$(AssemblyName).exe" Condition="Exists('$(TargetDir)$(AssemblyName).exe')" />
+      <PumaCompilerArtifacts Include="$(TargetDir)$(AssemblyName).deps.json" Condition="Exists('$(TargetDir)$(AssemblyName).deps.json')" />
+      <PumaCompilerArtifacts Include="$(TargetDir)$(AssemblyName).runtimeconfig.json" Condition="Exists('$(TargetDir)$(AssemblyName).runtimeconfig.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PumaCompilerArtifacts)" DestinationFolder="$(PumaInstallDirectory)\" />
+  </Target>
 
 </Project>
