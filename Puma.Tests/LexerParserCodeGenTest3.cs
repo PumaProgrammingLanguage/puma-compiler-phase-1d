@@ -2244,8 +2244,8 @@ struct MyRecord [[gnu::packed]]
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 };
 ";
 

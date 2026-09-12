@@ -1246,15 +1246,15 @@ namespace Puma
         {
             if (string.IsNullOrWhiteSpace(literal))
             {
-                return "String(\"\")";
+                return "PumaType::String(\"\", sizeof(\"\") - 1)";
             }
 
-            if (literal.StartsWith("String(", StringComparison.Ordinal))
+            if (literal.StartsWith("PumaType::String(", StringComparison.Ordinal))
             {
                 return literal;
             }
 
-            return $"String({literal})";
+            return $"PumaType::String({literal}, sizeof({literal}) - 1)";
         }
 
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
@@ -1806,7 +1806,7 @@ namespace Puma
                                 {
                                     rightExpression = typedLiteralName switch
                                     {
-                                        "Puma::Type::String" => ToPumaStringLiteral(typedLiteralValue),
+                                        "PumaType::String" => ToPumaStringLiteral(typedLiteralValue),
                                         "bool" => typedLiteralValue,
                                         _ => $"({typedLiteralName}){typedLiteralValue}"
                                     };
@@ -2021,7 +2021,7 @@ namespace Puma
             var type = MapType(parameter.Type) ?? "int64_t";
             return type switch
             {
-                "Puma::Type::String" => "String(\"\")",
+                "PumaType::String" => "PumaType::String(\"\", sizeof(\"\") - 1)",
                 "bool_t" => "false",
                 _ => "0"
             };
@@ -2050,7 +2050,7 @@ namespace Puma
                 "fix32" => "int32_t",
                 "bool" => "bool_t",
                 "char" => "PumaType::Character",
-                "str" => "Puma::Type::String",
+                "str" => "PumaType::String",
                 _ => type
             };
         }
@@ -2176,7 +2176,7 @@ namespace Puma
                 .ToHashSet(StringComparer.Ordinal);
 
             if (!properties.All(p => TryGetTypedLiteralDeclaration(GetPropertyValue(p) ?? string.Empty, out var typeName, out _)
-                && typeName is not "Puma::Type::String" and not "bool"))
+                && typeName is not "PumaType::String" and not "bool"))
             {
                 return false;
             }
@@ -2217,7 +2217,7 @@ namespace Puma
             }
             else if (ContainsStringLiteral(GetAssignmentRightExpression(statement)))
             {
-                typeName = "Puma::Type::String";
+                typeName = "PumaType::String";
             }
             else if (ContainsDecimalLiteral(GetAssignmentRightExpression(statement)))
             {
@@ -2309,7 +2309,7 @@ namespace Puma
 
             if (value.StartsWith("\"", StringComparison.Ordinal))
             {
-                return ("Puma::Type::String", value);
+                return ("PumaType::String", value);
             }
 
             if (bool.TryParse(value, out _))
@@ -2449,7 +2449,7 @@ namespace Puma
 
             var initializer = typeName switch
             {
-                "Puma::Type::String" => ToPumaStringLiteral(value),
+                "PumaType::String" => ToPumaStringLiteral(value),
                 "PumaType::Character" => $"Character({value})",
                 "bool" => value,
                 _ => $"({typeName}){value}"
@@ -2512,14 +2512,14 @@ namespace Puma
 
             if (text.StartsWith("\"", StringComparison.Ordinal))
             {
-                typeName = "Puma::Type::String";
+                typeName = "PumaType::String";
                 literalValue = text;
                 return true;
             }
 
             if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase))
             {
-                typeName = "Puma::Type::String";
+                typeName = "PumaType::String";
                 literalValue = "\"\"";
                 return true;
             }

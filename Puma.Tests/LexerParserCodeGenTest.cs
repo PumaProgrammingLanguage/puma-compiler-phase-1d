@@ -245,14 +245,14 @@ initialize
 // properties
 auto a = (int64_t)0;
 auto b = (double)0.0;
-auto c = String("""");
+auto c = PumaType::String("""", sizeof("""") - 1);
 
 // initialize
 void initialize(void)
 {
     a = 5;
     b = 6.5;
-    c = String(""Hello"");
+    c = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
 }
 ";
 
@@ -418,8 +418,8 @@ class MyTrait
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 };
 ";
 
@@ -708,8 +708,8 @@ void initialize(void)
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 }
 ";
 
@@ -764,8 +764,8 @@ public:
         auto a = false;
         auto b = true;
         auto c = false;
-        auto d = String("""");
-        auto e = String("""");
+        auto d = PumaType::String("""", sizeof("""") - 1);
+        auto e = PumaType::String("""", sizeof("""") - 1);
     }
 };
 ";
@@ -818,8 +818,8 @@ public:
 auto a = false;
 auto b = true;
 auto c = false;
-auto d = String("""");
-auto e = String("""");
+auto d = PumaType::String("""", sizeof("""") - 1);
+auto e = PumaType::String("""", sizeof("""") - 1);
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -977,8 +977,8 @@ struct MyRecord
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 };
 ";
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -1233,12 +1233,12 @@ finalize
 @"#include <PumaType/String.hpp>
 
 // properties
-auto s = String(""Hello, World!\n"");
+auto s = PumaType::String(""Hello, World!\n"", sizeof(""Hello, World!\n"") - 1);
 
 // finalize
 void finalize(void)
 {
-    s = String("""");
+    s = PumaType::String("""", sizeof("""") - 1);
 }
 ";
 
@@ -1288,14 +1288,14 @@ start
 
 auto a = (int64_t)0;
 auto b = (double)0.0;
-auto c = String("""");
+auto c = PumaType::String("""", sizeof("""") - 1);
 
 // start
 int main()
 {
     a = 5;
     b = 6.5;
-    c = String(""Hello"");
+    c = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
     return 0;
 }
 ";
