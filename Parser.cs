@@ -1434,13 +1434,13 @@ namespace Puma
 
             if (tokens.Any(t => t.Category == TokenCategory.Keyword && (t.TokenText == "is" || t.TokenText == "has")))
             {
-                throw new InvalidOperationException($"Unexpected inheritance in {declarationKind} declaration.");
+                throw CreateParserException($"Unexpected inheritance in {declarationKind} declaration.", firstToken);
             }
 
             var name = BuildQualifiedName(tokens);
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new InvalidOperationException($"Missing {declarationKind} name.");
+                throw CreateParserException($"Missing {declarationKind} name.", firstToken);
             }
 
             ast.Add(Node.CreateTypeDeclaration(declarationKind, name, null));
@@ -1457,13 +1457,13 @@ namespace Puma
             var isIndex = tokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "is");
             if (isIndex < 0)
             {
-                throw new InvalidOperationException("Type declarations must include an 'is' base type.");
+                throw CreateParserException("Type declarations must include an 'is' base type.", firstToken);
             }
 
             var nameTokens = tokens.Take(isIndex).ToList();
             if (nameTokens.Count == 0)
             {
-                throw new InvalidOperationException("Missing type name.");
+                throw CreateParserException("Missing type name.", tokens[isIndex]);
             }
 
             var hasIndex = tokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "has");
@@ -1473,7 +1473,7 @@ namespace Puma
 
             if (baseTokens.Count == 0)
             {
-                throw new InvalidOperationException("Missing base type after 'is'.");
+                throw CreateParserException("Missing base type after 'is'.", tokens[isIndex]);
             }
 
             var name = BuildQualifiedName(nameTokens);
@@ -1509,7 +1509,7 @@ namespace Puma
 
                 if (traits.Count == 0)
                 {
-                    throw new InvalidOperationException("Missing trait list after 'has'.");
+                    throw CreateParserException("Missing trait list after 'has'.", tokens[hasIndex]);
                 }
             }
 
@@ -1636,7 +1636,7 @@ namespace Puma
             {
                 if (aliasIndex + 1 >= parts.Count)
                 {
-                    throw new InvalidOperationException("Expected alias identifier after 'as' in use statement.");
+                    throw CreateParserException("Expected alias identifier after 'as' in use statement.", parts[aliasIndex]);
                 }
 
                 alias = parts[aliasIndex + 1].TokenText;
@@ -1649,7 +1649,7 @@ namespace Puma
 
             if (isFilePath && alias != null)
             {
-                throw new InvalidOperationException("File path use statements cannot specify an alias.");
+                throw CreateParserException("File path use statements cannot specify an alias.", parts[0]);
             }
 
             ast.Add(Node.CreateUseStatement(target, alias, isFilePath));
@@ -1728,7 +1728,7 @@ namespace Puma
             var expression = parser.ParseExpression();
             if (parser.HasRemainingTokens())
             {
-                throw new InvalidOperationException("Unable to parse full expression.");
+                throw CreateParserException("Unable to parse full expression.", tokens.FirstOrDefault());
             }
 
             return expression;
@@ -1763,10 +1763,11 @@ namespace Puma
                 var expression = ParseOr();
                 while (MatchKeyword("if"))
                 {
+                    var ifToken = _tokens[_index - 1];
                     var condition = ParseOr();
                     if (!MatchKeyword("else"))
                     {
-                        throw new InvalidOperationException("Conditional expressions require an 'else' branch.");
+                        throw CreateParserException("Conditional expressions require an 'else' branch.", ifToken);
                     }
 
                     var whenFalse = ParseOr();
@@ -1822,7 +1823,7 @@ namespace Puma
                 {
                     if (matched)
                     {
-                        throw new InvalidOperationException("Only one consecutive equality expression is allowed.");
+                        throw CreateParserException("Only one consecutive equality expression is allowed.", _tokens[_index - 1]);
                     }
 
                     matched = true;
@@ -1841,7 +1842,7 @@ namespace Puma
                 {
                     if (matched)
                     {
-                        throw new InvalidOperationException("Only one consecutive relational expression is allowed.");
+                        throw CreateParserException("Only one consecutive relational expression is allowed.", _tokens[_index - 1]);
                     }
 
                     matched = true;
@@ -1932,7 +1933,7 @@ namespace Puma
                 {
                     if (seenPairOrRange)
                     {
-                        throw new InvalidOperationException("Only one consecutive pair or range expression is allowed.");
+                        throw CreateParserException("Only one consecutive pair or range expression is allowed.", _tokens[_index - 1]);
                     }
 
                     seenPairOrRange = true;
@@ -1969,7 +1970,7 @@ namespace Puma
                     var operand = ParseUnary();
                     if (operand?.Kind == ExpressionKind.Unary)
                     {
-                        throw new InvalidOperationException("Unary operators cannot be repeated consecutively.");
+                        throw CreateParserException("Unary operators cannot be repeated consecutively.", _tokens[_index - 1]);
                     }
                     return new ExpressionNode { Kind = ExpressionKind.Unary, Value = op, Left = operand };
                 }
@@ -2585,6 +2586,7 @@ namespace Puma
             var right = BuildQualifiedName(rightTokens);
             var leftExpression = ParseExpression(leftTokens);
             var rightExpression = ParseExpression(rightTokens);
+            var assignmentToken = leftTokens.FirstOrDefault();
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
@@ -2596,17 +2598,17 @@ namespace Puma
 
             if (assignmentOperator == "=" && _constantProperties.Contains(left))
             {
-                throw new InvalidOperationException($"Cannot assign to constant property '{left}'.");
+                throw CreateParserException($"Cannot assign to constant property '{left}'.", assignmentToken);
             }
 
             if (assignmentOperator == "=" && _readonlyProperties.Contains(left))
             {
-                throw new InvalidOperationException($"Cannot assign to readonly property '{left}'.");
+                throw CreateParserException($"Cannot assign to readonly property '{left}'.", assignmentToken);
             }
 
             if (assignmentOperator == "=" && IsKnownConstantParameter(left))
             {
-                throw new InvalidOperationException($"Cannot assign to constant parameter '{left}'.");
+                throw CreateParserException($"Cannot assign to constant parameter '{left}'.", assignmentToken);
             }
 
             if (assignmentOperator == "="
@@ -2614,17 +2616,17 @@ namespace Puma
                 && IsNoneAssignment(rightExpression, right)
                 && IsKnownNonOptionalProperty(left))
             {
-                throw new InvalidOperationException($"Cannot assign none to non-optional property '{left}'.");
+                throw CreateParserException($"Cannot assign none to non-optional property '{left}'.", assignmentToken);
             }
 
             if (assignmentOperator == "=" && IsKnownReadonlyLocal(left))
             {
-                throw new InvalidOperationException($"Cannot assign to readonly local variable '{left}'.");
+                throw CreateParserException($"Cannot assign to readonly local variable '{left}'.", assignmentToken);
             }
 
             if (assignmentOperator == "=" && IsKnownReadonlyParameter(left))
             {
-                throw new InvalidOperationException($"Cannot assign to readonly parameter '{left}'.");
+                throw CreateParserException($"Cannot assign to readonly parameter '{left}'.", assignmentToken);
             }
 
             if (assignmentOperator == "="
@@ -2639,7 +2641,7 @@ namespace Puma
             if ((string.IsNullOrWhiteSpace(left) && leftExpression == null)
                 || (string.IsNullOrWhiteSpace(right) && rightExpression == null))
             {
-                throw new InvalidOperationException("Assignment statements require left and right expressions.");
+                throw CreateParserException("Assignment statements require left and right expressions.", tokens.FirstOrDefault());
             }
 
             var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
@@ -3248,7 +3250,7 @@ namespace Puma
             var condition = BuildQualifiedName(conditionTokens);
             if (string.IsNullOrWhiteSpace(condition))
             {
-                throw new InvalidOperationException("While statements require a condition.");
+                throw CreateParserException("While statements require a condition.", tokens[0]);
             }
 
             var node = Node.CreateWhileStatement(condition);
@@ -3272,14 +3274,14 @@ namespace Puma
             var inIndex = tokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "in");
             if (inIndex <= 1)
             {
-                throw new InvalidOperationException("For statements require the 'in' keyword and a variable name.");
+                throw CreateParserException("For statements require the 'in' keyword and a variable name.", tokens[0]);
             }
 
             var variable = BuildQualifiedName(tokens.Skip(1).Take(inIndex - 1));
             var container = BuildQualifiedName(tokens.Skip(inIndex + 1));
             if (string.IsNullOrWhiteSpace(variable) || string.IsNullOrWhiteSpace(container))
             {
-                throw new InvalidOperationException("For statements require a variable and container expression.");
+                throw CreateParserException("For statements require a variable and container expression.", tokens[0]);
             }
 
             if (tokens[0].TokenText == "for")

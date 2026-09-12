@@ -34,6 +34,7 @@ namespace Puma
         protected static string OutputFileName = "";
         // variable to store the source code.
         protected static string source = "";
+        private static string? CommandLineError;
 
         private sealed record InstalledPumaRuntime(string IncludeDirectory, string LibraryDirectory);
 
@@ -44,7 +45,13 @@ namespace Puma
         static int Main(string[] args)
         {
             // Parse the command-line arguments.
-            ParseCommandArguments(args);
+            CommandLineError = ParseCommandArguments(args);
+
+            if (!string.IsNullOrWhiteSpace(CommandLineError))
+            {
+                Console.Error.WriteLine($"Puma command-line error: {CommandLineError}");
+                return 2;
+            }
 
             // Emit a C++ translation unit (.cpp) instead of .c
             var cppSourceFileName = Path.ChangeExtension(SourceFileName, ".cpp");
@@ -168,7 +175,7 @@ namespace Puma
             }
         }
 
-        private static void ParseCommandArguments(string[] args)
+        private static string? ParseCommandArguments(string[] args)
         {
             foreach (var arg in args)
             {
@@ -215,6 +222,11 @@ namespace Puma
                         if (Output)
                         {
                             // If the output flag is set, the argument that follows is the output file name.
+                            if (arg.StartsWith("-", StringComparison.Ordinal))
+                            {
+                                return "Expected an output file name after -o or --output.";
+                            }
+
                             OutputFileName = arg;
                             Output = false;
                             break;
@@ -222,6 +234,11 @@ namespace Puma
                         // If the argument ends with ".puma", it is the source file name.
                         else if (arg.EndsWith(".puma", StringComparison.OrdinalIgnoreCase))
                         {
+                            if (!string.IsNullOrWhiteSpace(SourceFileName))
+                            {
+                                return "Only one Puma source file may be specified.";
+                            }
+
                             SourceFileName = arg;
                         }
                         else
@@ -233,6 +250,8 @@ namespace Puma
                         break;
                 }
             }
+
+            return Output ? "Expected an output file name after -o or --output." : null;
         }
 
         private static int BuildGeneratedCode()
