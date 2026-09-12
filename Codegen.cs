@@ -2049,7 +2049,7 @@ namespace Puma
                 "fix" or "fix64" => "int64_t",
                 "fix32" => "int32_t",
                 "bool" => "bool_t",
-                "char" => "Puma::Type::Character",
+                "char" => "PumaType::Character",
                 "str" => "Puma::Type::String",
                 _ => type
             };
@@ -2442,7 +2442,7 @@ namespace Puma
                 return true;
             }
 
-            if (typeName == "Puma::Type::Character")
+            if (typeName == "PumaType::Character")
             {
                 usedExpressionFallback = true;
             }
@@ -2450,7 +2450,7 @@ namespace Puma
             var initializer = typeName switch
             {
                 "Puma::Type::String" => ToPumaStringLiteral(value),
-                "Puma::Type::Character" => $"Character({value})",
+                "PumaType::Character" => $"Character({value})",
                 "bool" => value,
                 _ => $"({typeName}){value}"
             };
@@ -2526,7 +2526,7 @@ namespace Puma
 
             if (IsCharacterLiteralText(text))
             {
-                typeName = "Puma::Type::Character";
+                typeName = "PumaType::Character";
                 literalValue = text;
                 return true;
             }

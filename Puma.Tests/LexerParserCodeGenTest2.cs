@@ -27,6 +27,21 @@ namespace test
         private static string Normalize(string s) =>
             s.Replace("\r\n", "\n").Replace("\r", "\n");
 
+        private static void ConfigureX64LibraryPath(ProcessStartInfo startInfo)
+        {
+            var libraryPaths = (Environment.GetEnvironmentVariable("LIB") ?? string.Empty)
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+                .Select(path => path.Replace("\\x86", "\\x64", StringComparison.OrdinalIgnoreCase))
+                .Where(Directory.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (libraryPaths.Length > 0)
+            {
+                startInfo.Environment["LIB"] = string.Join(Path.PathSeparator, libraryPaths);
+            }
+        }
+
         private static List<Puma.Lexer.LexerTokens> GetSignificantTokens(List<Puma.Lexer.LexerTokens> tokens)
         {
             return tokens
@@ -191,13 +206,15 @@ int main()
                 var sourcePath = Path.Combine(directory, "generated.cpp");
                 var executablePath = Path.Combine(directory, "generated.exe");
                 File.WriteAllText(sourcePath, generated);
-                using var process = Process.Start(new ProcessStartInfo
+                var startInfo = new ProcessStartInfo
                 {
                     FileName = compilerPath,
                     RedirectStandardError = true,
                     UseShellExecute = false,
-                    ArgumentList = { "-std=c++20", "-fms-runtime-lib=dll", "-I", includePath, sourcePath, consoleLibrary, typeLibrary, "-o", executablePath }
-                });
+                    ArgumentList = { "-std=c++20", "--target=x86_64-pc-windows-msvc", "-fms-runtime-lib=dll", "-I", includePath, sourcePath, consoleLibrary, typeLibrary, "-o", executablePath }
+                };
+                ConfigureX64LibraryPath(startInfo);
+                using var process = Process.Start(startInfo);
                 Assert.IsNotNull(process);
                 var standardError = process.StandardError.ReadToEnd();
                 process.WaitForExit();
@@ -252,7 +269,7 @@ int main()
 @"#include <PumaType/Character.hpp>
 
 // functions
-void DoNothing(Puma::Type::Character c)
+void DoNothing(PumaType::Character c)
 {
     return;
 }
@@ -447,7 +464,7 @@ void initialize(void)
 @"#include <PumaType/Character.hpp>
 
 // functions
-char Pick(Puma::Type::Character a, Puma::Type::Character b)
+char Pick(PumaType::Character a, PumaType::Character b)
 {
     auto result = ((a == b) ? a : b);
     auto mirror = result;

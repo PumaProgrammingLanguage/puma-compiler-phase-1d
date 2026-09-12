@@ -112,6 +112,7 @@ namespace Puma
                 string Quote(string s) => $"\"{s}\"";
                 var sb = new StringBuilder();
                 sb.Append(Quote(cppSourceFileName));
+                sb.Append(" --target=x86_64-pc-windows-msvc");
                 sb.Append(" -fms-runtime-lib=dll");
 
                 if (requiredRuntimeLibraries.Count > 0)
@@ -236,18 +237,17 @@ namespace Puma
 
         private static int BuildGeneratedCode()
         {
-            var process = new Process
+            var startInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = FindClangPlusPlus(),
-                    Arguments = ClangArguments,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,   // capture errors
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = FindClangPlusPlus(),
+                Arguments = ClangArguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,   // capture errors
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
+            ConfigureX64LibraryPath(startInfo);
+            var process = new Process { StartInfo = startInfo };
 
             process.Start();
 
@@ -296,6 +296,21 @@ namespace Puma
 
             var installedCompiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
             return File.Exists(installedCompiler) ? installedCompiler : "clang++";
+        }
+
+        private static void ConfigureX64LibraryPath(ProcessStartInfo startInfo)
+        {
+            var libraryPaths = (Environment.GetEnvironmentVariable("LIB") ?? string.Empty)
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+                .Select(path => path.Replace("\\x86", "\\x64", StringComparison.OrdinalIgnoreCase))
+                .Where(Directory.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (libraryPaths.Length > 0)
+            {
+                startInfo.Environment["LIB"] = string.Join(Path.PathSeparator, libraryPaths);
+            }
         }
 
         private static InstalledPumaRuntime? FindInstalledPumaRuntime()
