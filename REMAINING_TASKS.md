@@ -28,10 +28,10 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
 
 ## 4. Compiler Installation and Publishing
 
-- [ ] Add a Release publish/install target for Puma compiler artifacts.
-- [ ] Decide whether distributions should be framework-dependent, self-contained, or native AOT.
-- [ ] Document the selected deployment model and required runtime files.
-- [ ] Validate the installed compiler from a clean terminal session.
+- [x] Add a Release publish/install target for Puma compiler artifacts.
+- [x] Decide whether distributions should be framework-dependent, self-contained, or native AOT.
+- [x] Document the selected deployment model and required runtime files.
+- [x] Validate the installed compiler from a clean terminal session.
 
 ## 5. CLI Quality Improvements
 
