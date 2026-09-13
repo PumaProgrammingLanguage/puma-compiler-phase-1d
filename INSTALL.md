@@ -12,7 +12,7 @@ From the repository root, run the Release publish-and-install target:
 
 	dotnet msbuild Puma.csproj -t:PublishAndInstallPumaCompiler -p:Configuration=Release
 
-The target publishes the compiler and replaces the contents of `%USERPROFILE%\Puma` with the complete publish output. To use a different destination, set `PumaInstallDirectory`:
+The target publishes the compiler and copies the complete publish output to `%USERPROFILE%\Puma`, preserving separately installed Puma runtime headers and libraries. To use a different destination, set `PumaInstallDirectory`:
 
 	dotnet msbuild Puma.csproj -t:PublishAndInstallPumaCompiler -p:Configuration=Release -p:PumaInstallDirectory=C:\Tools\Puma
 

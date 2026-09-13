@@ -70,7 +70,6 @@
   </ItemGroup>
 
   <Target Name="PublishAndInstallPumaCompiler" DependsOnTargets="Publish">
-    <RemoveDir Directories="$(PumaInstallDirectory)" />
     <MakeDir Directories="$(PumaInstallDirectory)" />
     <ItemGroup>
       <PumaCompilerArtifacts Include="$(PublishDir)**\*" />
