@@ -334,17 +334,18 @@ namespace Puma
 
         private static InstalledPumaRuntime? FindInstalledPumaRuntime()
         {
-            var candidateRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var pumaHome = Environment.GetEnvironmentVariable("PUMA_HOME");
-            if (!string.IsNullOrWhiteSpace(pumaHome))
-            {
-                candidateRoots.Add(pumaHome);
-            }
-
+            var candidateRoots = new List<string>();
             var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (!string.IsNullOrWhiteSpace(userProfile))
             {
                 candidateRoots.Add(Path.Combine(userProfile, "Puma"));
+            }
+
+            var pumaHome = Environment.GetEnvironmentVariable("PUMA_HOME");
+            if (!string.IsNullOrWhiteSpace(pumaHome)
+                && !candidateRoots.Contains(pumaHome, StringComparer.OrdinalIgnoreCase))
+            {
+                candidateRoots.Add(pumaHome);
             }
 
             foreach (var candidateRoot in candidateRoots)
@@ -354,6 +355,12 @@ namespace Puma
                 if (IsInstalledPumaRuntime(includeDirectory, libraryDirectory))
                 {
                     return new InstalledPumaRuntime(includeDirectory, libraryDirectory);
+                }
+
+                var sourceLibraryDirectory = Path.Combine(candidateRoot, "x64", "Release");
+                if (IsInstalledPumaRuntime(candidateRoot, sourceLibraryDirectory))
+                {
+                    return new InstalledPumaRuntime(candidateRoot, sourceLibraryDirectory);
                 }
             }
 
@@ -392,7 +399,7 @@ namespace Puma
             Console.WriteLine("  -V, --version  Print the version of the Puma compiler and exit.");
             Console.WriteLine("  -emit-c        Emit the generated code to a file and exit.");
             Console.WriteLine("  -o, --output   Specify the output file name.");
-            Console.WriteLine("  <clang flag>   other clang++ flags.");
+            Console.WriteLine("  <clang++ flag> other clang++ flags.");
         }
     }
 }

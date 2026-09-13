@@ -16,6 +16,10 @@ The target publishes the compiler and copies the complete publish output to `%US
 
 	dotnet msbuild Puma.csproj -t:PublishAndInstallPumaCompiler -p:Configuration=Release -p:PumaInstallDirectory=C:\Tools\Puma
 
+To compile Puma programs that use runtime dependencies, the compiler first searches `%USERPROFILE%\Puma`. If its runtime artifacts are unavailable, set `PUMA_HOME` to an installed runtime directory (`include\` and `lib\x64\Release\`) or the PumaStdLib source tree (`PumaType\`, `PumaConsole\`, `PumaFile\`, and `x64\Release\`):
+
+	$env:PUMA_HOME = '<path-to-PumaStdLib>'
+
 ## Verify the installation
 
 Open a new PowerShell session and run:
