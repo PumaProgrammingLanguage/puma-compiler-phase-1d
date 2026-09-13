@@ -14,7 +14,7 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
 - [x] Add line and column information to assignment and mutability diagnostics.
 - [x] Add line and column information to expression and conditional diagnostics.
 - [x] Add line and column information to type, loop, and `use` diagnostics.
-- [ ] Add AST source spans where validation occurs after token consumption.
+- [x] Add AST source spans where validation occurs after token consumption.
 - [x] Add exact diagnostic-message regression coverage for assignment and expression diagnostics.
 
 ## 3. Runtime-Backed Integration Execution

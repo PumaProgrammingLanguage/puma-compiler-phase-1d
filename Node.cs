@@ -63,6 +63,8 @@ namespace Puma
         Call
     }
 
+    internal readonly record struct SourceSpan(int StartLine, int StartColumn, int EndLine, int EndColumn);
+
     internal sealed class ExpressionNode
     {
         public ExpressionKind Kind { get; set; }
@@ -70,6 +72,7 @@ namespace Puma
         public ExpressionNode? Left { get; set; }
         public ExpressionNode? Right { get; set; }
         public List<ExpressionNode> Arguments { get; } = new();
+        public SourceSpan? SourceSpan { get; set; }
     }
 
     internal sealed class WriteLineAstNode : Node
@@ -253,6 +256,7 @@ namespace Puma
         public string? AssignmentOperator { get; set; }
         public ExpressionNode? AssignmentLeftExpression { get; set; }
         public ExpressionNode? AssignmentRightExpression { get; set; }
+        public SourceSpan? AssignmentLeftSourceSpan { get; set; }
         public bool IsLoweredPostfixMutation { get; set; }
 
         public AssignmentStatementAstNode()

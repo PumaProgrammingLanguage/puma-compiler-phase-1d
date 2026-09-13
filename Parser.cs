@@ -697,6 +697,13 @@ namespace Puma
                 : new InvalidOperationException(message);
         }
 
+        private static InvalidOperationException CreateParserException(string message, SourceSpan? sourceSpan)
+        {
+            return sourceSpan is SourceSpan location && location.StartLine > 0 && location.StartColumn > 0
+                ? new InvalidOperationException($"Line {location.StartLine}, column {location.StartColumn}: {message}")
+                : new InvalidOperationException(message);
+        }
+
         private static (string Value, List<string> Modifiers) SplitTrailingModifiers(List<LexerTokens> tokens, HashSet<string> allowedModifiers)
         {
             var modifiers = new List<string>();
@@ -1731,6 +1738,17 @@ namespace Puma
                 throw CreateParserException("Unable to parse full expression.", tokens.FirstOrDefault());
             }
 
+            if (expression != null)
+            {
+                var firstToken = tokens[0];
+                var lastToken = tokens[^1];
+                expression.SourceSpan = new SourceSpan(
+                    firstToken.StartLine,
+                    firstToken.StartColumn,
+                    lastToken.StartLine,
+                    lastToken.StartColumn + lastToken.TokenText.Length);
+            }
+
             return expression;
         }
 
@@ -2377,6 +2395,7 @@ namespace Puma
             {
                 typedNode.AssignmentLeftExpression = leftExpression;
                 typedNode.AssignmentRightExpression = rightExpression;
+                typedNode.AssignmentLeftSourceSpan = leftExpression?.SourceSpan;
                 typedNode.IsLoweredPostfixMutation = isLoweredPostfixMutation;
             }
         }
@@ -2587,6 +2606,9 @@ namespace Puma
             var leftExpression = ParseExpression(leftTokens);
             var rightExpression = ParseExpression(rightTokens);
             var assignmentToken = leftTokens.FirstOrDefault();
+            var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
+            SetAssignmentExpressions(node, leftExpression, rightExpression, isLoweredPostfixMutation: false);
+            var assignmentSourceSpan = ((AssignmentStatementAstNode)node).AssignmentLeftSourceSpan;
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
@@ -2598,17 +2620,17 @@ namespace Puma
 
             if (assignmentOperator == "=" && _constantProperties.Contains(left))
             {
-                throw CreateParserException($"Cannot assign to constant property '{left}'.", assignmentToken);
+                throw CreateParserException($"Cannot assign to constant property '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && _readonlyProperties.Contains(left))
             {
-                throw CreateParserException($"Cannot assign to readonly property '{left}'.", assignmentToken);
+                throw CreateParserException($"Cannot assign to readonly property '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && IsKnownConstantParameter(left))
             {
-                throw CreateParserException($"Cannot assign to constant parameter '{left}'.", assignmentToken);
+                throw CreateParserException($"Cannot assign to constant parameter '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "="
@@ -2616,17 +2638,17 @@ namespace Puma
                 && IsNoneAssignment(rightExpression, right)
                 && IsKnownNonOptionalProperty(left))
             {
-                throw CreateParserException($"Cannot assign none to non-optional property '{left}'.", assignmentToken);
+                throw CreateParserException($"Cannot assign none to non-optional property '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && IsKnownReadonlyLocal(left))
             {
-                throw CreateParserException($"Cannot assign to readonly local variable '{left}'.", assignmentToken);
+                throw CreateParserException($"Cannot assign to readonly local variable '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && IsKnownReadonlyParameter(left))
             {
-                throw CreateParserException($"Cannot assign to readonly parameter '{left}'.", assignmentToken);
+                throw CreateParserException($"Cannot assign to readonly parameter '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "="
@@ -2644,8 +2666,6 @@ namespace Puma
                 throw CreateParserException("Assignment statements require left and right expressions.", tokens.FirstOrDefault());
             }
 
-            var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
-            SetAssignmentExpressions(node, leftExpression, rightExpression, isLoweredPostfixMutation: false);
             target.Add(node);
 
             if (assignmentOperator == "="

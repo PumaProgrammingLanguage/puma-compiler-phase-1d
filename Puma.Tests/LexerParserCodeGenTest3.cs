@@ -509,8 +509,7 @@ int Echo(int64_t value)
             var tokens = lexer.Tokenize(src);
 
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
-            StringAssert.Contains(ex.Message, "Cannot assign to constant parameter");
-            StringAssert.Contains(ex.Message, "value");
+            Assert.AreEqual("Line 3, column 9: Cannot assign to constant parameter 'value'.", ex.Message);
         }
 
         [TestMethod]
