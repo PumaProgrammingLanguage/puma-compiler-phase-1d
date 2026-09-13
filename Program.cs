@@ -17,14 +17,13 @@
 
 using System.Diagnostics;
 using System.Reflection;
-using System.Text;
 
 namespace Puma
 {
     internal class Program
     {
         // variables to store the command-line arguments.
-        protected static string ClangArguments = "";
+        protected static List<string> ClangArguments = [];
         protected static bool Verbose = false;
         protected static bool Help = false;
         protected static bool Version = false;
@@ -115,12 +114,12 @@ namespace Puma
                 // Always write the generated C++ code to a .cpp file.
                 File.WriteAllText(cppSourceFileName, cCode);
 
-                // Build the clang++ argument string with proper quoting.
-                string Quote(string s) => $"\"{s}\"";
-                var sb = new StringBuilder();
-                sb.Append(Quote(cppSourceFileName));
-                sb.Append(" --target=x86_64-pc-windows-msvc");
-                sb.Append(" -fms-runtime-lib=dll");
+                var clangArguments = new List<string>
+                {
+                    cppSourceFileName,
+                    "--target=x86_64-pc-windows-msvc",
+                    "-fms-runtime-lib=dll"
+                };
 
                 if (requiredRuntimeLibraries.Count > 0)
                 {
@@ -130,25 +129,24 @@ namespace Puma
                         throw new InvalidOperationException("Unable to locate the installed Puma runtime under PUMA_HOME or %USERPROFILE%\\Puma.");
                     }
 
-                    sb.Append(" -I ").Append(Quote(installedRuntime.IncludeDirectory));
-                    sb.Append(" -L ").Append(Quote(installedRuntime.LibraryDirectory));
+                    clangArguments.Add("-I");
+                    clangArguments.Add(installedRuntime.IncludeDirectory);
+                    clangArguments.Add("-L");
+                    clangArguments.Add(installedRuntime.LibraryDirectory);
                     foreach (var libraryPath in GetRuntimeLibraryPaths(installedRuntime, requiredRuntimeLibraries))
                     {
-                        sb.Append(' ').Append(Quote(libraryPath));
+                        clangArguments.Add(libraryPath);
                     }
                 }
 
                 if (!string.IsNullOrEmpty(OutputFileName))
                 {
-                    sb.Append(" -o ").Append(Quote(OutputFileName));
+                    clangArguments.Add("-o");
+                    clangArguments.Add(OutputFileName);
                 }
 
-                if (!string.IsNullOrWhiteSpace(ClangArguments))
-                {
-                    sb.Append(' ').Append(ClangArguments.Trim());
-                }
-
-                ClangArguments = sb.ToString();
+                clangArguments.AddRange(ClangArguments);
+                ClangArguments = clangArguments;
 
                 // Compile the generated C++ code using clang++.
                 return BuildGeneratedCode();
@@ -243,9 +241,8 @@ namespace Puma
                         }
                         else
                         {
-                            // Otherwise, add the argument to the clang++ arguments string.
-                            // BUGFIX: append the single argument, not the args array.
-                            ClangArguments += arg + " ";
+                            // Otherwise, preserve the argument for clang++.
+                            ClangArguments.Add(arg);
                         }
                         break;
                 }
@@ -259,12 +256,15 @@ namespace Puma
             var startInfo = new ProcessStartInfo
             {
                 FileName = FindClangPlusPlus(),
-                Arguments = ClangArguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,   // capture errors
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            foreach (var argument in ClangArguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
             ConfigureX64LibraryPath(startInfo);
             var process = new Process { StartInfo = startInfo };
 

@@ -37,5 +37,5 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
 
 - [x] Reject duplicate source-file arguments with a clear diagnostic.
 - [x] Reject a missing value after `-o` or `--output`.
-- [ ] Preserve unknown flags as `clang++` pass-through arguments.
+- [x] Preserve unknown flags as `clang++` pass-through arguments.
 - [x] Add CLI integration tests for exit codes and generated source files.

@@ -358,6 +358,39 @@ int main()
         }
 
         [TestMethod]
+        public void Cli_UnknownFlags_ArePassedToClangWithoutSplittingArguments()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            var originalCompiler = Environment.GetEnvironmentVariable("PUMA_CLANGXX");
+            var originalCaptureFile = Environment.GetEnvironmentVariable("PUMA_CLANG_ARGUMENTS_FILE");
+
+            try
+            {
+                var sourcePath = Path.Combine(directory, "sample.puma");
+                var compilerPath = Path.Combine(directory, "capture-clang-arguments.cmd");
+                var capturePath = Path.Combine(directory, "clang-arguments.txt");
+                File.WriteAllText(sourcePath, "start\n    value = 42\n");
+                File.WriteAllText(compilerPath, "@echo off\r\n> \"%PUMA_CLANG_ARGUMENTS_FILE%\" echo %*\r\n");
+                Environment.SetEnvironmentVariable("PUMA_CLANGXX", compilerPath);
+                Environment.SetEnvironmentVariable("PUMA_CLANG_ARGUMENTS_FILE", capturePath);
+
+                using var process = Process.Start(CreatePumaProcess(sourcePath, "-DNAME=Puma Test"));
+                Assert.IsNotNull(process);
+                process.WaitForExit();
+
+                Assert.AreEqual(0, process.ExitCode);
+                StringAssert.Contains(File.ReadAllText(capturePath), "\"-DNAME=Puma Test\"");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("PUMA_CLANGXX", originalCompiler);
+                Environment.SetEnvironmentVariable("PUMA_CLANG_ARGUMENTS_FILE", originalCaptureFile);
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [TestMethod]
         public void FunctionsExample_CharParameter_LexerParserCodegen_AreConsistent()
         {
             const string src =
