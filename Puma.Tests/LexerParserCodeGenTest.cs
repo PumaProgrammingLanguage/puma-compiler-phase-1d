@@ -106,6 +106,7 @@ namespace test
             Assert.AreEqual(6, assignments.Count);
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
             CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
+            CollectionAssert.AreEqual(new string?[] { null, "int", "int64", "int32", "int16", "int8" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentInferredType).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =

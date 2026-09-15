@@ -116,6 +116,44 @@ int main()
         }
 
         [TestMethod]
+        public void Codegen_UsesStructuredExpressions_WhenRetainedSourceTextDiffers()
+        {
+            const string src =
+@"properties
+    enabled = true
+
+start
+    value = 42
+";
+            const string expected =
+@"#include <cstdint>
+
+auto enabled = true;
+
+// start
+int main()
+{
+    auto value = (int64_t)42;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var ast = parser.Parse(lexer.Tokenize(src));
+            var property = (PropertyDeclarationAstNode)ast.Single(node => node.Kind == NodeKind.PropertyDeclaration);
+            var assignment = (AssignmentStatementAstNode)ast.Single(node => node.Kind == NodeKind.AssignmentStatement);
+            property.PropertyValue = "\"incorrect\"";
+            assignment.AssignmentLeft = "incorrect";
+            assignment.AssignmentRight = "false";
+
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void StringAssignment_CodegenDependencies_AreExplicit()
         {
             const string src =
@@ -903,9 +941,9 @@ void F(void)
     x = a - b;
     x = a * b;
     x = a / b;
-    y = c and d;
-    y = c or d;
-    y = not c;
+    y = c && d;
+    y = c || d;
+    y = !c;
     x = a << b;
     x = a >> b;
     z = a & b;
@@ -1831,7 +1869,7 @@ int main()
         }
 
         [TestMethod]
-        public void CodegenFallbackPaths_AreCovered_WithIncompleteAstData()
+        public void CodegenIncompleteExpressionAst_ThrowsCompilerError()
         {
             var ast = new List<Node>
             {
@@ -1841,21 +1879,9 @@ int main()
             };
 
             var codegen = new Puma.Codegen();
-            var generated = codegen.Generate(ast);
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => codegen.Generate(ast));
 
-            var expected =
-@"mysteryType p = {0};
-
-// start
-int main()
-{
-    return 0;
-}
-";
-
-            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
-            StringAssert.Contains(generated, "mysteryType p = {0};");
-            StringAssert.Contains(generated, "int main()");
+            StringAssert.Contains(ex.Message, "Expression AST node is required");
         }
 
         [TestMethod]
@@ -1894,6 +1920,26 @@ int main()
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
             Assert.IsFalse(generated.Contains("{0}", StringComparison.Ordinal));
             Assert.IsFalse(generated.Contains(" = ;", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public void Properties_LogicalExpression_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    enabled = ready and not disabled
+";
+            const string expected =
+@"// properties
+auto enabled = (ready && !disabled);
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
     }
 }

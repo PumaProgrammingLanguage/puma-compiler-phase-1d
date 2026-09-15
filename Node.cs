@@ -256,6 +256,7 @@ namespace Puma
         public string? AssignmentOperator { get; set; }
         public ExpressionNode? AssignmentLeftExpression { get; set; }
         public ExpressionNode? AssignmentRightExpression { get; set; }
+        public string? AssignmentInferredType { get; set; }
         public SourceSpan? AssignmentLeftSourceSpan { get; set; }
         public bool IsLoweredPostfixMutation { get; set; }
 
@@ -284,6 +285,7 @@ namespace Puma
     {
         public string? PropertyName { get; set; }
         public string? PropertyValue { get; set; }
+        public ExpressionNode? PropertyValueExpression { get; set; }
         public string? PropertyType { get; set; }
         public List<string> PropertyModifiers { get; } = new();
 
@@ -435,12 +437,13 @@ namespace Puma
             return node;
         }
 
-        public static Node CreatePropertyDeclaration(string name, string? value, string? type, IEnumerable<string>? modifiers = null)
+        public static Node CreatePropertyDeclaration(string name, string? value, string? type, IEnumerable<string>? modifiers = null, ExpressionNode? valueExpression = null)
         {
             var node = new PropertyDeclarationAstNode
             {
                 PropertyName = name,
                 PropertyValue = value,
+                PropertyValueExpression = valueExpression,
                 PropertyType = type
             };
 

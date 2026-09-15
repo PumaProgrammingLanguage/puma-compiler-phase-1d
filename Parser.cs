@@ -2234,7 +2234,7 @@ namespace Puma
 
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    var node = Node.CreatePropertyDeclaration(name, value, propertyType, modifiers);
+                    var node = Node.CreatePropertyDeclaration(name, value, propertyType, modifiers, ParseExpression(coreValueTokens));
                     ast.Add(node);
                     if (modifiers.Contains("optional"))
                     {
@@ -2612,10 +2612,13 @@ namespace Puma
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
-                && TryExtractNumericLiteralWithSuffix(rightTokens, out _, out var inferredSuffix)
-                && TryMapConvertionType(inferredSuffix, out var inferredType))
+                && TryExtractNumericLiteralWithSuffix(originalRightTokens, out _, out var inferredSuffix))
             {
-                _inferredIdentifierTypes[left] = inferredType;
+                ((AssignmentStatementAstNode)node).AssignmentInferredType = inferredSuffix;
+                if (TryMapConvertionType(inferredSuffix, out var inferredType))
+                {
+                    _inferredIdentifierTypes[left] = inferredType;
+                }
             }
 
             if (assignmentOperator == "=" && _constantProperties.Contains(left))

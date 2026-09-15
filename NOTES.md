@@ -49,6 +49,7 @@ Recent updates
 - Converted readonly/readwrite propagation tests from value-type literals to object/reference (`Shape`) scenarios, fixed function-body indentation in readonly-parameter propagation coverage, and validated the targeted propagation suite (18/18 passing).
 - Extracted unit tests into a dedicated `Puma.Tests` project; removed test dependencies and compile files from `Puma.csproj` to maintain clean AOT publishing.
 - Fixed nullable reference warnings in `Codegen.cs`, resolved all compiler warnings, and enabled `TreatWarningsAsErrors=True` in `Puma.csproj`.
+- Began AST semantic-model migration: property initializers now retain `ExpressionNode` trees; code generation emits assignments, calls, control-flow conditions, ownership checks, and property initializers from structured expressions. Added exact structured-expression output and incomplete-AST diagnostics coverage; all 162 tests pass. Remaining migration work is source-text use for type inference, include selection, and ownership-name analysis.
 
 1) Unit test TODO list
 

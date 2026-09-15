@@ -199,8 +199,8 @@ void F(void)
     x = (a * b) - f;
     x = ~a % b;
     x = ~(a % b);
-    y = (c and d) or g;
-    y = c or (d and h);
+    y = (c && d) || g;
+    y = c || (d && h);
     z = (a & b) | e;
     z = a | (b & f);
     z = (a & b) ^ e;
@@ -2185,7 +2185,7 @@ functions
             var generated = codegen.Generate(ast);
             var expected =
 @"// properties
-auto arr = Array(items,2);
+auto arr = Array(items, 2);
 
 // functions
 void F(void)
