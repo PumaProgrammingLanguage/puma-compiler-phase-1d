@@ -2561,11 +2561,20 @@ namespace Puma
         {
             if (statement is AssignmentStatementAstNode
                 {
-                    AssignmentRight: { } sourceText,
-                    AssignmentRightExpression: { Kind: ExpressionKind.Literal or ExpressionKind.Unary }
+                    AssignmentInferredType: { } inferredType,
+                    AssignmentRightExpression: { } expression
                 })
             {
-                return TryGetTypedLiteralDeclaration(sourceText, out typeName, out literalValue);
+                if (inferredType is "flt" or "flt32" or "flt64")
+                {
+                    typeName = MapType(inferredType) ?? inferredType;
+                    literalValue = GenerateExpression(expression);
+                    return true;
+                }
+
+                typeName = MapType(inferredType) ?? inferredType;
+                literalValue = GenerateExpression(expression);
+                return true;
             }
 
             return TryGetTypedLiteralDeclaration(GetAssignmentRightExpression(statement), out typeName, out literalValue);

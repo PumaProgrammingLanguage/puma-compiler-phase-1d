@@ -1821,12 +1821,11 @@ void Caller(void)
 int main()
 {
     auto decNeg = (int64_t)-42;
-    auto exp64 = 1.25e+3;
-    auto exp32 = 6.5e-1;
+    auto exp64 = (double)1.25e+3;
+    auto exp32 = (float)6.5e-1;
     auto hex32 = (uint32_t)0x1F;
     auto bin8 = (uint8_t)0b1010;
     auto oct16 = (uint16_t)0o17;
-
     return 0;
 }
 ";

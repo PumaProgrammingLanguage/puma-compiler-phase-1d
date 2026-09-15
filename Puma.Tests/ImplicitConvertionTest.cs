@@ -674,15 +674,14 @@ int main()
 @"// start
 int main()
 {
-    auto f32Min = 1.17549435e-38;
-    auto f32Max = 3.4028235e+38;
-    auto f64Min = 2.2250738585072014e-308;
-    auto f64Max = 1.7976931348623157e+308;
+    auto f32Min = (float)1.17549435e-38;
+    auto f32Max = (float)3.4028235e+38;
+    auto f64Min = (double)2.2250738585072014e-308;
+    auto f64Max = (double)1.7976931348623157e+308;
     auto g32 = (float)0;
     auto g64 = (double)0;
     g32 = f32Max;
     g64 = f64Max;
-
     return 0;
 }
 ";

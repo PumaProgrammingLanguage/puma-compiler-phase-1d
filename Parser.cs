@@ -2615,6 +2615,7 @@ namespace Puma
                 && TryExtractNumericLiteralWithSuffix(originalRightTokens, out _, out var inferredSuffix))
             {
                 ((AssignmentStatementAstNode)node).AssignmentInferredType = inferredSuffix;
+                rightExpression!.DeclaredType = inferredSuffix;
                 if (TryMapConvertionType(inferredSuffix, out var inferredType))
                 {
                     _inferredIdentifierTypes[left] = inferredType;

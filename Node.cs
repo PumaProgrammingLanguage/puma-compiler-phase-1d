@@ -71,6 +71,7 @@ namespace Puma
         public string? Value { get; set; }
         public ExpressionNode? Left { get; set; }
         public ExpressionNode? Right { get; set; }
+        public string? DeclaredType { get; set; }
         public List<ExpressionNode> Arguments { get; } = new();
         public SourceSpan? SourceSpan { get; set; }
     }
