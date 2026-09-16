@@ -257,9 +257,6 @@ namespace Puma
 
     internal sealed class AssignmentStatementAstNode : Node
     {
-        public string? Left { get; set; }
-        public string? Right { get; set; }
-        public string? Operator { get; set; }
         public string? AssignmentLeft { get; set; }
         public string? AssignmentRight { get; set; }
         public string? AssignmentOperator { get; set; }
@@ -470,10 +467,7 @@ namespace Puma
             {
                 AssignmentLeft = left,
                 AssignmentRight = right,
-                AssignmentOperator = assignmentOperator,
-                Left = left,
-                Right = right,
-                Operator = assignmentOperator
+                AssignmentOperator = assignmentOperator
             };
         }
 
