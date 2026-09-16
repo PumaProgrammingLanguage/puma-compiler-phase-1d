@@ -2496,12 +2496,54 @@ namespace Puma
             typeName = "int64_t";
             literalValue = string.Empty;
 
-            if (expression?.Kind is not (ExpressionKind.Literal or ExpressionKind.Unary))
+            if (expression == null)
             {
                 return false;
             }
 
-            return TryGetTypedLiteralDeclaration(GenerateExpression(expression), out typeName, out literalValue);
+            var literal = expression;
+            var unaryOperator = string.Empty;
+            if (literal.Kind == ExpressionKind.Unary && literal.Value is "+" or "-")
+            {
+                unaryOperator = literal.Value;
+                literal = literal.Left;
+            }
+
+            if (literal?.Kind is not (ExpressionKind.Literal or ExpressionKind.Identifier)
+                || string.IsNullOrWhiteSpace(literal.Value))
+            {
+                return false;
+            }
+
+            var value = literal.Value;
+            literalValue = unaryOperator + value;
+            if (value is "true" or "false" or "bool")
+            {
+                typeName = "bool";
+                literalValue = value == "bool" ? "false" : value;
+                return true;
+            }
+
+            if (value == "str" || value.StartsWith('"'))
+            {
+                typeName = "PumaType::String";
+                literalValue = value == "str" ? "\"\"" : value;
+                return true;
+            }
+
+            if (IsCharacterLiteralText(value))
+            {
+                typeName = "PumaType::Character";
+                return true;
+            }
+
+            if (literal.Kind != ExpressionKind.Literal || !char.IsDigit(value.TrimStart('+', '-')[0]))
+            {
+                return false;
+            }
+
+            typeName = MapType(literal.DeclaredType) ?? (value.Contains('.') || value.Contains('e') || value.Contains('E') ? "double" : "int64_t");
+            return true;
         }
 
         private static bool TryGetTypedLiteralDeclaration(Node statement, out string typeName, out string literalValue)
