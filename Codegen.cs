@@ -638,13 +638,6 @@ namespace Puma
                 : null;
         }
 
-        private static string? GetAssignmentRight(Node node)
-        {
-            return node is AssignmentStatementAstNode typedNode
-                ? typedNode.AssignmentRight
-                : null;
-        }
-
         private static string? GetAssignmentLeft(Node node)
         {
             return node is AssignmentStatementAstNode typedNode
@@ -696,13 +689,6 @@ namespace Puma
 
             return node is PropertyDeclarationAstNode typedNode
                 ? typedNode.PropertyName
-                : null;
-        }
-
-        private static string? GetPropertyValue(Node node)
-        {
-            return node is PropertyDeclarationAstNode typedNode
-                ? typedNode.PropertyValue
                 : null;
         }
 

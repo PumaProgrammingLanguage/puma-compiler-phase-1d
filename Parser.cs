@@ -228,10 +228,14 @@ namespace Puma
             }
         }
 
-        private void ValidateImplicitPropertyAssignment(string left, string right)
+        private void ValidateImplicitPropertyAssignment(ExpressionNode left, ExpressionNode right)
         {
-            if (!TryGetKnownIdentifierType(right, out var fromType)
-                || !TryGetKnownIdentifierType(left, out var toType))
+            if (left.Kind != ExpressionKind.Identifier
+                || right.Kind != ExpressionKind.Identifier
+                || string.IsNullOrWhiteSpace(left.Value)
+                || string.IsNullOrWhiteSpace(right.Value)
+                || !TryGetKnownIdentifierType(right.Value, out var fromType)
+                || !TryGetKnownIdentifierType(left.Value, out var toType))
             {
                 return;
             }
@@ -269,59 +273,7 @@ namespace Puma
             }
         }
 
-        private static bool TryGetTypedLiteralConvertionType(string? expressionText, out Convertion.Type type)
-        {
-            type = default;
-            if (string.IsNullOrWhiteSpace(expressionText))
-            {
-                return false;
-            }
-
-            var text = expressionText.Trim();
-            var signOffset = (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal)) ? 1 : 0;
-            var index = signOffset;
-            var dotSeen = false;
-
-            while (index < text.Length)
-            {
-                var ch = text[index];
-                if (char.IsDigit(ch))
-                {
-                    index++;
-                    continue;
-                }
-
-                if (ch == '.' && !dotSeen)
-                {
-                    dotSeen = true;
-                    index++;
-                    continue;
-                }
-
-                if ((ch == 'e' || ch == 'E') && index + 1 < text.Length)
-                {
-                    index++;
-                    if (index < text.Length && (text[index] == '+' || text[index] == '-'))
-                    {
-                        index++;
-                    }
-
-                    while (index < text.Length && char.IsDigit(text[index]))
-                    {
-                        index++;
-                    }
-
-                    continue;
-                }
-
-                break;
-            }
-
-            var suffix = text[index..];
-            return TryMapConvertionType(suffix, out type);
-        }
-
-        private void ValidateImplicitExpressionConversion(ExpressionNode? expression, Convertion.Type toType, string? expressionText = null)
+        private void ValidateImplicitExpressionConversion(ExpressionNode? expression, Convertion.Type toType)
         {
             if (expression == null)
             {
@@ -337,7 +289,7 @@ namespace Puma
             }
 
             if (expression.Kind == ExpressionKind.Literal
-                && TryGetTypedLiteralConvertionType(expressionText, out fromType))
+                && TryMapConvertionType(expression.DeclaredType, out fromType))
             {
                 ValidateImplicitConversion(fromType, toType);
                 return;
@@ -365,56 +317,6 @@ namespace Puma
                 && string.Equals(GetFunctionDeclarationName(n), functionName, StringComparison.Ordinal));
         }
 
-        private static List<string> SplitCallArgumentTexts(List<LexerTokens> argumentTokens)
-        {
-            var result = new List<string>();
-            var current = new List<LexerTokens>();
-            var parenDepth = 0;
-            var bracketDepth = 0;
-
-            foreach (var token in argumentTokens)
-            {
-                if (token.Category == TokenCategory.Delimiter)
-                {
-                    if (token.TokenText == "(")
-                    {
-                        parenDepth++;
-                    }
-                    else if (token.TokenText == ")" && parenDepth > 0)
-                    {
-                        parenDepth--;
-                    }
-                    else if (token.TokenText == "[")
-                    {
-                        bracketDepth++;
-                    }
-                    else if (token.TokenText == "]" && bracketDepth > 0)
-                    {
-                        bracketDepth--;
-                    }
-                }
-
-                if (token.Category == TokenCategory.Punctuation
-                    && token.TokenText == ","
-                    && parenDepth == 0
-                    && bracketDepth == 0)
-                {
-                    result.Add(BuildQualifiedName(current));
-                    current.Clear();
-                    continue;
-                }
-
-                current.Add(token);
-            }
-
-            if (current.Count > 0)
-            {
-                result.Add(BuildQualifiedName(current));
-            }
-
-            return result;
-        }
-
         private void ValidateImplicitFunctionCallArguments(string functionName, ExpressionNode? callExpression, List<LexerTokens> argumentTokens)
         {
             if (callExpression?.Kind != ExpressionKind.Call)
@@ -428,11 +330,10 @@ namespace Puma
                 return;
             }
 
-            var argumentTexts = SplitCallArgumentTexts(argumentTokens);
             var declarationParameters = declaration is FunctionDeclarationAstNode typedDeclaration
                 ? typedDeclaration.FunctionParameterList
                 : new List<Node.ParameterInfo>();
-            var max = Math.Min(Math.Min(callExpression.Arguments.Count, declarationParameters.Count), argumentTexts.Count);
+            var max = Math.Min(callExpression.Arguments.Count, declarationParameters.Count);
             for (var i = 0; i < max; i++)
             {
                 var parameter = declarationParameters[i];
@@ -441,7 +342,7 @@ namespace Puma
                     continue;
                 }
 
-                ValidateImplicitExpressionConversion(callExpression.Arguments[i], toType, argumentTexts[i]);
+                ValidateImplicitExpressionConversion(callExpression.Arguments[i], toType);
             }
         }
 
@@ -2669,10 +2570,9 @@ namespace Puma
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
-                && TryExtractNumericLiteralWithSuffix(originalRightTokens, out _, out var inferredSuffix))
+                && rightExpression?.DeclaredType is { } inferredSuffix)
             {
                 ((AssignmentStatementAstNode)node).AssignmentInferredType = inferredSuffix;
-                rightExpression!.DeclaredType = inferredSuffix;
                 if (TryMapConvertionType(inferredSuffix, out var inferredType))
                 {
                     _inferredIdentifierTypes[left] = inferredType;
@@ -2718,7 +2618,7 @@ namespace Puma
                 && leftExpression is ExpressionNode { Kind: ExpressionKind.Identifier }
                 && rightExpression is ExpressionNode { Kind: ExpressionKind.Identifier })
             {
-                ValidateImplicitPropertyAssignment(left, right);
+                ValidateImplicitPropertyAssignment(leftExpression, rightExpression);
             }
 
             if ((string.IsNullOrWhiteSpace(left) && leftExpression == null)
@@ -3484,7 +3384,7 @@ namespace Puma
             if (_currentFunctionNode != null
                 && TryMapConvertionType(GetFunctionDeclarationReturnType(_currentFunctionNode), out var returnType))
             {
-                ValidateImplicitExpressionConversion(GetStatementExpression(node), returnType, value);
+                ValidateImplicitExpressionConversion(GetStatementExpression(node), returnType);
             }
 
             target.Add(node);
