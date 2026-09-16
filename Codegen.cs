@@ -666,13 +666,6 @@ namespace Puma
                 : false;
         }
 
-        private static string? GetRepeatExpression(Node node)
-        {
-            return node is RepeatStatementAstNode typedNode
-                ? typedNode.RepeatExpression
-                : null;
-        }
-
         private static ExpressionNode? GetRepeatExpressionNode(Node node)
         {
             return node is RepeatStatementAstNode typedNode
@@ -891,13 +884,6 @@ namespace Puma
                 : new List<string>();
         }
 
-        private static string? GetStatementValue(Node node)
-        {
-            return node is StatementAstNode typedNode
-                ? typedNode.StatementValue
-                : null;
-        }
-
         private static ExpressionNode? GetStatementExpression(Node node)
         {
             return node is StatementAstNode typedNode
@@ -923,13 +909,6 @@ namespace Puma
             };
         }
 
-        private static string? GetIfCondition(Node node)
-        {
-            return node is IfStatementAstNode typedNode
-                ? typedNode.IfCondition
-                : null;
-        }
-
         private static ExpressionNode? GetIfConditionExpression(Node node)
         {
             return node is IfStatementAstNode typedNode
@@ -944,13 +923,6 @@ namespace Puma
                 : new List<Node>();
         }
 
-        private static string? GetMatchExpression(Node node)
-        {
-            return node is MatchStatementAstNode typedNode
-                ? typedNode.Expression
-                : null;
-        }
-
         private static ExpressionNode? GetMatchExpressionNode(Node node)
         {
             return node is MatchStatementAstNode typedNode
@@ -958,24 +930,10 @@ namespace Puma
                 : null;
         }
 
-        private static string? GetWhenCondition(Node node)
-        {
-            return node is WhenStatementAstNode typedNode
-                ? typedNode.WhenCondition
-                : null;
-        }
-
         private static ExpressionNode? GetWhenExpression(Node node)
         {
             return node is WhenStatementAstNode typedNode
                 ? typedNode.WhenExpression
-                : null;
-        }
-
-        private static string? GetWhileCondition(Node node)
-        {
-            return node is WhileStatementAstNode typedNode
-                ? typedNode.WhileCondition
                 : null;
         }
 
