@@ -50,6 +50,7 @@ Recent updates
 - Extracted unit tests into a dedicated `Puma.Tests` project; removed test dependencies and compile files from `Puma.csproj` to maintain clean AOT publishing.
 - Fixed nullable reference warnings in `Codegen.cs`, resolved all compiler warnings, and enabled `TreatWarningsAsErrors=True` in `Puma.csproj`.
 - Began AST semantic-model migration: property initializers now retain `ExpressionNode` trees; code generation emits assignments, calls, control-flow conditions, ownership checks, and property initializers from structured expressions. Added exact structured-expression output and incomplete-AST diagnostics coverage; all 162 tests pass. Remaining migration work is source-text use for type inference, include selection, and ownership-name analysis.
+- Continued AST semantic-model migration: expression nodes now retain recursive source spans and numeric suffix metadata; assignment validation and declaration inference use structured nodes; record members retain structured declarations and are emitted without substring parsing. Removed duplicate assignment fields and obsolete raw-expression codegen accessors. The legacy raw fields retained for parser compatibility still prevent marking the overall migration task complete.
 
 1) Unit test TODO list
 
