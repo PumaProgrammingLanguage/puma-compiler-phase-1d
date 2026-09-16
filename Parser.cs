@@ -1740,6 +1740,7 @@ namespace Puma
 
             if (expression != null)
             {
+                PopulateExpressionSourceSpans(expression);
                 var firstToken = tokens[0];
                 var lastToken = tokens[^1];
                 expression.SourceSpan = new SourceSpan(
@@ -1750,6 +1751,43 @@ namespace Puma
             }
 
             return expression;
+        }
+
+        private static void PopulateExpressionSourceSpans(ExpressionNode expression)
+        {
+            if (expression.Left != null)
+            {
+                PopulateExpressionSourceSpans(expression.Left);
+            }
+
+            if (expression.Right != null)
+            {
+                PopulateExpressionSourceSpans(expression.Right);
+            }
+
+            foreach (var argument in expression.Arguments)
+            {
+                PopulateExpressionSourceSpans(argument);
+            }
+
+            if (expression.SourceSpan != null)
+            {
+                return;
+            }
+
+            var children = new[] { expression.Left, expression.Right }
+                .Concat(expression.Arguments)
+                .Where(child => child?.SourceSpan != null)
+                .Select(child => child!.SourceSpan!.Value)
+                .ToList();
+            if (children.Count == 0)
+            {
+                return;
+            }
+
+            var first = children[0];
+            var last = children[^1];
+            expression.SourceSpan = new SourceSpan(first.StartLine, first.StartColumn, last.EndLine, last.EndColumn);
         }
 
         private sealed class ExpressionParser
@@ -2071,25 +2109,44 @@ namespace Puma
                 }
 
                 var token = _tokens[_index++];
+                var sourceSpan = new SourceSpan(
+                    token.StartLine,
+                    token.StartColumn,
+                    token.StartLine,
+                    token.StartColumn + token.TokenText.Length);
                 if (token.Category is TokenCategory.Identifier or TokenCategory.Keyword)
                 {
-                    return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = token.TokenText };
+                    return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = token.TokenText, SourceSpan = sourceSpan };
                 }
 
                 if (token.Category is TokenCategory.StringLiteral or TokenCategory.NumericLiteral or TokenCategory.CharLiteral)
                 {
+                    string? declaredType = null;
                     if (token.Category == TokenCategory.NumericLiteral
                         && _index < _tokens.Count
                         && (_tokens[_index].Category is TokenCategory.Identifier or TokenCategory.Keyword)
                         && IsNumericTypeSuffix(_tokens[_index].TokenText))
                     {
+                        declaredType = _tokens[_index].TokenText;
+                        var suffix = _tokens[_index];
+                        sourceSpan = new SourceSpan(
+                            token.StartLine,
+                            token.StartColumn,
+                            suffix.StartLine,
+                            suffix.StartColumn + suffix.TokenText.Length);
                         _index++;
                     }
 
-                    return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText };
+                    return new ExpressionNode
+                    {
+                        Kind = ExpressionKind.Literal,
+                        Value = token.TokenText,
+                        DeclaredType = declaredType,
+                        SourceSpan = sourceSpan
+                    };
                 }
 
-                return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText };
+                return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText, SourceSpan = sourceSpan };
             }
 
             private bool MatchOperator(string op)

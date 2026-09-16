@@ -154,6 +154,40 @@ int main()
         }
 
         [TestMethod]
+        public void NumericExpression_AstRetainsSuffixTypesAndSourceSpans()
+        {
+            const string src =
+@"start
+    value = 1 uint8 + 2 int16
+";
+            const string expected =
+@"// start
+int main()
+{
+    auto value = 1 + 2;
+
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var ast = parser.Parse(lexer.Tokenize(src));
+            var assignment = (AssignmentStatementAstNode)ast.Single(node => node.Kind == NodeKind.AssignmentStatement);
+            var expression = assignment.AssignmentRightExpression;
+
+            Assert.IsNotNull(expression);
+            Assert.AreEqual(ExpressionKind.Binary, expression.Kind);
+            Assert.AreEqual(new SourceSpan(2, 13, 2, 30), expression.SourceSpan);
+            Assert.AreEqual("uint8", expression.Left?.DeclaredType);
+            Assert.AreEqual(new SourceSpan(2, 13, 2, 20), expression.Left?.SourceSpan);
+            Assert.AreEqual("int16", expression.Right?.DeclaredType);
+            Assert.AreEqual(new SourceSpan(2, 23, 2, 30), expression.Right?.SourceSpan);
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(codegen.Generate(ast)).Trim());
+        }
+
+        [TestMethod]
         public void StringAssignment_CodegenDependencies_AreExplicit()
         {
             const string src =
