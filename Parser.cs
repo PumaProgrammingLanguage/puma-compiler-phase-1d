@@ -123,6 +123,7 @@ namespace Puma
         private int? _currentRecordPackSize;
         private List<string> _currentRecordMembers = new();
         private Dictionary<string, string> _currentRecordMemberTypes = new(StringComparer.Ordinal);
+        private List<RecordMemberInfo> _currentRecordMemberDeclarations = new();
         private int? _propertiesSectionIndent;
         private FileDeclarationKind _currentFileKind;
         private Node? _currentSectionNode;
@@ -399,6 +400,7 @@ namespace Puma
             _currentRecordPackSize = null;
             _currentRecordMembers = new List<string>();
             _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+                    _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
             _propertiesSectionIndent = null;
             _currentFileKind = FileDeclarationKind.None;
             _currentSectionNode = null;
@@ -1090,16 +1092,26 @@ namespace Puma
                     var left = BuildQualifiedName(memberTokens.Take(equalsIndex));
                     var rightTokens = memberTokens.Skip(equalsIndex + 1).ToList();
                     var right = NormalizeAssignedValueTokens(rightTokens);
+                    var valueExpression = ParseExpression(rightTokens);
+                    string? declaredType = null;
                     if (TryExtractNumericLiteralWithSuffix(rightTokens, out _, out var memberType)
                         && !string.IsNullOrWhiteSpace(left))
                     {
                         _currentRecordMemberTypes[left] = memberType;
+                        declaredType = memberType;
                     }
                     memberName = $"{left}={right}";
+                    _currentRecordMemberDeclarations.Add(new RecordMemberInfo
+                    {
+                        Name = left,
+                        DeclaredType = declaredType,
+                        ValueExpression = valueExpression
+                    });
                 }
                 else
                 {
                     memberName = BuildQualifiedName(memberTokens);
+                    _currentRecordMemberDeclarations.Add(new RecordMemberInfo { Name = memberName });
                 }
 
                 if (!string.IsNullOrWhiteSpace(memberName))
@@ -2142,6 +2154,7 @@ namespace Puma
                 {
                     typedRecordNode.RecordMemberTypes[pair.Key] = pair.Value;
                 }
+                typedRecordNode.MemberDeclarations.AddRange(_currentRecordMemberDeclarations);
             }
 
             ast.Add(node);
@@ -2149,6 +2162,7 @@ namespace Puma
             _currentRecordPackSize = null;
             _currentRecordMembers = new List<string>();
             _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+            _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
         }
 
         private Node? ParsePropertyDeclaration(LexerTokens firstToken)

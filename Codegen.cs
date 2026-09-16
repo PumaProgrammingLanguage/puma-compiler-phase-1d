@@ -349,8 +349,8 @@ namespace Puma
         {
             foreach (var node in ast.Where(n => n.Kind == NodeKind.RecordDeclaration))
             {
-                var recordMembers = GetRecordMembers(node);
-                var hasAssignedMembers = recordMembers.Any(m => m.Contains('=', StringComparison.Ordinal));
+                var recordMembers = GetRecordMemberDeclarations(node);
+                var hasAssignedMembers = recordMembers.Any(m => m.ValueExpression != null);
                 var packedSuffix = GetRecordPackSize(node).HasValue ? " [[gnu::packed]]" : string.Empty;
                 if (hasAssignedMembers)
                 {
@@ -359,18 +359,14 @@ namespace Puma
                     sb.AppendLine("{");
                     foreach (var member in recordMembers)
                     {
-                        var equalsIndex = member.IndexOf('=');
-                        if (equalsIndex > 0)
+                        if (member.ValueExpression != null)
                         {
-                            var memberName = member[..equalsIndex];
-                            var value = member[(equalsIndex + 1)..];
-                            TryGetRecordMemberType(node, memberName, out var declaredType);
-                            var initializer = FormatAutoPropertyInitializer(value, declaredType);
-                            sb.AppendLine($"    auto {memberName} = {initializer};");
+                            var initializer = FormatAutoPropertyInitializer(GenerateExpression(member.ValueExpression), member.DeclaredType);
+                            sb.AppendLine($"    auto {member.Name} = {initializer};");
                         }
                         else
                         {
-                            sb.AppendLine($"    int {member};");
+                            sb.AppendLine($"    int {member.Name};");
                         }
                     }
                     sb.AppendLine("};");
@@ -381,8 +377,8 @@ namespace Puma
                 sb.AppendLine($"typedef struct {GetRecordName(node)} {{");
                 foreach (var member in recordMembers)
                 {
-                    var memberType = string.Equals(member, "Name", StringComparison.Ordinal) ? "stdstr" : "int";
-                    sb.AppendLine($"    {memberType} {member};");
+                    var memberType = string.Equals(member.Name, "Name", StringComparison.Ordinal) ? "stdstr" : "int";
+                    sb.AppendLine($"    {memberType} {member.Name};");
                 }
                 sb.AppendLine($"}} {GetRecordName(node)};");
                 sb.AppendLine();
@@ -616,6 +612,13 @@ namespace Puma
             return node is RecordDeclarationAstNode typedNode
                 ? typedNode.RecordMembers
                 : new List<string>();
+        }
+
+        private static List<RecordMemberInfo> GetRecordMemberDeclarations(Node node)
+        {
+            return node is RecordDeclarationAstNode typedNode
+                ? typedNode.MemberDeclarations
+                : new List<RecordMemberInfo>();
         }
 
         private static bool TryGetRecordMemberType(Node node, string memberName, out string? declaredType)

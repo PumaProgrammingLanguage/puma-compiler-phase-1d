@@ -97,12 +97,20 @@ namespace Puma
         }
     }
 
+    internal sealed class RecordMemberInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? DeclaredType { get; set; }
+        public ExpressionNode? ValueExpression { get; set; }
+    }
+
     internal sealed class RecordDeclarationAstNode : Node
     {
         public string? RecordName { get; set; }
         public int? RecordPackSize { get; set; }
         public List<string> RecordMembers { get; } = new();
         public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
+        public List<RecordMemberInfo> MemberDeclarations { get; } = new();
 
         public RecordDeclarationAstNode()
         {
