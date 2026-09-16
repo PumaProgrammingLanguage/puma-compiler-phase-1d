@@ -966,6 +966,8 @@ auto f = (uint8_t)6;
             var ast = parser.Parse(tokens);
             var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
             CollectionAssert.AreEqual(new[] { "a=false", "b=true", "c=bool", "d=\"\"", "e=str" }, record.RecordMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, record.MemberDeclarations.Select(member => member.Name).ToArray());
+            CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, record.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
