@@ -51,10 +51,12 @@ Recent updates
 - Fixed nullable reference warnings in `Codegen.cs`, resolved all compiler warnings, and enabled `TreatWarningsAsErrors=True` in `Puma.csproj`.
 - Began AST semantic-model migration: property initializers now retain `ExpressionNode` trees; code generation emits assignments, calls, control-flow conditions, ownership checks, and property initializers from structured expressions. Added exact structured-expression output and incomplete-AST diagnostics coverage; all 162 tests pass. Remaining migration work is source-text use for type inference, include selection, and ownership-name analysis.
 - Continued AST semantic-model migration: expression nodes now retain recursive source spans and numeric suffix metadata; assignment validation and declaration inference use structured nodes; record members retain structured declarations and are emitted without substring parsing. Removed duplicate assignment fields and obsolete raw-expression codegen accessors. The legacy raw fields retained for parser compatibility still prevent marking the overall migration task complete.
+- Completed the typed-expression emission increment: explicit numeric casts and fixed-width integer header dependencies now come from expression metadata, and typed local declarations no longer consult legacy assignment inference. Fixed the text-based initializer classification that introduced blank-line regressions. Added exact return/call/cast/unary/conditional coverage and native compilation of nested integer casts; all 172 tests pass in Debug and Release, and the solution build passes. Task #1 remains open for remaining raw-text semantics.
 
 1) Unit test TODO list
 
-
+1. Add global numeric return-signature mapping coverage (`int32` must emit `int32_t`), including native compilation; current global codegen emits the Puma return type verbatim.
+2. Extend exact-output and source-text-independence coverage as remaining raw-text initializer/type and record-dependency paths are migrated.
 
 2) Separate special-feature TODO list - On hold until core language features are implemented
 
@@ -64,4 +66,6 @@ Recent updates
 4. Add postponed tests for `override` behavior.
 5. Add postponed tests for range operator `..` scenarios.
 6. Add postponed tests for boxing/unboxing scenarios.
+7. Retain remaining readonly/reference-mutability edge cases in the postponed special-feature backlog.
+8. Retain additional optional property/local-variable edge cases in the postponed special-feature backlog.
 

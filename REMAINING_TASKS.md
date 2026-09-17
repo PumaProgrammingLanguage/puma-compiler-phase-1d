@@ -5,9 +5,17 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
 ## 1. AST Semantic-Model Migration
 
 - [ ] Make structured `ExpressionNode` trees authoritative for expression semantics.
+  - [x] Emit explicitly typed numeric literals from expression metadata in nested expressions, calls, and returns.
+  - [x] Infer typed local declarations without consulting legacy assignment inference fields.
+  - [x] Discover fixed-width integer header dependencies by traversing structured expressions.
 - [ ] Retain source text and source spans only for diagnostics.
 - [ ] Remove raw string fallback generation incrementally after each syntax path has complete structured AST coverage.
 - [ ] Add exact compiler-module regression coverage for each migrated path.
+  - [x] Validate typed literal, unary, conditional, cast, and call-argument output, plus native compilation of nested integer casts.
+
+Typed-expression validation: 172/172 tests passed in Debug and Release; solution build passed. The broader migration remains open because raw-text initializer/type helpers and legacy record-member dependency paths still exist.
+
+- [ ] Map global numeric function return signatures to C++ types (for example, `int32` to `int32_t`) and add exact-output/native compilation coverage. This pre-existing issue was discovered during typed-return testing; current return-expression regressions use the supported `int` signature.
 
 ## 2. Broader Location-Aware Diagnostics
 

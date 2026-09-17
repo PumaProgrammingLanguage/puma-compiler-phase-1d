@@ -42,6 +42,11 @@ namespace Puma
 
             var allNodes = EnumerateAllNodes(ast).ToList();
 
+            if (allNodes.SelectMany(GetExpressionRoots).Any(RequiresTypedIntegerHeader))
+            {
+                includes.Add("<cstdint>");
+            }
+
             var needsStdBool = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
                 && GetAssignmentOperator(n) == "="
                 && (ContainsBooleanKeyword(GetAssignmentRightExpression(n))
@@ -1938,7 +1943,9 @@ namespace Puma
                 ExpressionKind.Identifier => string.Equals(node.Value, "none", StringComparison.OrdinalIgnoreCase)
                     ? "null"
                     : node.Value ?? string.Empty,
-                ExpressionKind.Literal => node.Value ?? string.Empty,
+                ExpressionKind.Literal => !string.IsNullOrWhiteSpace(node.DeclaredType)
+                    ? $"({MapType(node.DeclaredType) ?? node.DeclaredType}){node.Value}"
+                    : node.Value ?? string.Empty,
                 ExpressionKind.Unary => string.Equals(node.Value, "not", StringComparison.Ordinal)
                     ? $"!{GenerateExpression(node.Left)}"
                     : $"{node.Value}{GenerateExpression(node.Left)}",
@@ -2392,8 +2399,7 @@ namespace Puma
             string typeName;
             string value;
             var structuredInitializer = GenerateExpression(GetAssignmentRightExpression(statement));
-            if (structuredInitializer.StartsWith("(", StringComparison.Ordinal)
-                && structuredInitializer.IndexOf(')') > 1)
+            if (GetAssignmentRightExpression(statement)?.Kind is ExpressionKind.Cast or ExpressionKind.Binary or ExpressionKind.Conditional)
             {
                 typeName = "int64_t";
                 value = structuredInitializer;
@@ -2548,24 +2554,6 @@ namespace Puma
 
         private static bool TryGetTypedLiteralDeclaration(Node statement, out string typeName, out string literalValue)
         {
-            if (statement is AssignmentStatementAstNode
-                {
-                    AssignmentInferredType: { } inferredType,
-                    AssignmentRightExpression: { } expression
-                })
-            {
-                if (inferredType is "flt" or "flt32" or "flt64")
-                {
-                    typeName = MapType(inferredType) ?? inferredType;
-                    literalValue = GenerateExpression(expression);
-                    return true;
-                }
-
-                typeName = MapType(inferredType) ?? inferredType;
-                literalValue = GenerateExpression(expression);
-                return true;
-            }
-
             return TryGetTypedLiteralDeclaration(GetAssignmentRightExpression(statement), out typeName, out literalValue);
         }
 
@@ -2752,6 +2740,41 @@ namespace Puma
             };
 
             return true;
+        }
+
+        private static IEnumerable<ExpressionNode?> GetExpressionRoots(Node node) => node switch
+        {
+            AssignmentStatementAstNode assignment => new[] { assignment.AssignmentLeftExpression, assignment.AssignmentRightExpression },
+            PropertyDeclarationAstNode property => new[] { property.PropertyValueExpression },
+            RecordDeclarationAstNode record => record.MemberDeclarations.Select(member => member.ValueExpression),
+            TypeDeclarationAstNode type => type.TypeProperties.SelectMany(GetExpressionRoots),
+            FunctionCallAstNode call => new[] { call.Expression },
+            IfStatementAstNode conditional => new[] { conditional.ConditionExpression },
+            MatchStatementAstNode match => new[] { match.ExpressionNode },
+            WhenStatementAstNode whenStatement => new[] { whenStatement.WhenExpression },
+            WhileStatementAstNode loop => new[] { loop.WhileExpression },
+            ForStatementAstNode loop => new[] { loop.ForContainerExpression },
+            ForAllStatementAstNode loop => new[] { loop.ForContainerExpression },
+            RepeatStatementAstNode loop => new[] { loop.RepeatExpressionNode },
+            HasStatementAstNode has => new[] { has.HasExpression },
+            HasTraitStatementAstNode has => new[] { has.HasTraitExpression },
+            StatementAstNode statement => new[] { statement.StatementExpression },
+            _ => Enumerable.Empty<ExpressionNode?>()
+        };
+
+        private static bool RequiresTypedIntegerHeader(ExpressionNode? expression)
+        {
+            if (expression == null)
+            {
+                return false;
+            }
+
+            var type = expression.Kind == ExpressionKind.Cast ? expression.Value : expression.DeclaredType;
+            return MapType(type) is "int64_t" or "int32_t" or "int16_t" or "int8_t"
+                    or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t"
+                || RequiresTypedIntegerHeader(expression.Left)
+                || RequiresTypedIntegerHeader(expression.Right)
+                || expression.Arguments.Any(RequiresTypedIntegerHeader);
         }
 
         private static IEnumerable<Node> EnumerateAllNodes(IEnumerable<Node> nodes)

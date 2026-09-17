@@ -161,10 +161,12 @@ int main()
     value = 1 uint8 + 2 int16
 ";
             const string expected =
-@"// start
+@"#include <cstdint>
+
+// start
 int main()
 {
-    auto value = 1 + 2;
+    auto value = (uint8_t)1 + (int16_t)2;
 
     return 0;
 }
@@ -214,17 +216,18 @@ int main()
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(result.SourceCode).Trim());
         }
 
-        [TestMethod]
-        public void GeneratedRuntimeIndependentCpp_CompilesWithClang()
+        [DataTestMethod]
+        [DataRow("42", "(int64_t)42;\n")]
+        [DataRow("1 uint8 + 2 int16", "(uint8_t)1 + (int16_t)2;\n\n")]
+        public void GeneratedRuntimeIndependentCpp_CompilesWithClang(string expression, string expectedInitializer)
         {
-            const string src =
-@"start
-    value = 42
-";
+            var src = $"start\n    value = {expression}\n";
+            var expected = $"#include <cstdint>\n\n// start\nint main()\n{{\n    auto value = {expectedInitializer}    return 0;\n}}";
             var lexer = new Puma.Lexer();
             var parser = new Puma.Parser();
             var codegen = new Puma.Codegen();
             var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
+            Assert.AreEqual(expected, Normalize(generated).Trim());
             var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
             var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -874,9 +877,9 @@ void Consume(int32_t a, int32_t b, int32_t c)
 
 void Caller(void)
 {
-    x = 1;
-    y = 2;
-    z = 3;
+    x = (int16_t)1;
+    y = (int16_t)2;
+    z = (int16_t)3;
     Consume((x + y), ((x > 0) ? x : y), z);
 }
 ";

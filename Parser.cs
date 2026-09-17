@@ -1922,7 +1922,12 @@ namespace Puma
                     var castOperand = ParseUnary();
                     if (castOperand != null)
                     {
-                        return new ExpressionNode { Kind = ExpressionKind.Cast, Value = castType, Left = castOperand };
+                        return new ExpressionNode
+                        {
+                            Kind = ExpressionKind.Cast,
+                            Value = castType,
+                            Left = castOperand
+                        };
                     }
                 }
                 _index = castStart;
@@ -1941,7 +1946,13 @@ namespace Puma
                     {
                         throw CreateParserException("Unary operators cannot be repeated consecutively.", _tokens[_index - 1]);
                     }
-                    return new ExpressionNode { Kind = ExpressionKind.Unary, Value = op, Left = operand };
+                    return new ExpressionNode
+                    {
+                        Kind = ExpressionKind.Unary,
+                        Value = op,
+                        Left = operand,
+                        DeclaredType = operand?.DeclaredType
+                    };
                 }
 
                 return ParsePostfix();
@@ -1959,7 +1970,12 @@ namespace Puma
                     {
                         var castType = _tokens[_index].TokenText;
                         _index++;
-                        expr = new ExpressionNode { Kind = ExpressionKind.Cast, Value = castType, Left = expr };
+                        expr = new ExpressionNode
+                        {
+                            Kind = ExpressionKind.Cast,
+                            Value = castType,
+                            Left = expr
+                        };
                         continue;
                     }
 
