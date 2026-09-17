@@ -8,12 +8,16 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
   - [x] Emit explicitly typed numeric literals from expression metadata in nested expressions, calls, and returns.
   - [x] Infer typed local declarations without consulting legacy assignment inference fields.
   - [x] Discover fixed-width integer header dependencies by traversing structured expressions.
+  - [x] Use structured record initializers for literal formatting and bool/string/character/integer dependencies.
 - [ ] Retain source text and source spans only for diagnostics.
+  - [x] Remove duplicate record `name=value` strings, member-type dictionaries, and redundant member type metadata.
 - [ ] Remove raw string fallback generation incrementally after each syntax path has complete structured AST coverage.
+  - [x] Remove record substring-based codegen and emit record initializers directly from expression nodes.
 - [ ] Add exact compiler-module regression coverage for each migrated path.
   - [x] Validate typed literal, unary, conditional, cast, and call-argument output, plus native compilation of nested integer casts.
+  - [x] Validate record numeric forms, runtime headers, initializer AST changes, and parser reuse with exact-output tests.
 
-Typed-expression validation: 172/172 tests passed in Debug and Release; solution build passed. The broader migration remains open because raw-text initializer/type helpers and legacy record-member dependency paths still exist.
+Latest validation: 176/176 tests passed in Debug and Release; solution build passed. Record string dependencies have been removed. The broader migration remains open for raw-text property initializer/type helpers and other legacy semantic paths. Next: migrate property initializer formatting and type selection to structured expressions.
 
 - [ ] Map global numeric function return signatures to C++ types (for example, `int32` to `int32_t`) and add exact-output/native compilation coverage. This pre-existing issue was discovered during typed-return testing; current return-expression regressions use the supported `int` signature.
 

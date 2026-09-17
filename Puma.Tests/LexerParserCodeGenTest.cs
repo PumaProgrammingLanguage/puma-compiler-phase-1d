@@ -965,7 +965,6 @@ auto f = (uint8_t)6;
 
             var ast = parser.Parse(tokens);
             var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "a=false", "b=true", "c=bool", "d=\"\"", "e=str" }, record.RecordMembers.ToArray());
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, record.MemberDeclarations.Select(member => member.Name).ToArray());
             CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, record.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
 
@@ -1023,7 +1022,9 @@ struct MyRecord
 
             var ast = parser.Parse(tokens);
             var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "a=1", "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, record.MemberDeclarations.Select(member => member.Name).ToArray());
+            CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, record.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
+            CollectionAssert.AreEqual(new string?[] { null, "int", "int64", "int32", "int16", "int8" }, record.MemberDeclarations.Select(member => member.ValueExpression?.DeclaredType).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1078,7 +1079,9 @@ struct MyRecord
 
             var ast = parser.Parse(tokens);
             var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, record.MemberDeclarations.Select(member => member.Name).ToArray());
+            CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, record.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
+            CollectionAssert.AreEqual(new[] { "uint", "uint64", "uint32", "uint16", "uint8" }, record.MemberDeclarations.Select(member => member.ValueExpression?.DeclaredType).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =

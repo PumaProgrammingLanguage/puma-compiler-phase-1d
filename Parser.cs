@@ -121,8 +121,6 @@ namespace Puma
         private int? _recordSectionIndent;
         private string? _currentRecordName;
         private int? _currentRecordPackSize;
-        private List<string> _currentRecordMembers = new();
-        private Dictionary<string, string> _currentRecordMemberTypes = new(StringComparer.Ordinal);
         private List<RecordMemberInfo> _currentRecordMemberDeclarations = new();
         private int? _propertiesSectionIndent;
         private FileDeclarationKind _currentFileKind;
@@ -398,9 +396,7 @@ namespace Puma
             _recordSectionIndent = null;
             _currentRecordName = null;
             _currentRecordPackSize = null;
-            _currentRecordMembers = new List<string>();
-            _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
-                    _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
+            _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
             _propertiesSectionIndent = null;
             _currentFileKind = FileDeclarationKind.None;
             _currentSectionNode = null;
@@ -1047,8 +1043,7 @@ namespace Puma
                 if (!string.IsNullOrWhiteSpace(name))
                 {
                     _currentRecordName = name;
-                    _currentRecordMembers = new List<string>();
-                    _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+                    _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
                     _currentRecordPackSize = null;
 
                     if (packIndex >= 0)
@@ -1086,37 +1081,21 @@ namespace Puma
                 }
 
                 var equalsIndex = memberTokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
-                string memberName;
+                var memberName = BuildQualifiedName(equalsIndex >= 0 ? memberTokens.Take(equalsIndex) : memberTokens);
+                ExpressionNode? valueExpression = null;
                 if (equalsIndex >= 0)
                 {
-                    var left = BuildQualifiedName(memberTokens.Take(equalsIndex));
                     var rightTokens = memberTokens.Skip(equalsIndex + 1).ToList();
-                    var right = NormalizeAssignedValueTokens(rightTokens);
-                    var valueExpression = ParseExpression(rightTokens);
-                    string? declaredType = null;
-                    if (TryExtractNumericLiteralWithSuffix(rightTokens, out _, out var memberType)
-                        && !string.IsNullOrWhiteSpace(left))
-                    {
-                        _currentRecordMemberTypes[left] = memberType;
-                        declaredType = memberType;
-                    }
-                    memberName = $"{left}={right}";
-                    _currentRecordMemberDeclarations.Add(new RecordMemberInfo
-                    {
-                        Name = left,
-                        DeclaredType = declaredType,
-                        ValueExpression = valueExpression
-                    });
-                }
-                else
-                {
-                    memberName = BuildQualifiedName(memberTokens);
-                    _currentRecordMemberDeclarations.Add(new RecordMemberInfo { Name = memberName });
+                    valueExpression = ParseExpression(rightTokens);
                 }
 
                 if (!string.IsNullOrWhiteSpace(memberName))
                 {
-                    _currentRecordMembers.Add(memberName);
+                    _currentRecordMemberDeclarations.Add(new RecordMemberInfo
+                    {
+                        Name = memberName,
+                        ValueExpression = valueExpression
+                    });
                 }
                 return;
             }
@@ -2163,21 +2142,9 @@ namespace Puma
                 return;
             }
 
-            var node = Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers);
-            if (node is RecordDeclarationAstNode typedRecordNode)
-            {
-                foreach (var pair in _currentRecordMemberTypes)
-                {
-                    typedRecordNode.RecordMemberTypes[pair.Key] = pair.Value;
-                }
-                typedRecordNode.MemberDeclarations.AddRange(_currentRecordMemberDeclarations);
-            }
-
-            ast.Add(node);
+            ast.Add(Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMemberDeclarations));
             _currentRecordName = null;
             _currentRecordPackSize = null;
-            _currentRecordMembers = new List<string>();
-            _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
             _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
         }
 

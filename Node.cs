@@ -100,7 +100,6 @@ namespace Puma
     internal sealed class RecordMemberInfo
     {
         public string Name { get; set; } = string.Empty;
-        public string? DeclaredType { get; set; }
         public ExpressionNode? ValueExpression { get; set; }
     }
 
@@ -108,8 +107,6 @@ namespace Puma
     {
         public string? RecordName { get; set; }
         public int? RecordPackSize { get; set; }
-        public List<string> RecordMembers { get; } = new();
-        public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
         public List<RecordMemberInfo> MemberDeclarations { get; } = new();
 
         public RecordDeclarationAstNode()
@@ -429,7 +426,7 @@ namespace Puma
             return node;
         }
 
-        public static Node CreateRecordDeclaration(string name, int? packSize, IEnumerable<string> members)
+        public static Node CreateRecordDeclaration(string name, int? packSize, IEnumerable<RecordMemberInfo> members)
         {
             var node = new RecordDeclarationAstNode
             {
@@ -438,7 +435,7 @@ namespace Puma
             };
             foreach (var member in members)
             {
-                node.RecordMembers.Add(member);
+                node.MemberDeclarations.Add(member);
             }
             return node;
         }

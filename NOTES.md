@@ -52,11 +52,13 @@ Recent updates
 - Began AST semantic-model migration: property initializers now retain `ExpressionNode` trees; code generation emits assignments, calls, control-flow conditions, ownership checks, and property initializers from structured expressions. Added exact structured-expression output and incomplete-AST diagnostics coverage; all 162 tests pass. Remaining migration work is source-text use for type inference, include selection, and ownership-name analysis.
 - Continued AST semantic-model migration: expression nodes now retain recursive source spans and numeric suffix metadata; assignment validation and declaration inference use structured nodes; record members retain structured declarations and are emitted without substring parsing. Removed duplicate assignment fields and obsolete raw-expression codegen accessors. The legacy raw fields retained for parser compatibility still prevent marking the overall migration task complete.
 - Completed the typed-expression emission increment: explicit numeric casts and fixed-width integer header dependencies now come from expression metadata, and typed local declarations no longer consult legacy assignment inference. Fixed the text-based initializer classification that introduced blank-line regressions. Added exact return/call/cast/unary/conditional coverage and native compilation of nested integer casts; all 172 tests pass in Debug and Release, and the solution build passes. Task #1 remains open for remaining raw-text semantics.
+- Completed the record semantic-model increment: removed duplicate record strings/type dictionaries and redundant member type metadata; initializer formatting and header selection now use expression nodes. Fixed truncated exponent/signed/hex initializers, missing character headers, and stale dependencies after AST changes. Four new compiler-module regressions pass; all 176 tests pass in Debug and Release, and the solution build passes. Existing record C++ expectations remain unchanged; property initializer/type helpers are the next migration target.
+- Release validation reports MSB3270 because the MSIL test project references the AMD64 compiler assembly. Tests pass; project architecture alignment remains a separate follow-up, and no project settings were changed in the record migration.
 
 1) Unit test TODO list
 
 1. Add global numeric return-signature mapping coverage (`int32` must emit `int32_t`), including native compilation; current global codegen emits the Puma return type verbatim.
-2. Extend exact-output and source-text-independence coverage as remaining raw-text initializer/type and record-dependency paths are migrated.
+2. Extend exact-output and source-text-independence coverage as remaining raw-text property initializer/type and other semantic paths are migrated; record dependency coverage is complete for this increment.
 
 2) Separate special-feature TODO list - On hold until core language features are implemented
 

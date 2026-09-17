@@ -88,40 +88,32 @@ namespace Puma
                 includes.Add("<PumaType/Character.hpp>");
             }
 
-            var needsStdBoolForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .SelectMany(GetRecordMembers)
-                .Any(m =>
-                {
-                    var value = GetRecordMemberValue(m);
-                    return IsBooleanPropertyValue(value);
-                });
+            var recordInitializers = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
+                .SelectMany(GetRecordMemberDeclarations)
+                .Select(member => member.ValueExpression)
+                .ToList();
+            var needsStdBoolForRecords = recordInitializers.Any(ContainsBooleanKeyword);
             if (needsStdBoolForRecords)
             {
                 includes.Add("<stdbool>");
             }
 
-            var needsStringForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .SelectMany(GetRecordMembers)
-                .Any(m =>
-                {
-                    var value = GetRecordMemberValue(m);
-                    return IsStringPropertyValue(value);
-                });
+            var needsStringForRecords = recordInitializers.Any(expression =>
+                IsIdentifier(expression, "str") || ContainsStringLiteral(expression));
             if (needsStringForRecords)
             {
                 includes.Add("<PumaType/String.hpp>");
             }
 
-            var needsCStdIntForRecords = ast.Where(n => n.Kind == NodeKind.RecordDeclaration)
-                .Any(record => GetRecordMembers(record).Any(member =>
-                {
-                    var value = GetRecordMemberValue(member);
-                    var memberName = member.Contains('=', StringComparison.Ordinal)
-                        ? member[..member.IndexOf('=')]
-                        : member;
-                    TryGetRecordMemberType(record, memberName, out var declaredType);
-                    return RequiresFixedWidthIntegerCast(value, declaredType);
-                }));
+            if (recordInitializers.Any(ContainsCharacterLiteral))
+            {
+                includes.Add("<PumaType/Character.hpp>");
+            }
+
+            var needsCStdIntForRecords = recordInitializers.Any(expression =>
+                TryGetTypedLiteralDeclaration(expression, out var typeName, out _)
+                && typeName is "int64_t" or "int32_t" or "int16_t" or "int8_t"
+                    or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t");
             if (needsCStdIntForRecords)
             {
                 includes.Add("<cstdint>");
@@ -366,7 +358,7 @@ namespace Puma
                     {
                         if (member.ValueExpression != null)
                         {
-                            var initializer = FormatAutoPropertyInitializer(GenerateExpression(member.ValueExpression), member.DeclaredType);
+                            var initializer = FormatRecordInitializer(member.ValueExpression);
                             sb.AppendLine($"    auto {member.Name} = {initializer};");
                         }
                         else
@@ -390,88 +382,21 @@ namespace Puma
             }
         }
 
-        private static string? GetRecordMemberValue(string member)
+        private static string FormatRecordInitializer(ExpressionNode expression)
         {
-            var equalsIndex = member.IndexOf('=');
-            if (equalsIndex < 0 || equalsIndex + 1 >= member.Length)
+            if (TryGetTypedLiteralDeclaration(expression, out var typeName, out var literalValue))
             {
-                return null;
-            }
-
-            return member[(equalsIndex + 1)..];
-        }
-
-        private static string FormatRecordMemberDeclaration(string member, string? declaredType)
-        {
-            var equalsIndex = member.IndexOf('=');
-            if (equalsIndex <= 0)
-            {
-                return $"int {member};";
-            }
-
-            var name = member[..equalsIndex];
-            var value = member[(equalsIndex + 1)..];
-
-            if (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "false", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"bool {name} = {value.ToLowerInvariant()};";
-            }
-
-            if (string.Equals(value, "bool", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"bool {name} = false;";
-            }
-
-            if (string.Equals(value, "str", StringComparison.OrdinalIgnoreCase) || value.StartsWith("\"", StringComparison.Ordinal))
-            {
-                var literal = string.Equals(value, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : value;
-                return $"str:string {name} = {literal}s;";
-            }
-
-            var index = 0;
-            var dotSeen = false;
-            while (index < value.Length)
-            {
-                var ch = value[index];
-                if (char.IsDigit(ch))
+                return typeName switch
                 {
-                    index++;
-                    continue;
-                }
-
-                if (ch == '.' && !dotSeen)
-                {
-                    dotSeen = true;
-                    index++;
-                    continue;
-                }
-
-                break;
+                    "bool" => literalValue,
+                    "PumaType::String" => ToPumaStringLiteral(literalValue),
+                    "PumaType::Character" => $"Character({literalValue})",
+                    _ => $"({typeName}){literalValue}"
+                };
             }
 
-            if (index == 0)
-            {
-                return $"int {name} = {value};";
-            }
-
-            var numeric = value[..index];
-            var suffix = value[index..];
-            var effectiveType = !string.IsNullOrWhiteSpace(declaredType) ? declaredType : suffix;
-            var typeName = effectiveType switch
-            {
-                "" or "int" or "int64" => "int64_t",
-                "int32" => "int32_t",
-                "int16" => "int16_t",
-                "int8" => "int8_t",
-                "uint" or "uint64" => "uint64_t",
-                "uint32" => "uint32_t",
-                "uint16" => "uint16_t",
-                "uint8" => "uint8_t",
-                _ => "int64_t"
-            };
-
-            return $"{typeName} {name} = {numeric};";
+            var initializer = GenerateExpression(expression);
+            return IsObjectConstructorCall(expression) ? $"new {initializer}" : initializer;
         }
 
         private static void EmitGlobals(List<Node> ast, StringBuilder sb, HashSet<Node> typeProperties)
@@ -612,31 +537,11 @@ namespace Puma
                 : null;
         }
 
-        private static List<string> GetRecordMembers(Node node)
-        {
-            return node is RecordDeclarationAstNode typedNode
-                ? typedNode.RecordMembers
-                : new List<string>();
-        }
-
         private static List<RecordMemberInfo> GetRecordMemberDeclarations(Node node)
         {
             return node is RecordDeclarationAstNode typedNode
                 ? typedNode.MemberDeclarations
                 : new List<RecordMemberInfo>();
-        }
-
-        private static bool TryGetRecordMemberType(Node node, string memberName, out string? declaredType)
-        {
-            if (node is RecordDeclarationAstNode typedNode
-                && typedNode.RecordMemberTypes.TryGetValue(memberName, out var recordType))
-            {
-                declaredType = recordType;
-                return true;
-            }
-
-            declaredType = null;
-            return false;
         }
 
         private static string? GetAssignmentOperator(Node node)
@@ -2543,12 +2448,17 @@ namespace Puma
                 return true;
             }
 
-            if (literal.Kind != ExpressionKind.Literal || !char.IsDigit(value.TrimStart('+', '-')[0]))
+            var unsignedValue = value.TrimStart('+', '-');
+            if (literal.Kind != ExpressionKind.Literal || unsignedValue.Length == 0 || !char.IsDigit(unsignedValue[0]))
             {
                 return false;
             }
 
-            typeName = MapType(literal.DeclaredType) ?? (value.Contains('.') || value.Contains('e') || value.Contains('E') ? "double" : "int64_t");
+            var isPrefixedInteger = unsignedValue.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                || unsignedValue.StartsWith("0b", StringComparison.OrdinalIgnoreCase)
+                || unsignedValue.StartsWith("0o", StringComparison.OrdinalIgnoreCase);
+            var isFloatingPoint = !isPrefixedInteger && (value.Contains('.') || value.Contains('e') || value.Contains('E'));
+            typeName = MapType(literal.DeclaredType) ?? (isFloatingPoint ? "double" : "int64_t");
             return true;
         }
 
