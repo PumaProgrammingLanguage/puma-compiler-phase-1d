@@ -135,7 +135,8 @@ namespace Puma
                     includes.Add("<stdbool>");
                 }
 
-                if (propertyDeclarations.Any(p => ContainsStringLiteral(GetPropertyValueExpression(p))))
+                if (propertyDeclarations.Any(p => ContainsStringLiteral(GetPropertyValueExpression(p))
+                    || IsIdentifier(GetPropertyValueExpression(p), "str")))
                 {
                     includes.Add("<PumaType/String.hpp>");
                 }
@@ -358,7 +359,7 @@ namespace Puma
                     {
                         if (member.ValueExpression != null)
                         {
-                            var initializer = FormatRecordInitializer(member.ValueExpression);
+                            var initializer = FormatInitializer(member.ValueExpression);
                             sb.AppendLine($"    auto {member.Name} = {initializer};");
                         }
                         else
@@ -382,8 +383,13 @@ namespace Puma
             }
         }
 
-        private static string FormatRecordInitializer(ExpressionNode expression)
+        private static string FormatInitializer(ExpressionNode? expression)
         {
+            if (expression == null)
+            {
+                throw new InvalidOperationException("Expression AST node is required for code generation.");
+            }
+
             if (TryGetTypedLiteralDeclaration(expression, out var typeName, out var literalValue))
             {
                 return typeName switch
@@ -409,7 +415,7 @@ namespace Puma
                 sb.AppendLine("// properties");
                 foreach (var node in globalProperties)
                 {
-                    var initializer = FormatAutoPropertyInitializer(GetPropertyInitializer(node), GetPropertyType(node));
+                    var initializer = FormatInitializer(GetPropertyValueExpression(node));
                     sb.AppendLine($"auto {GetPropertyName(node)} = {initializer};");
                 }
 
@@ -427,29 +433,23 @@ namespace Puma
 
             foreach (var node in globalProperties)
             {
-                var propertyValue = GetPropertyInitializer(node);
-                var propertyType = GetPropertyType(node);
+                var propertyExpression = GetPropertyValueExpression(node);
                 var propertyName = GetPropertyName(node);
                 var modifiers = GetPropertyModifiers(node).Contains("const") ? "const " : string.Empty;
-                var trimmed = propertyValue?.Trim() ?? string.Empty;
-                var shouldUseAuto = IsBooleanPropertyValue(propertyValue)
-                    || IsStringPropertyValue(propertyValue)
-                    || RequiresFixedWidthIntegerCast(propertyValue, propertyType)
-                    || double.TryParse(trimmed, out _)
-                    || (!string.IsNullOrWhiteSpace(trimmed)
-                        && (trimmed.Contains('(')
-                            || trimmed.Contains('.')
-                            || trimmed.Contains("::", StringComparison.Ordinal)));
+                var shouldUseAuto = propertyExpression?.Kind != ExpressionKind.Identifier
+                    || IsIdentifier(propertyExpression, "true")
+                    || IsIdentifier(propertyExpression, "false")
+                    || IsIdentifier(propertyExpression, "bool")
+                    || IsIdentifier(propertyExpression, "str");
 
                 if (shouldUseAuto)
                 {
-                    var initializer = FormatAutoPropertyInitializer(propertyValue, propertyType);
+                    var initializer = FormatInitializer(propertyExpression);
                     sb.AppendLine($"{modifiers}auto {propertyName} = {initializer};");
                 }
                 else
                 {
-                    var (type, value) = InferCTypeAndValue(propertyValue);
-                    sb.AppendLine($"{modifiers}{type} {propertyName} = {value};");
+                    sb.AppendLine($"{modifiers}{propertyExpression!.Value} {propertyName} = {{0}};");
                 }
             }
 
@@ -457,29 +457,6 @@ namespace Puma
             {
                 sb.AppendLine();
             }
-        }
-
-        private static bool IsBooleanPropertyValue(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "false", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "bool", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsStringPropertyValue(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            return string.Equals(value, "str", StringComparison.OrdinalIgnoreCase)
-                || value.StartsWith("\"", StringComparison.Ordinal);
         }
 
         private static bool IsCharacterLiteralText(string? value)
@@ -605,15 +582,10 @@ namespace Puma
                 : null;
         }
 
-        private static string GetPropertyInitializer(Node node)
-        {
-            return GenerateExpression(GetPropertyValueExpression(node));
-        }
-
         private static string? GetPropertyType(Node node)
         {
             return node is PropertyDeclarationAstNode typedNode
-                ? typedNode.PropertyType
+                ? typedNode.PropertyValueExpression?.DeclaredType
                 : null;
         }
 
@@ -929,126 +901,6 @@ namespace Puma
                 : null;
         }
 
-        private static string FormatAutoPropertyInitializer(string? value, string? declaredType)
-        {
-            var text = value?.Trim() ?? string.Empty;
-            if (string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(text, "false", StringComparison.OrdinalIgnoreCase))
-            {
-                return text.ToLowerInvariant();
-            }
-
-            if (string.Equals(text, "bool", StringComparison.OrdinalIgnoreCase))
-            {
-                return "false";
-            }
-
-            if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) || text.StartsWith("\"", StringComparison.Ordinal))
-            {
-                var literal = string.Equals(text, "str", StringComparison.OrdinalIgnoreCase) ? "\"\"" : text;
-                return ToPumaStringLiteral(NormalizeAutoStringLiteral(literal));
-            }
-
-            if (IsCharacterLiteralText(text))
-            {
-                return $"Character({text})";
-            }
-
-            if (LooksLikeObjectConstructorCall(text))
-            {
-                return $"new {text}";
-            }
-
-            var sign = string.Empty;
-            var startIndex = 0;
-            if (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal))
-            {
-                sign = text[..1];
-                startIndex = 1;
-            }
-
-            var index = startIndex;
-            var dotSeen = false;
-            while (index < text.Length)
-            {
-                var ch = text[index];
-                if (char.IsDigit(ch))
-                {
-                    index++;
-                    continue;
-                }
-
-                if (ch == '.' && !dotSeen)
-                {
-                    dotSeen = true;
-                    index++;
-                    continue;
-                }
-
-                break;
-            }
-
-            if (index == 0)
-            {
-                return text;
-            }
-
-            var numeric = sign + text[startIndex..index];
-            var suffix = text[index..];
-            var effectiveType = !string.IsNullOrWhiteSpace(declaredType) ? declaredType : suffix;
-            var castType = effectiveType switch
-            {
-                "" => dotSeen ? "double" : "int64_t",
-                "int" or "int64" => "int64_t",
-                "int32" => "int32_t",
-                "int16" => "int16_t",
-                "int8" => "int8_t",
-                "uint" or "uint64" => "uint64_t",
-                "uint32" => "uint32_t",
-                "uint16" => "uint16_t",
-                "uint8" => "uint8_t",
-                "flt" or "flt64" => "double",
-                "flt32" => "float",
-                _ => "int64_t"
-            };
-
-            return $"({castType}){numeric}";
-        }
-
-        private static bool LooksLikeObjectConstructorCall(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            var trimmed = text.Trim();
-            if (trimmed.StartsWith("new ", StringComparison.Ordinal)
-                || !trimmed.EndsWith(")", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            var openIndex = trimmed.IndexOf('(');
-            if (openIndex <= 0)
-            {
-                return false;
-            }
-
-            var ctorName = trimmed[..openIndex].Trim();
-            if (ctorName.Length == 0)
-            {
-                return false;
-            }
-
-            if (ctorName is "List" or "Range" or "Array")
-            {
-                return false;
-            }
-
-            return char.IsUpper(ctorName[0]);
-        }
-
         private static bool IsObjectConstructorCall(ExpressionNode? expression)
         {
             return expression?.Kind == ExpressionKind.Call
@@ -1056,67 +908,6 @@ namespace Puma
                 && expression.Left.Value is { Length: > 0 } name
                 && name is not "List" and not "Range" and not "Array"
                 && char.IsUpper(name[0]);
-        }
-
-        private static bool RequiresFixedWidthIntegerCast(string? value, string? declaredType)
-        {
-            var text = value?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            var signOffset = (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal)) ? 1 : 0;
-            var index = signOffset;
-            var dotSeen = false;
-            while (index < text.Length)
-            {
-                var ch = text[index];
-                if (char.IsDigit(ch))
-                {
-                    index++;
-                    continue;
-                }
-
-                if (ch == '.' && !dotSeen)
-                {
-                    dotSeen = true;
-                    index++;
-                    continue;
-                }
-
-                break;
-            }
-
-            if (index == signOffset)
-            {
-                return false;
-            }
-
-            var suffix = text[index..];
-            var effectiveType = !string.IsNullOrWhiteSpace(declaredType) ? declaredType : suffix;
-            var castType = effectiveType switch
-            {
-                "" => dotSeen ? "double" : "int64_t",
-                "int" or "int64" => "int64_t",
-                "int32" => "int32_t",
-                "int16" => "int16_t",
-                "int8" => "int8_t",
-                "uint" or "uint64" => "uint64_t",
-                "uint32" => "uint32_t",
-                "uint16" => "uint16_t",
-                "uint8" => "uint8_t",
-                "flt" or "flt64" => "double",
-                "flt32" => "float",
-                _ => "int64_t"
-            };
-
-            return castType is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t";
-        }
-
-        private static string NormalizeAutoStringLiteral(string literal)
-        {
-            return literal;
         }
 
         private static string ToPumaStringLiteral(string literal)
@@ -1551,7 +1342,7 @@ namespace Puma
             sb.AppendLine($"{indent}{access}:");
             foreach (var property in properties)
             {
-                var value = FormatAutoPropertyInitializer(GetPropertyInitializer(property), GetPropertyType(property));
+                var value = FormatInitializer(GetPropertyValueExpression(property));
                 var modifiers = GetPropertyModifiers(property).Contains("constant") ? "const " : string.Empty;
                 sb.AppendLine($"{indent}{modifiers}auto {GetPropertyName(property)} = {value};");
             }
@@ -1994,8 +1785,7 @@ namespace Puma
             if (GetAssignmentRightExpression(statement)!.Left?.Kind == ExpressionKind.Identifier)
             {
                 var functionName = GetAssignmentRightExpression(statement)!.Left!.Value ?? string.Empty;
-                var callText = GenerateExpression(GetAssignmentRightExpression(statement));
-                if (LooksLikeObjectConstructorCall(callText))
+                if (IsObjectConstructorCall(GetAssignmentRightExpression(statement)))
                 {
                     ownedLocalsToDelete.Add(leftName);
                     return;
@@ -2178,36 +1968,6 @@ namespace Puma
             }
 
             return name.Replace(".", "::", StringComparison.Ordinal);
-        }
-
-        private static (string Type, string Value) InferCTypeAndValue(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return ("int64_t", "0");
-            }
-
-            if (value.StartsWith("\"", StringComparison.Ordinal))
-            {
-                return ("PumaType::String", value);
-            }
-
-            if (bool.TryParse(value, out _))
-            {
-                return ("bool_t", value.ToLowerInvariant());
-            }
-
-            if (int.TryParse(value, out _))
-            {
-                return ("int64_t", value);
-            }
-
-            if (double.TryParse(value, out _))
-            {
-                return ("double", value);
-            }
-
-            return (value, "{0}");
         }
 
         private static string UnwrapOutermostParentheses(string? expression)

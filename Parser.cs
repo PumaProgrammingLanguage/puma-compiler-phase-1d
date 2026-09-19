@@ -2180,16 +2180,11 @@ namespace Puma
                 }
 
                 var coreValueTokens = valueEnd >= 0 ? valueTokens.Take(valueEnd + 1).ToList() : new List<LexerTokens>();
-                string? propertyType = null;
-                if (TryExtractNumericLiteralWithSuffix(coreValueTokens, out _, out var suffixType))
-                {
-                    propertyType = suffixType;
-                }
                 var value = NormalizeAssignedValueTokens(coreValueTokens);
 
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    var node = Node.CreatePropertyDeclaration(name, value, propertyType, modifiers, ParseExpression(coreValueTokens));
+                    var node = Node.CreatePropertyDeclaration(name, value, ParseExpression(coreValueTokens), modifiers);
                     ast.Add(node);
                     if (modifiers.Contains("optional"))
                     {
@@ -2272,7 +2267,7 @@ namespace Puma
         private static string? GetPropertyType(Node node)
         {
             return node is PropertyDeclarationAstNode typedNode
-                ? typedNode.PropertyType
+                ? typedNode.PropertyValueExpression?.DeclaredType
                 : null;
         }
 

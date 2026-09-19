@@ -54,11 +54,12 @@ Recent updates
 - Completed the typed-expression emission increment: explicit numeric casts and fixed-width integer header dependencies now come from expression metadata, and typed local declarations no longer consult legacy assignment inference. Fixed the text-based initializer classification that introduced blank-line regressions. Added exact return/call/cast/unary/conditional coverage and native compilation of nested integer casts; all 172 tests pass in Debug and Release, and the solution build passes. Task #1 remains open for remaining raw-text semantics.
 - Completed the record semantic-model increment: removed duplicate record strings/type dictionaries and redundant member type metadata; initializer formatting and header selection now use expression nodes. Fixed truncated exponent/signed/hex initializers, missing character headers, and stale dependencies after AST changes. Four new compiler-module regressions pass; all 176 tests pass in Debug and Release, and the solution build passes. Existing record C++ expectations remain unchanged; property initializer/type helpers are the next migration target.
 - Release validation reports MSB3270 because the MSIL test project references the AMD64 compiler assembly. Tests pass; project architecture alignment remains a separate follow-up, and no project settings were changed in the record migration.
+- Completed the property initializer/type-selection increment: properties and records share AST-based initializer formatting; declaration selection and constructor ownership detection no longer parse generated text. Removed duplicate PropertyType metadata and obsolete text-based initializer/type helpers. Fixed truncated numeric property initializers, stale type metadata after AST replacement, and missing default-string headers. Added 11 regression cases; all 187 tests pass in Debug and Release, and the solution build passes. Existing C++ expectations remain unchanged; the known Release architecture warning remains.
 
 1) Unit test TODO list
 
 1. Add global numeric return-signature mapping coverage (`int32` must emit `int32_t`), including native compilation; current global codegen emits the Puma return type verbatim.
-2. Extend exact-output and source-text-independence coverage as remaining raw-text property initializer/type and other semantic paths are migrated; record dependency coverage is complete for this increment.
+2. Add exact-output and AST-authority coverage for structured parameter default expressions, then remaining raw-text validation fallbacks; record and property initializer coverage is complete for these increments.
 
 2) Separate special-feature TODO list - On hold until core language features are implemented
 

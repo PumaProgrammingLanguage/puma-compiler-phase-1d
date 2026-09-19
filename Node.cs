@@ -289,7 +289,6 @@ namespace Puma
         public string? PropertyName { get; set; }
         public string? PropertyValue { get; set; }
         public ExpressionNode? PropertyValueExpression { get; set; }
-        public string? PropertyType { get; set; }
         public List<string> PropertyModifiers { get; } = new();
 
         public PropertyDeclarationAstNode()
@@ -440,14 +439,13 @@ namespace Puma
             return node;
         }
 
-        public static Node CreatePropertyDeclaration(string name, string? value, string? type, IEnumerable<string>? modifiers = null, ExpressionNode? valueExpression = null)
+        public static Node CreatePropertyDeclaration(string name, string? value, ExpressionNode? valueExpression, IEnumerable<string>? modifiers = null)
         {
             var node = new PropertyDeclarationAstNode
             {
                 PropertyName = name,
                 PropertyValue = value,
-                PropertyValueExpression = valueExpression,
-                PropertyType = type
+                PropertyValueExpression = valueExpression
             };
 
             if (modifiers != null)
