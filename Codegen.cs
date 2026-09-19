@@ -41,6 +41,11 @@ namespace Puma
             }
 
             var allNodes = EnumerateAllNodes(ast).ToList();
+            var defaultExpressions = allNodes.SelectMany(GetParameters)
+                .Select(parameter => parameter.DefaultExpression).ToList();
+            if (defaultExpressions.Any(ContainsStringLiteral)) includes.Add("<PumaType/String.hpp>");
+            if (defaultExpressions.Any(ContainsCharacterLiteral)) includes.Add("<PumaType/Character.hpp>");
+            if (defaultExpressions.Any(ContainsBooleanKeyword)) includes.Add("<stdbool>");
 
             if (allNodes.SelectMany(GetExpressionRoots).Any(RequiresTypedIntegerHeader))
             {
@@ -55,7 +60,7 @@ namespace Puma
             {
                 needsStdBool = allNodes.Any(n => n.Kind == NodeKind.RepeatStatement
                     && (GetRepeatExpressionNode(n) == null
-                        || GenerateExpression(GetRepeatExpressionNode(n)!).Equals("1", StringComparison.Ordinal)));
+                        || GetRepeatExpressionNode(n) is { Kind: ExpressionKind.Literal, Value: "1", DeclaredType: null }));
             }
             if (needsStdBool)
             {
@@ -528,13 +533,6 @@ namespace Puma
                 : null;
         }
 
-        private static string? GetAssignmentLeft(Node node)
-        {
-            return node is AssignmentStatementAstNode typedNode
-                ? typedNode.AssignmentLeft
-                : null;
-        }
-
         private static ExpressionNode? GetAssignmentLeftExpression(Node node)
         {
             return node is AssignmentStatementAstNode typedNode
@@ -859,13 +857,6 @@ namespace Puma
             };
         }
 
-        private static string? GetHasCondition(Node node)
-        {
-            return node is HasStatementAstNode typedNode
-                ? typedNode.HasCondition
-                : null;
-        }
-
         private static ExpressionNode? GetHasExpression(Node node)
         {
             return node is HasStatementAstNode typedNode
@@ -877,20 +868,6 @@ namespace Puma
         {
             return node is HasTraitStatementAstNode typedNode
                 ? typedNode.HasTraitTypeName
-                : null;
-        }
-
-        private static string? GetHasTraitVariableName(Node node)
-        {
-            return node is HasTraitStatementAstNode typedNode
-                ? typedNode.HasTraitVariableName
-                : null;
-        }
-
-        private static string? GetHasTraitCondition(Node node)
-        {
-            return node is HasTraitStatementAstNode typedNode
-                ? typedNode.HasTraitCondition
                 : null;
         }
 
@@ -1440,16 +1417,14 @@ namespace Puma
 
                             if (GetAssignmentOperator(node) == "="
                                 && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal
-                                && !string.IsNullOrWhiteSpace(rightExpression)
-                                && rightExpression.StartsWith("\"", StringComparison.Ordinal)
-                                && !rightExpression.EndsWith("s", StringComparison.Ordinal))
+                                && ContainsStringLiteral(GetAssignmentRightExpression(node)))
                             {
                                 rightExpression = ToPumaStringLiteral(rightExpression);
                             }
 
                             if (GetAssignmentOperator(node) == "="
                                 && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal
-                                && IsCharacterLiteralText(rightExpression))
+                                && ContainsCharacterLiteral(GetAssignmentRightExpression(node)))
                             {
                                 rightExpression = $"Character({rightExpression})";
                             }
@@ -1586,7 +1561,7 @@ namespace Puma
                         break;
                     case NodeKind.HasTraitStatement:
                         {
-                            var variable = GetHasTraitVariableName(node) ?? GenerateExpression(GetHasTraitExpression(node));
+                            var variable = GenerateExpression(GetHasTraitExpression(node));
                             var traitType = GetHasTraitTypeName(node) ?? "Trait";
                             sb.AppendLine($"{indent}if ({variable} != null && typeof({variable}) == typeof({traitType}))");
                             sb.AppendLine($"{indent}{{");
@@ -1680,9 +1655,12 @@ namespace Puma
 
         private static string FormatDefaultArgument(Node.ParameterInfo parameter)
         {
-            if (!string.IsNullOrWhiteSpace(parameter.DefaultValue))
+            if (parameter.DefaultExpression is { } expression)
             {
-                return parameter.DefaultValue;
+                return expression.Kind == ExpressionKind.Literal
+                    && (ContainsStringLiteral(expression) || ContainsCharacterLiteral(expression))
+                    ? FormatInitializer(expression)
+                    : GenerateExpression(expression);
             }
 
             var type = MapType(parameter.Type) ?? "int64_t";
@@ -2227,193 +2205,17 @@ namespace Puma
             return TryGetTypedLiteralDeclaration(GetAssignmentRightExpression(statement), out typeName, out literalValue);
         }
 
-        private static bool TryGetTypedLiteralDeclaration(string rightText, out string typeName, out string literalValue)
+        private static IEnumerable<Node.ParameterInfo> GetParameters(Node node) => node switch
         {
-            typeName = "int64_t";
-            literalValue = rightText;
-
-            if (string.IsNullOrWhiteSpace(rightText))
-            {
-                return false;
-            }
-
-            var text = rightText.Trim();
-
-            if (string.Equals(text, "true", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(text, "false", StringComparison.OrdinalIgnoreCase))
-            {
-                typeName = "bool";
-                literalValue = text.ToLowerInvariant();
-                return true;
-            }
-
-            if (string.Equals(text, "bool", StringComparison.OrdinalIgnoreCase))
-            {
-                typeName = "bool";
-                literalValue = "false";
-                return true;
-            }
-
-            if (text.StartsWith("\"", StringComparison.Ordinal))
-            {
-                typeName = "PumaType::String";
-                literalValue = text;
-                return true;
-            }
-
-            if (string.Equals(text, "str", StringComparison.OrdinalIgnoreCase))
-            {
-                typeName = "PumaType::String";
-                literalValue = "\"\"";
-                return true;
-            }
-
-            if (IsCharacterLiteralText(text))
-            {
-                typeName = "PumaType::Character";
-                literalValue = text;
-                return true;
-            }
-
-            var signLength = 0;
-            if (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal))
-            {
-                signLength = 1;
-            }
-
-            var index = signLength;
-            var dotSeen = false;
-            var exponentSeen = false;
-            var hasDigits = false;
-
-            if (index + 1 < text.Length
-                && text[index] == '0'
-                && (text[index + 1] == 'x' || text[index + 1] == 'X'))
-            {
-                index += 2;
-                var hexStart = index;
-                while (index < text.Length && Uri.IsHexDigit(text[index]))
-                {
-                    index++;
-                }
-
-                hasDigits = index > hexStart;
-            }
-            else if (index + 1 < text.Length
-                && text[index] == '0'
-                && (text[index + 1] == 'b' || text[index + 1] == 'B'))
-            {
-                index += 2;
-                var binStart = index;
-                while (index < text.Length && (text[index] == '0' || text[index] == '1'))
-                {
-                    index++;
-                }
-
-                hasDigits = index > binStart;
-            }
-            else if (index + 1 < text.Length
-                && text[index] == '0'
-                && (text[index + 1] == 'o' || text[index + 1] == 'O'))
-            {
-                index += 2;
-                var octStart = index;
-                while (index < text.Length && text[index] >= '0' && text[index] <= '7')
-                {
-                    index++;
-                }
-
-                hasDigits = index > octStart;
-            }
-            else
-            {
-                while (index < text.Length)
-                {
-                    var ch = text[index];
-                    if (char.IsDigit(ch))
-                    {
-                        hasDigits = true;
-                        index++;
-                        continue;
-                    }
-
-                    if (ch == '.' && !dotSeen && !exponentSeen)
-                    {
-                        dotSeen = true;
-                        index++;
-                        continue;
-                    }
-
-                    if ((ch == 'e' || ch == 'E') && !exponentSeen && hasDigits)
-                    {
-                        var expIndex = index + 1;
-                        if (expIndex < text.Length && (text[expIndex] == '+' || text[expIndex] == '-'))
-                        {
-                            expIndex++;
-                        }
-
-                        var expDigitsStart = expIndex;
-                        while (expIndex < text.Length && char.IsDigit(text[expIndex]))
-                        {
-                            expIndex++;
-                        }
-
-                        if (expIndex > expDigitsStart)
-                        {
-                            exponentSeen = true;
-                            index = expIndex;
-                            continue;
-                        }
-                    }
-
-                    break;
-                }
-            }
-
-            if (!hasDigits)
-            {
-                return false;
-            }
-
-            literalValue = text[..index];
-            var suffix = text[index..];
-            if (exponentSeen)
-            {
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(suffix))
-            {
-                typeName = (dotSeen || exponentSeen) ? "double" : "int64_t";
-                return true;
-            }
-
-            // Non-literal expressions (e.g. 2.0*PI*(r*r)) should be handled by expression inference.
-            if (suffix.Any(ch => !char.IsLetterOrDigit(ch)))
-            {
-                return false;
-            }
-
-            typeName = suffix switch
-            {
-                "int" or "int64" => "int64_t",
-                "int32" => "int32_t",
-                "int16" => "int16_t",
-                "int8" => "int8_t",
-                "uint" or "uint64" => "uint64_t",
-                "uint32" => "uint32_t",
-                "uint16" => "uint16_t",
-                "uint8" => "uint8_t",
-                "flt" or "flt64" => "double",
-                "flt32" => "float",
-                _ => "int64_t"
-            };
-
-            return true;
-        }
+            FunctionDeclarationAstNode function => function.FunctionParameterList,
+            SectionAstNode section => section.SectionParameterList,
+            DelegateDeclarationAstNode declaration => declaration.DelegateParameterList,
+            _ => Enumerable.Empty<Node.ParameterInfo>()
+        };
 
         private static IEnumerable<ExpressionNode?> GetExpressionRoots(Node node) => node switch
         {
+            FunctionDeclarationAstNode or SectionAstNode or DelegateDeclarationAstNode => GetParameters(node).Select(parameter => parameter.DefaultExpression),
             AssignmentStatementAstNode assignment => new[] { assignment.AssignmentLeftExpression, assignment.AssignmentRightExpression },
             PropertyDeclarationAstNode property => new[] { property.PropertyValueExpression },
             RecordDeclarationAstNode record => record.MemberDeclarations.Select(member => member.ValueExpression),

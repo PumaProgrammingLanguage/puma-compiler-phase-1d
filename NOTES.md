@@ -56,10 +56,12 @@ Recent updates
 - Release validation reports MSB3270 because the MSIL test project references the AMD64 compiler assembly. Tests pass; project architecture alignment remains a separate follow-up, and no project settings were changed in the record migration.
 - Completed the property initializer/type-selection increment: properties and records share AST-based initializer formatting; declaration selection and constructor ownership detection no longer parse generated text. Removed duplicate PropertyType metadata and obsolete text-based initializer/type helpers. Fixed truncated numeric property initializers, stale type metadata after AST replacement, and missing default-string headers. Added 11 regression cases; all 187 tests pass in Debug and Release, and the solution build passes. Existing C++ expectations remain unchanged; the known Release architecture warning remains.
 
+- Completed the parameter-default migration and bounded semantic-fallback audit: `DefaultExpression` replaces raw default text; nested function/section defaults retain parameter boundaries and dependencies. Assignment validation uses AST identifiers, including parenthesized targets; `has trait` generation ignores legacy variable text. Removed the obsolete text literal parser and unused accessors. Fixed section-header parsing at newline boundaries. Added 16 regression cases; all 203 tests pass in Debug and Release with no skips, and the solution build passes. Task #1 remains open for built-in `WriteLn` raw arguments and the remaining legacy expression-text field audit.
+
 1) Unit test TODO list
 
 1. Add global numeric return-signature mapping coverage (`int32` must emit `int32_t`), including native compilation; current global codegen emits the Puma return type verbatim.
-2. Add exact-output and AST-authority coverage for structured parameter default expressions, then remaining raw-text validation fallbacks; record and property initializer coverage is complete for these increments.
+2. Add exact-output and AST-authority coverage for built-in `WriteLn` argument migration, then complete the retained legacy expression-text field audit. Parameter-default and bounded assignment/has-trait fallback coverage is complete.
 
 2) Separate special-feature TODO list - On hold until core language features are implemented
 

@@ -640,9 +640,16 @@ namespace Puma
             }
 
             var current = new List<LexerTokens>();
+            var depth = 0;
             foreach (var token in tokens)
             {
-                if (token.Category == TokenCategory.Punctuation && token.TokenText == ",")
+                if (token.Category == TokenCategory.Delimiter)
+                {
+                    if (token.TokenText is "(" or "[") depth++;
+                    if (token.TokenText is ")" or "]") depth--;
+                }
+
+                if (depth == 0 && token.Category == TokenCategory.Punctuation && token.TokenText == ",")
                 {
                     if (current.Count == 0)
                     {
@@ -701,13 +708,16 @@ namespace Puma
                 throw CreateParserException($"Parameter '{name}' is missing the type.", nameAndTypeTokens[0]);
             }
 
-            var defaultValue = defaultTokens.Count > 0 ? BuildQualifiedName(defaultTokens) : null;
+            if (equalsIndex >= 0 && defaultTokens.Count == 0)
+            {
+                throw CreateParserException($"Parameter '{name}' is missing the default expression.", tokens[equalsIndex]);
+            }
 
             parameters.Add(new Node.ParameterInfo
             {
                 Name = name,
                 Type = type,
-                DefaultValue = defaultValue
+                DefaultExpression = ParseExpression(defaultTokens)
             });
 
             if (modifiers.Count > 0)
@@ -735,7 +745,18 @@ namespace Puma
             }
 
             var openIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == "(");
-            var closeIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == ")");
+            var closeIndex = -1;
+            var depth = 0;
+            for (var i = openIndex; i >= 0 && i < tokens.Count; i++)
+            {
+                if (tokens[i].Category != TokenCategory.Delimiter) continue;
+                if (tokens[i].TokenText == "(") depth++;
+                if (tokens[i].TokenText == ")" && --depth == 0)
+                {
+                    closeIndex = i;
+                    break;
+                }
+            }
             if (openIndex < 0 || closeIndex < openIndex)
             {
                 throw CreateParserException("Function declarations require a parameter list.", firstToken);
@@ -1156,6 +1177,11 @@ namespace Puma
             if (TrySwitchSection(token))
                 return;
 
+            if (token?.Category == TokenCategory.EndOfLine)
+            {
+                _startHeaderParsed = true;
+            }
+
             if (!_startHeaderParsed && TryParseSectionParameters(token, out var parameters))
             {
                 if (_currentSectionNode is SectionAstNode sectionNode)
@@ -1196,6 +1222,11 @@ namespace Puma
             if (TrySwitchSection(token))
             {
                 return;
+            }
+
+            if (token?.Category == TokenCategory.EndOfLine)
+            {
+                _initializeHeaderParsed = true;
             }
 
             if (!_initializeHeaderParsed && TryParseSectionParameters(token, out var parameters))
@@ -2551,12 +2582,15 @@ namespace Puma
             EnsureReadonlyLocalScope();
             EnsureReadwriteLocalScope();
             var assignmentOperator = tokens[assignmentIndex].TokenText;
-            var left = BuildQualifiedName(leftTokens);
-            var right = BuildQualifiedName(rightTokens);
             var leftExpression = ParseExpression(leftTokens);
             var rightExpression = ParseExpression(rightTokens);
-            var assignmentToken = leftTokens.FirstOrDefault();
-            var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
+            if (leftExpression == null || rightExpression == null)
+            {
+                throw CreateParserException("Assignment statements require left and right expressions.", tokens.FirstOrDefault());
+            }
+
+            var left = leftExpression.Kind == ExpressionKind.Identifier ? leftExpression.Value ?? string.Empty : string.Empty;
+            var node = Node.CreateAssignmentStatement(BuildQualifiedName(leftTokens), BuildQualifiedName(rightTokens), assignmentOperator);
             SetAssignmentExpressions(node, leftExpression, rightExpression, isLoweredPostfixMutation: false);
             var assignmentSourceSpan = ((AssignmentStatementAstNode)node).AssignmentLeftSourceSpan;
 
@@ -2588,7 +2622,7 @@ namespace Puma
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
-                && IsNoneAssignment(rightExpression, right)
+                && rightExpression is { Kind: ExpressionKind.Identifier, Value: "none" }
                 && IsKnownNonOptionalProperty(left))
             {
                 throw CreateParserException($"Cannot assign none to non-optional property '{left}'.", assignmentSourceSpan);
@@ -2605,18 +2639,10 @@ namespace Puma
             }
 
             if (assignmentOperator == "="
-                && !string.IsNullOrWhiteSpace(left)
-                && !string.IsNullOrWhiteSpace(right)
                 && leftExpression is ExpressionNode { Kind: ExpressionKind.Identifier }
                 && rightExpression is ExpressionNode { Kind: ExpressionKind.Identifier })
             {
                 ValidateImplicitPropertyAssignment(leftExpression, rightExpression);
-            }
-
-            if ((string.IsNullOrWhiteSpace(left) && leftExpression == null)
-                || (string.IsNullOrWhiteSpace(right) && rightExpression == null))
-            {
-                throw CreateParserException("Assignment statements require left and right expressions.", tokens.FirstOrDefault());
             }
 
             target.Add(node);
@@ -2624,7 +2650,7 @@ namespace Puma
             if (assignmentOperator == "="
                 && _readonlyLocalScopes.Count > 0
                 && !string.IsNullOrWhiteSpace(left)
-                && IsSimpleIdentifier(left)
+                && leftExpression.Kind == ExpressionKind.Identifier
                 && !IsKnownReadonlyLocal(left)
                 && !IsKnownReadwriteLocal(left)
                 && !IsKnownReadonlyParameter(left)
@@ -2661,40 +2687,6 @@ namespace Puma
             }
 
             return true;
-        }
-
-        private static bool IsSimpleIdentifier(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            if (!(char.IsLetter(value[0]) || value[0] == '_'))
-            {
-                return false;
-            }
-
-            for (var i = 1; i < value.Length; i++)
-            {
-                if (!(char.IsLetterOrDigit(value[i]) || value[i] == '_'))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool IsNoneAssignment(ExpressionNode? rightExpression, string? right)
-        {
-            if (rightExpression?.Kind == ExpressionKind.Identifier
-                && string.Equals(rightExpression.Value, "none", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            return string.Equals(right?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
         }
 
         private bool IsKnownNonOptionalProperty(string name)
@@ -3315,6 +3307,7 @@ namespace Puma
             }
 
             var parameterTokens = new List<LexerTokens>();
+            var depth = 1;
 
             while (true)
             {
@@ -3324,7 +3317,12 @@ namespace Puma
                     throw new InvalidOperationException("Unterminated parameter list in section header.");
                 }
 
-                if (next.Value.Category == TokenCategory.Delimiter && next.Value.TokenText == ")")
+                if (next.Value.Category == TokenCategory.Delimiter && next.Value.TokenText == "(")
+                {
+                    depth++;
+                }
+
+                if (next.Value.Category == TokenCategory.Delimiter && next.Value.TokenText == ")" && --depth == 0)
                 {
                     break;
                 }

@@ -356,7 +356,7 @@ namespace Puma
         {
             public string Name { get; set; } = string.Empty;
             public string Type { get; set; } = string.Empty;
-            public string? DefaultValue { get; set; }
+            public ExpressionNode? DefaultExpression { get; set; }
             public List<string> Modifiers { get; } = new();
         }
         public NodeKind Kind { get; set; } = NodeKind.Section;

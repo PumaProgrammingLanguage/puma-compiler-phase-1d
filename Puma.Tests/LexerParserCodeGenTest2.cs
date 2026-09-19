@@ -1792,8 +1792,8 @@ void F(void)
             var ast = parser.Parse(tokens);
             var logValues = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "LogValues");
             Assert.AreEqual(3, logValues.FunctionParameterList.Count);
-            Assert.AreEqual("10", logValues.FunctionParameterList[1].DefaultValue);
-            Assert.AreEqual("20", logValues.FunctionParameterList[2].DefaultValue);
+            Assert.AreEqual("10", logValues.FunctionParameterList[1].DefaultExpression?.Value);
+            Assert.AreEqual("20", logValues.FunctionParameterList[2].DefaultExpression?.Value);
 
             var generated = codegen.Generate(ast);
             var expected =
