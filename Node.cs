@@ -129,8 +129,6 @@ namespace Puma
 
     internal sealed class FunctionCallAstNode : Node
     {
-        public string? Name { get; set; }
-        public string? Arguments { get; set; }
         public ExpressionNode? Expression { get; set; }
 
         public FunctionCallAstNode()
@@ -325,7 +323,6 @@ namespace Puma
 
     internal sealed class StatementAstNode : Node
     {
-        public string? StatementValue { get; set; }
         public List<Node> StatementBody { get; } = new();
         public ExpressionNode? StatementExpression { get; set; }
 
@@ -466,12 +463,10 @@ namespace Puma
             };
         }
 
-        public static Node CreateFunctionCall(string name, string arguments, ExpressionNode? expression = null)
+        public static Node CreateFunctionCall(ExpressionNode? expression)
         {
             return new FunctionCallAstNode
             {
-                Name = name,
-                Arguments = arguments,
                 Expression = expression
             };
         }
@@ -570,11 +565,11 @@ namespace Puma
             return node;
         }
 
-        public static Node CreateStatement(NodeKind kind, string? value = null)
+        public static Node CreateStatement(NodeKind kind, ExpressionNode? expression = null)
         {
             return new StatementAstNode(kind)
             {
-                StatementValue = value
+                StatementExpression = expression
             };
         }
 

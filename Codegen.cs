@@ -718,20 +718,6 @@ namespace Puma
                 : null;
         }
 
-        private static string? GetFunctionCallName(Node node)
-        {
-            return node is FunctionCallAstNode typedNode
-                ? typedNode.Name
-                : null;
-        }
-
-        private static string? GetFunctionCallArguments(Node node)
-        {
-            return node is FunctionCallAstNode typedNode
-                ? typedNode.Arguments
-                : null;
-        }
-
         private static ExpressionNode? GetWriteLineArgumentExpression(Node node)
         {
             return node is WriteLineAstNode typedNode
@@ -1476,24 +1462,16 @@ namespace Puma
                         }
                     case NodeKind.FunctionCall:
                         {
-                            var callExpressionNode = GetFunctionCallExpression(node) ?? GetStatementExpression(node);
+                            var callExpressionNode = GetFunctionCallExpression(node);
                             var callExpression = GenerateExpression(callExpressionNode);
-                            if (!string.IsNullOrWhiteSpace(callExpression) && callExpressionNode?.Kind == ExpressionKind.Call)
+                            if (callExpressionNode?.Kind == ExpressionKind.Call
+                                && callExpressionNode.Left?.Kind == ExpressionKind.Identifier
+                                && !string.IsNullOrWhiteSpace(callExpressionNode.Left.Value))
                             {
-                                var functionName = GenerateExpression(callExpressionNode.Left);
-                                if (!string.IsNullOrWhiteSpace(functionName)
-                                    && IsSimpleIdentifier(functionName)
-                                    && callExpressionNode.Arguments.Count >= 0)
-                                {
-                                    callExpression = BuildCallWithDefaultArguments(functionName, callExpressionNode, ast);
-                                }
+                                callExpression = BuildCallWithDefaultArguments(callExpressionNode.Left.Value, callExpressionNode, ast);
+                            }
 
-                                sb.AppendLine($"{indent}{callExpression};");
-                            }
-                            else
-                            {
-                                sb.AppendLine($"{indent}{GetFunctionCallName(node)}({GetFunctionCallArguments(node)});");
-                            }
+                            sb.AppendLine($"{indent}{callExpression};");
                             break;
                         }
                     case NodeKind.WriteLine:

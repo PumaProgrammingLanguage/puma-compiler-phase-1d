@@ -11,6 +11,7 @@
 - Break large tasks into smaller tasks that can be completed in one session, then continue iteratively. 
 - Prioritize parser/lexer work first; do codegen unit tests last.
 - Do as many small tasks as possible each session, then report remaining tasks.
+- Do not commit or push changes automatically. At the end of each work session, list what changed and instruct the user to commit and push; the user handles Git commits and pushes to reduce credit usage.
 
 ## Unit Testing
 

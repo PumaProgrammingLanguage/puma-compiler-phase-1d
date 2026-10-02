@@ -316,14 +316,16 @@ namespace Puma
                 && string.Equals(GetFunctionDeclarationName(n), functionName, StringComparison.Ordinal));
         }
 
-        private void ValidateImplicitFunctionCallArguments(string functionName, ExpressionNode? callExpression, List<LexerTokens> argumentTokens)
+        private void ValidateImplicitFunctionCallArguments(ExpressionNode? callExpression)
         {
-            if (callExpression?.Kind != ExpressionKind.Call)
+            if (callExpression?.Kind != ExpressionKind.Call
+                || callExpression.Left?.Kind != ExpressionKind.Identifier
+                || string.IsNullOrWhiteSpace(callExpression.Left.Value))
             {
                 return;
             }
 
-            var declaration = GetFunctionDeclarationForCall(functionName);
+            var declaration = GetFunctionDeclarationForCall(callExpression.Left.Value);
             if (declaration == null)
             {
                 return;
@@ -2362,14 +2364,6 @@ namespace Puma
                 : null;
         }
 
-        private static void SetStatementExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is StatementAstNode typedNode)
-            {
-                typedNode.StatementExpression = expression;
-            }
-        }
-
         private static void SetAssignmentExpressions(Node node, ExpressionNode? leftExpression, ExpressionNode? rightExpression, bool isLoweredPostfixMutation)
         {
             if (node is AssignmentStatementAstNode typedNode)
@@ -3066,20 +3060,9 @@ namespace Puma
                 return false;
             }
 
-            var nameTokens = tokens.Take(openIndex).ToList();
-            var argsTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();
-            var name = BuildQualifiedName(nameTokens);
-            var args = BuildQualifiedName(argsTokens);
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return false;
-            }
-
             var callExpression = ParseExpression(tokens);
-            ValidateImplicitFunctionCallArguments(name, callExpression, argsTokens);
-            var callNode = Node.CreateFunctionCall(name, args, callExpression);
-            SetStatementExpression(callNode, callExpression);
+            ValidateImplicitFunctionCallArguments(callExpression);
+            var callNode = Node.CreateFunctionCall(callExpression);
             target.Add(callNode);
             return true;
         }
@@ -3121,9 +3104,7 @@ namespace Puma
                 return false;
             }
 
-            var valueTokens = tokens.Skip(1).ToList();
-            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-            target.Add(Node.CreateStatement(NodeKind.ElseStatement, value));
+            target.Add(Node.CreateStatement(NodeKind.ElseStatement));
             return true;
         }
 
@@ -3367,9 +3348,7 @@ namespace Puma
             }
 
             var valueTokens = tokens.Skip(1).ToList();
-            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-            var node = Node.CreateStatement(NodeKind.ReturnStatement, value);
-            SetStatementExpression(node, ParseExpression(valueTokens));
+            var node = Node.CreateStatement(NodeKind.ReturnStatement, ParseExpression(valueTokens));
 
             if (_currentFunctionNode != null
                 && TryMapConvertionType(GetFunctionDeclarationReturnType(_currentFunctionNode), out var returnType))
@@ -3389,9 +3368,7 @@ namespace Puma
             }
 
             var valueTokens = tokens.Skip(1).ToList();
-            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-            var node = Node.CreateStatement(NodeKind.YieldStatement, value);
-            SetStatementExpression(node, ParseExpression(valueTokens));
+            var node = Node.CreateStatement(NodeKind.YieldStatement, ParseExpression(valueTokens));
             target.Add(node);
             return true;
         }
@@ -3406,10 +3383,8 @@ namespace Puma
             if (tokens[0].Category == TokenCategory.Keyword && (tokens[0].TokenText == "break" || tokens[0].TokenText == "continue"))
             {
                 var valueTokens = tokens.Skip(1).ToList();
-                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
                 var kind = tokens[0].TokenText == "break" ? NodeKind.BreakStatement : NodeKind.ContinueStatement;
-                var node = Node.CreateStatement(kind, value);
-                SetStatementExpression(node, ParseExpression(valueTokens));
+                var node = Node.CreateStatement(kind, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
@@ -3427,9 +3402,7 @@ namespace Puma
             if (tokens[0].Category == TokenCategory.Keyword && tokens[0].TokenText == "error")
             {
                 var valueTokens = tokens.Skip(1).ToList();
-                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-                var node = Node.CreateStatement(NodeKind.ErrorStatement, value);
-                SetStatementExpression(node, ParseExpression(valueTokens));
+                var node = Node.CreateStatement(NodeKind.ErrorStatement, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
@@ -3437,9 +3410,7 @@ namespace Puma
             if (tokens[0].Category == TokenCategory.Keyword && tokens[0].TokenText == "catch")
             {
                 var valueTokens = tokens.Skip(1).ToList();
-                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-                var node = Node.CreateStatement(NodeKind.CatchStatement, value);
-                SetStatementExpression(node, ParseExpression(valueTokens));
+                var node = Node.CreateStatement(NodeKind.CatchStatement, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
