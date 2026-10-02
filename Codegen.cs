@@ -823,16 +823,6 @@ namespace Puma
             };
         }
 
-        private static string? GetForContainer(Node node)
-        {
-            return node.Kind switch
-            {
-                NodeKind.ForStatement when node is ForStatementAstNode typedNode => typedNode.ForContainer,
-                NodeKind.ForAllStatement when node is ForAllStatementAstNode typedNode => typedNode.ForContainer,
-                _ => null
-            };
-        }
-
         private static ExpressionNode? GetForContainerExpression(Node node)
         {
             return node.Kind switch

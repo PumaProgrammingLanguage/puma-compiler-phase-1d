@@ -139,7 +139,6 @@ namespace Puma
 
     internal sealed class IfStatementAstNode : Node
     {
-        public string? IfCondition { get; set; }
         public ExpressionNode? ConditionExpression { get; set; }
         public List<Node> IfBody { get; } = new();
         public List<Node> ElseBody { get; } = new();
@@ -152,7 +151,6 @@ namespace Puma
 
     internal sealed class MatchStatementAstNode : Node
     {
-        public string? Expression { get; set; }
         public ExpressionNode? ExpressionNode { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -164,7 +162,6 @@ namespace Puma
 
     internal sealed class WhenStatementAstNode : Node
     {
-        public string? WhenCondition { get; set; }
         public ExpressionNode? WhenExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -176,7 +173,6 @@ namespace Puma
 
     internal sealed class WhileStatementAstNode : Node
     {
-        public string? WhileCondition { get; set; }
         public ExpressionNode? WhileExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -189,7 +185,6 @@ namespace Puma
     internal sealed class ForStatementAstNode : Node
     {
         public string? ForVariable { get; set; }
-        public string? ForContainer { get; set; }
         public ExpressionNode? ForContainerExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -202,7 +197,6 @@ namespace Puma
     internal sealed class ForAllStatementAstNode : Node
     {
         public string? ForVariable { get; set; }
-        public string? ForContainer { get; set; }
         public ExpressionNode? ForContainerExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -214,7 +208,6 @@ namespace Puma
 
     internal sealed class RepeatStatementAstNode : Node
     {
-        public string? RepeatExpression { get; set; }
         public ExpressionNode? RepeatExpressionNode { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -226,7 +219,6 @@ namespace Puma
 
     internal sealed class HasStatementAstNode : Node
     {
-        public string? HasCondition { get; set; }
         public ExpressionNode? HasExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -238,10 +230,8 @@ namespace Puma
 
     internal sealed class HasTraitStatementAstNode : Node
     {
-        public string? HasTraitCondition { get; set; }
         public ExpressionNode? HasTraitExpression { get; set; }
         public string? HasTraitTypeName { get; set; }
-        public string? HasTraitVariableName { get; set; }
         public List<Node> StatementBody { get; } = new();
 
         public HasTraitStatementAstNode()
@@ -471,79 +461,78 @@ namespace Puma
             };
         }
 
-        public static Node CreateIfStatement(string condition)
+        public static Node CreateIfStatement(ExpressionNode? condition)
         {
             return new IfStatementAstNode
             {
-                IfCondition = condition
+                ConditionExpression = condition
             };
         }
 
-        public static Node CreateMatchStatement(string expression)
+        public static Node CreateMatchStatement(ExpressionNode? expression)
         {
             return new MatchStatementAstNode
             {
-                Expression = expression
+                ExpressionNode = expression
             };
         }
 
-        public static Node CreateWhenStatement(string condition)
+        public static Node CreateWhenStatement(ExpressionNode? condition)
         {
             return new WhenStatementAstNode
             {
-                WhenCondition = condition
+                WhenExpression = condition
             };
         }
 
-        public static Node CreateWhileStatement(string condition)
+        public static Node CreateWhileStatement(ExpressionNode? condition)
         {
             return new WhileStatementAstNode
             {
-                WhileCondition = condition
+                WhileExpression = condition
             };
         }
 
-        public static Node CreateForStatement(string variable, string container)
+        public static Node CreateForStatement(string variable, ExpressionNode? container)
         {
             return new ForStatementAstNode
             {
                 ForVariable = variable,
-                ForContainer = container
+                ForContainerExpression = container
             };
         }
 
-        public static Node CreateForAllStatement(string variable, string container)
+        public static Node CreateForAllStatement(string variable, ExpressionNode? container)
         {
             return new ForAllStatementAstNode
             {
                 ForVariable = variable,
-                ForContainer = container
+                ForContainerExpression = container
             };
         }
 
-        public static Node CreateRepeatStatement(string expression)
+        public static Node CreateRepeatStatement(ExpressionNode? expression)
         {
             return new RepeatStatementAstNode
             {
-                RepeatExpression = expression
+                RepeatExpressionNode = expression
             };
         }
 
-        public static Node CreateHasStatement(string condition)
+        public static Node CreateHasStatement(ExpressionNode? condition)
         {
             return new HasStatementAstNode
             {
-                HasCondition = condition
+                HasExpression = condition
             };
         }
 
-        public static Node CreateHasTraitStatement(string condition, string? traitTypeName = null, string? traitVariableName = null)
+        public static Node CreateHasTraitStatement(ExpressionNode? expression, string traitTypeName)
         {
             return new HasTraitStatementAstNode
             {
-                HasTraitCondition = condition,
-                HasTraitTypeName = traitTypeName,
-                HasTraitVariableName = traitVariableName
+                HasTraitExpression = expression,
+                HasTraitTypeName = traitTypeName
             };
         }
 
