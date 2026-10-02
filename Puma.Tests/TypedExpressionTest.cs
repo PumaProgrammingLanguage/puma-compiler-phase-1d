@@ -47,12 +47,13 @@ void Caller(void)
         }
 
         [TestMethod]
-        public void TypedLocal_UsesExpressionMetadataNotLegacyAssignmentInference()
+        public void TypedLocal_UsesReplacedExpressionMetadata()
         {
             const string source =
 @"start
-    value = 1.25e+3 flt32
+    value = 0 int16
 ";
+            const string replacementSource = "start\n    value = 1.25e+3 flt32\n";
             const string expected =
 @"// start
 int main()
@@ -62,8 +63,8 @@ int main()
 }";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
             var assignment = ast.OfType<AssignmentStatementAstNode>().Single();
-            assignment.AssignmentInferredType = "int16";
-            assignment.AssignmentRight = "0 int16";
+            assignment.AssignmentRightExpression = new Parser().Parse(new Lexer().Tokenize(replacementSource))
+                .OfType<AssignmentStatementAstNode>().Single().AssignmentRightExpression;
 
             var generated = new Codegen().Generate(ast);
 

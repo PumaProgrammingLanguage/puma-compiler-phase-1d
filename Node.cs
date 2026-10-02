@@ -242,12 +242,9 @@ namespace Puma
 
     internal sealed class AssignmentStatementAstNode : Node
     {
-        public string? AssignmentLeft { get; set; }
-        public string? AssignmentRight { get; set; }
         public string? AssignmentOperator { get; set; }
         public ExpressionNode? AssignmentLeftExpression { get; set; }
         public ExpressionNode? AssignmentRightExpression { get; set; }
-        public string? AssignmentInferredType { get; set; }
         public SourceSpan? AssignmentLeftSourceSpan { get; set; }
         public bool IsLoweredPostfixMutation { get; set; }
 
@@ -275,7 +272,6 @@ namespace Puma
     internal sealed class PropertyDeclarationAstNode : Node
     {
         public string? PropertyName { get; set; }
-        public string? PropertyValue { get; set; }
         public ExpressionNode? PropertyValueExpression { get; set; }
         public List<string> PropertyModifiers { get; } = new();
 
@@ -288,7 +284,6 @@ namespace Puma
     internal sealed class FunctionDeclarationAstNode : Node
     {
         public string? FunctionDeclarationName { get; set; }
-        public string? FunctionDeclarationParameters { get; set; }
         public string? FunctionDeclarationReturnType { get; set; }
         public List<string> FunctionModifiers { get; } = new();
         public List<Node> FunctionBody { get; } = new();
@@ -325,7 +320,6 @@ namespace Puma
     internal sealed class SectionAstNode : Node
     {
         public string? SectionName { get; set; }
-        public string? SectionParameters { get; set; }
         public List<Node.ParameterInfo> SectionParameterList { get; } = new();
         public int LeadingBlankLines { get; set; }
 
@@ -426,12 +420,11 @@ namespace Puma
             return node;
         }
 
-        public static Node CreatePropertyDeclaration(string name, string? value, ExpressionNode? valueExpression, IEnumerable<string>? modifiers = null)
+        public static Node CreatePropertyDeclaration(string name, ExpressionNode? valueExpression, IEnumerable<string>? modifiers = null)
         {
             var node = new PropertyDeclarationAstNode
             {
                 PropertyName = name,
-                PropertyValue = value,
                 PropertyValueExpression = valueExpression
             };
 
@@ -443,13 +436,15 @@ namespace Puma
             return node;
         }
 
-        public static Node CreateAssignmentStatement(string left, string right, string assignmentOperator)
+        public static Node CreateAssignmentStatement(ExpressionNode? left, ExpressionNode? right, string assignmentOperator, bool isLoweredPostfixMutation = false)
         {
             return new AssignmentStatementAstNode
             {
-                AssignmentLeft = left,
-                AssignmentRight = right,
-                AssignmentOperator = assignmentOperator
+                AssignmentLeftExpression = left,
+                AssignmentRightExpression = right,
+                AssignmentOperator = assignmentOperator,
+                AssignmentLeftSourceSpan = left?.SourceSpan,
+                IsLoweredPostfixMutation = isLoweredPostfixMutation
             };
         }
 
@@ -536,12 +531,11 @@ namespace Puma
             };
         }
 
-        public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList, IEnumerable<string>? modifiers = null)
+        public static Node CreateFunctionDeclaration(string name, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList, IEnumerable<string>? modifiers = null)
         {
             var node = new FunctionDeclarationAstNode
             {
                 FunctionDeclarationName = name,
-                FunctionDeclarationParameters = parameters,
                 FunctionDeclarationReturnType = returnType
             };
 

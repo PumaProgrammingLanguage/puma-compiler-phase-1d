@@ -19,7 +19,7 @@ namespace test
             var source = $"properties\n    value = {expression}\n";
             var expected = $"{headers}// properties\nauto value = {expectedInitializer};";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
-            ast.OfType<PropertyDeclarationAstNode>().Single().PropertyValue = "incorrect";
+            Assert.IsNotNull(ast.OfType<PropertyDeclarationAstNode>().Single().PropertyValueExpression?.SourceSpan);
 
             Assert.AreEqual(expected, new Codegen().Generate(ast).Replace("\r\n", "\n").Trim());
         }

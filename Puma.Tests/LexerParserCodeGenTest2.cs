@@ -144,9 +144,9 @@ int main()
             var ast = parser.Parse(lexer.Tokenize(src));
             var property = (PropertyDeclarationAstNode)ast.Single(node => node.Kind == NodeKind.PropertyDeclaration);
             var assignment = (AssignmentStatementAstNode)ast.Single(node => node.Kind == NodeKind.AssignmentStatement);
-            property.PropertyValue = "\"incorrect\"";
-            assignment.AssignmentLeft = "incorrect";
-            assignment.AssignmentRight = "false";
+            property.PropertyValueExpression = new ExpressionNode { Kind = ExpressionKind.Identifier, Value = "true" };
+            assignment.AssignmentLeftExpression = new ExpressionNode { Kind = ExpressionKind.Identifier, Value = "value" };
+            assignment.AssignmentRightExpression = new ExpressionNode { Kind = ExpressionKind.Literal, Value = "42" };
 
             var generated = codegen.Generate(ast);
 
@@ -1910,7 +1910,7 @@ int main()
             var ast = new List<Node>
             {
                 Node.CreateSection(Puma.Parser.Section.Properties),
-                Node.CreatePropertyDeclaration("p", "mysteryType", null),
+                Node.CreatePropertyDeclaration("p", null),
                 Node.CreateSection(Puma.Parser.Section.Start)
             };
 

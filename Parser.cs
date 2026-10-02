@@ -772,7 +772,6 @@ namespace Puma
             }
 
             var parameterTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();
-            var parameters = BuildQualifiedName(parameterTokens);
             var parameterList = ParseParameterList(parameterTokens);
 
             var returnTokens = tokens.Skip(closeIndex + 1).ToList();
@@ -795,7 +794,7 @@ namespace Puma
                 return;
             }
 
-            _currentFunctionNode = Node.CreateFunctionDeclaration(name, parameters, returnType, Array.Empty<Node>(), parameterList, functionModifiers);
+            _currentFunctionNode = Node.CreateFunctionDeclaration(name, returnType, Array.Empty<Node>(), parameterList, functionModifiers);
             _currentFunctionBody = new List<Node>();
             _currentFunctionIsDelegate = false;
 
@@ -1184,12 +1183,8 @@ namespace Puma
                 _startHeaderParsed = true;
             }
 
-            if (!_startHeaderParsed && TryParseSectionParameters(token, out var parameters))
+            if (!_startHeaderParsed && TryParseSectionParameters(token))
             {
-                if (_currentSectionNode is SectionAstNode sectionNode)
-                {
-                    sectionNode.SectionParameters = parameters;
-                }
                 _startHeaderParsed = true;
                 return;
             }
@@ -1231,12 +1226,8 @@ namespace Puma
                 _initializeHeaderParsed = true;
             }
 
-            if (!_initializeHeaderParsed && TryParseSectionParameters(token, out var parameters))
+            if (!_initializeHeaderParsed && TryParseSectionParameters(token))
             {
-                if (_currentSectionNode is SectionAstNode sectionNode)
-                {
-                    sectionNode.SectionParameters = parameters;
-                }
                 _initializeHeaderParsed = true;
                 return;
             }
@@ -1484,51 +1475,6 @@ namespace Puma
         private static string BuildQualifiedName(IEnumerable<LexerTokens> tokens)
         {
             return string.Concat(tokens.Select(t => t.TokenText));
-        }
-
-        private static string NormalizeAssignedValueTokens(List<LexerTokens> tokens)
-        {
-            if (tokens.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            if (TryExtractNumericLiteralWithSuffix(tokens, out var literal, out _))
-            {
-                return literal;
-            }
-
-            return BuildQualifiedName(tokens);
-        }
-
-        private static bool TryExtractNumericLiteralWithSuffix(List<LexerTokens> tokens, out string literal, out string suffix)
-        {
-            literal = string.Empty;
-            suffix = string.Empty;
-
-            if (tokens.Count != 2)
-            {
-                return false;
-            }
-
-            if (tokens[0].Category != TokenCategory.NumericLiteral)
-            {
-                return false;
-            }
-
-            if (tokens[1].Category is not (TokenCategory.Keyword or TokenCategory.Identifier))
-            {
-                return false;
-            }
-
-            if (!NumericCastSuffixes.Contains(tokens[1].TokenText))
-            {
-                return false;
-            }
-
-            literal = tokens[0].TokenText;
-            suffix = tokens[1].TokenText;
-            return true;
         }
 
         private void ParseUseStatement(LexerTokens firstToken)
@@ -2213,11 +2159,10 @@ namespace Puma
                 }
 
                 var coreValueTokens = valueEnd >= 0 ? valueTokens.Take(valueEnd + 1).ToList() : new List<LexerTokens>();
-                var value = NormalizeAssignedValueTokens(coreValueTokens);
 
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    var node = Node.CreatePropertyDeclaration(name, value, ParseExpression(coreValueTokens), modifiers);
+                    var node = Node.CreatePropertyDeclaration(name, ParseExpression(coreValueTokens), modifiers);
                     ast.Add(node);
                     if (modifiers.Contains("optional"))
                     {
@@ -2364,17 +2309,6 @@ namespace Puma
                 : null;
         }
 
-        private static void SetAssignmentExpressions(Node node, ExpressionNode? leftExpression, ExpressionNode? rightExpression, bool isLoweredPostfixMutation)
-        {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                typedNode.AssignmentLeftExpression = leftExpression;
-                typedNode.AssignmentRightExpression = rightExpression;
-                typedNode.AssignmentLeftSourceSpan = leftExpression?.SourceSpan;
-                typedNode.IsLoweredPostfixMutation = isLoweredPostfixMutation;
-            }
-        }
-
         private void ParseStatement(LexerTokens firstToken) => ParseStatement(firstToken, ast);
 
         private void ParseStatement(LexerTokens firstToken, List<Node> target)
@@ -2516,15 +2450,13 @@ namespace Puma
             }
 
             var left = leftExpression.Kind == ExpressionKind.Identifier ? leftExpression.Value ?? string.Empty : string.Empty;
-            var node = Node.CreateAssignmentStatement(BuildQualifiedName(leftTokens), BuildQualifiedName(rightTokens), assignmentOperator);
-            SetAssignmentExpressions(node, leftExpression, rightExpression, isLoweredPostfixMutation: false);
+            var node = Node.CreateAssignmentStatement(leftExpression, rightExpression, assignmentOperator);
             var assignmentSourceSpan = ((AssignmentStatementAstNode)node).AssignmentLeftSourceSpan;
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
                 && rightExpression?.DeclaredType is { } inferredSuffix)
             {
-                ((AssignmentStatementAstNode)node).AssignmentInferredType = inferredSuffix;
                 if (TryMapConvertionType(inferredSuffix, out var inferredType))
                 {
                     _inferredIdentifierTypes[left] = inferredType;
@@ -2755,15 +2687,14 @@ namespace Puma
             }
 
             var leftTokens = tokens.Take(tokens.Count - 1).ToList();
-            var left = BuildQualifiedName(leftTokens);
-            if (string.IsNullOrWhiteSpace(left))
+            var left = ParseExpression(leftTokens);
+            if (left == null)
             {
                 return false;
             }
 
             var assignmentOperator = last.TokenText == "++" ? "+=" : "-=";
-            var node = Node.CreateAssignmentStatement(left, "1", assignmentOperator);
-            SetAssignmentExpressions(node, ParseExpression(leftTokens), new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" }, isLoweredPostfixMutation: true);
+            var node = Node.CreateAssignmentStatement(left, new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" }, assignmentOperator, isLoweredPostfixMutation: true);
             target.Add(node);
             return true;
         }
@@ -3188,10 +3119,8 @@ namespace Puma
             return false;
         }
 
-        private bool TryParseSectionParameters(LexerTokens? token, out string parameters)
+        private bool TryParseSectionParameters(LexerTokens? token)
         {
-            parameters = string.Empty;
-
             if (token == null)
             {
                 return false;
@@ -3236,7 +3165,6 @@ namespace Puma
                 parameterTokens.Add(next.Value);
             }
 
-            parameters = BuildQualifiedName(parameterTokens);
             if (_currentSectionNode is SectionAstNode sectionNode)
             {
                 sectionNode.SectionParameterList.Clear();

@@ -104,9 +104,9 @@ namespace test
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(6, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
-            CollectionAssert.AreEqual(new string?[] { null, "int", "int64", "int32", "int16", "int8" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentInferredType).ToArray());
+            CollectionAssert.AreEqual(new string?[] { null, "int", "int64", "int32", "int16", "int8" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.DeclaredType).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -472,7 +472,7 @@ class MyTrait
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(5, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
@@ -593,7 +593,7 @@ namespace MyModule
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(4, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "1.1", "2.2", "3.3", "4.4" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
@@ -695,7 +695,7 @@ public:
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(5, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
@@ -808,7 +808,7 @@ public:
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(5, properties.Count);
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -862,7 +862,7 @@ auto e = PumaType::String("""", sizeof("""") - 1);
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(6, properties.Count);
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -914,7 +914,7 @@ auto f = (int8_t)6;
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(5, properties.Count);
             CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1226,11 +1226,11 @@ finalize
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(1, properties.Count);
             Assert.AreEqual("s", ((PropertyDeclarationAstNode)properties[0]).PropertyName);
-            Assert.AreEqual("\"Hello, World!\\n\"", ((PropertyDeclarationAstNode)properties[0]).PropertyValue);
+            Assert.AreEqual("\"Hello, World!\\n\"", ((PropertyDeclarationAstNode)properties[0]).PropertyValueExpression?.Value);
 
             var finalizeSection = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Puma.Parser.Section.Finalize);
             Assert.IsNotNull(finalizeSection);
-            var finalizeAssignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement && ((AssignmentStatementAstNode)n).AssignmentLeft == "s").ToList();
+            var finalizeAssignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement && ((AssignmentStatementAstNode)n).AssignmentLeftExpression?.Value == "s").ToList();
             Assert.AreEqual(1, finalizeAssignments.Count);
             Assert.AreEqual("\"\"", ((AssignmentStatementAstNode)finalizeAssignments[0]).AssignmentRightExpression?.Value);
 

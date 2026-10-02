@@ -24,7 +24,7 @@ namespace test
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
             var function = ast.OfType<FunctionDeclarationAstNode>().First();
             Assert.IsNotNull(function.FunctionParameterList.Single().DefaultExpression?.SourceSpan);
-            function.FunctionDeclarationParameters = "stale text";
+            Assert.AreEqual(1, function.FunctionParameterList.Count);
             Assert.AreEqual(expected, new Codegen().Generate(ast).Replace("\r\n", "\n").Trim());
         }
 
