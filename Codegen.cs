@@ -732,10 +732,10 @@ namespace Puma
                 : null;
         }
 
-        private static string? GetWriteLineStringValue(Node node)
+        private static ExpressionNode? GetWriteLineArgumentExpression(Node node)
         {
             return node is WriteLineAstNode typedNode
-                ? typedNode.StringValue
+                ? typedNode.ArgumentExpression
                 : null;
         }
 
@@ -1497,10 +1497,7 @@ namespace Puma
                             break;
                         }
                     case NodeKind.WriteLine:
-                        if (!string.IsNullOrWhiteSpace(GetWriteLineStringValue(node)))
-                        {
-                            sb.AppendLine($"{indent}PumaConsole::WriteLn({GetWriteLineStringValue(node)});");
-                        }
+                        sb.AppendLine($"{indent}PumaConsole::WriteLn({GenerateExpression(GetWriteLineArgumentExpression(node))});");
                         break;
                     case NodeKind.IfStatement:
                         sb.AppendLine($"{indent}if ({UnwrapOutermostParentheses(GenerateExpression(GetIfConditionExpression(node)))})");
@@ -2221,6 +2218,7 @@ namespace Puma
             RecordDeclarationAstNode record => record.MemberDeclarations.Select(member => member.ValueExpression),
             TypeDeclarationAstNode type => type.TypeProperties.SelectMany(GetExpressionRoots),
             FunctionCallAstNode call => new[] { call.Expression },
+            WriteLineAstNode writeLine => new[] { writeLine.ArgumentExpression },
             IfStatementAstNode conditional => new[] { conditional.ConditionExpression },
             MatchStatementAstNode match => new[] { match.ExpressionNode },
             WhenStatementAstNode whenStatement => new[] { whenStatement.WhenExpression },

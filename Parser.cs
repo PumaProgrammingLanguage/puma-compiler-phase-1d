@@ -1337,7 +1337,7 @@ namespace Puma
             {
                 throw new InvalidOperationException("Expected string literal in WriteLn(...)");
             }
-            var literal = textTok.Value.TokenText; // keep quotes
+            var argument = ParseExpression(new List<LexerTokens> { textTok.Value })!;
 
             var close = GetNextToken(_tokens);
             if (close == null || close.Value.Category != TokenCategory.Delimiter || close.Value.TokenText != ")")
@@ -1345,7 +1345,7 @@ namespace Puma
                 throw new InvalidOperationException("Expected ')' after WriteLn argument.");
             }
 
-            ast.Add(Node.CreateWriteLine(literal));
+            ast.Add(Node.CreateWriteLine(argument));
         }
 
         private static bool IsIgnorable(LexerTokens token)

@@ -78,7 +78,7 @@ namespace Puma
 
     internal sealed class WriteLineAstNode : Node
     {
-        public string? StringValue { get; set; }
+        public ExpressionNode? ArgumentExpression { get; set; }
 
         public WriteLineAstNode()
         {
@@ -374,11 +374,11 @@ namespace Puma
             };
         }
 
-        public static Node CreateWriteLine(string literal)
+        public static Node CreateWriteLine(ExpressionNode argument)
         {
             return new WriteLineAstNode
             {
-                StringValue = literal
+                ArgumentExpression = argument
             };
         }
 
