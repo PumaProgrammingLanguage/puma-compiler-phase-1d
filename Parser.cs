@@ -117,7 +117,7 @@ namespace Puma
         private int _currentIndentLevel;
         private int? _enumSectionIndent;
         private string? _currentEnumName;
-        private List<string> _currentEnumMembers = new();
+        private List<EnumMemberInfo> _currentEnumMemberDeclarations = new();
         private int? _recordSectionIndent;
         private string? _currentRecordName;
         private int? _currentRecordPackSize;
@@ -394,7 +394,7 @@ namespace Puma
             _currentIndentLevel = 0;
             _enumSectionIndent = null;
             _currentEnumName = null;
-            _currentEnumMembers = new List<string>();
+            _currentEnumMemberDeclarations = new List<EnumMemberInfo>();
             _recordSectionIndent = null;
             _currentRecordName = null;
             _currentRecordPackSize = null;
@@ -1000,7 +1000,7 @@ namespace Puma
                 if (!string.IsNullOrWhiteSpace(name))
                 {
                     _currentEnumName = name;
-                    _currentEnumMembers = new List<string>();
+                    _currentEnumMemberDeclarations = new List<EnumMemberInfo>();
                 }
                 return;
             }
@@ -1013,11 +1013,22 @@ namespace Puma
                 }
 
                 var memberTokens = ReadTokensUntilEol(token.Value);
-                var memberName = BuildQualifiedName(memberTokens);
-                if (!string.IsNullOrWhiteSpace(memberName))
+                var equalsIndex = memberTokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
+                var memberName = BuildQualifiedName(equalsIndex >= 0 ? memberTokens.Take(equalsIndex) : memberTokens);
+                if (string.IsNullOrWhiteSpace(memberName))
                 {
-                    _currentEnumMembers.Add(memberName);
+                    throw CreateParserException("Enum members require a name.", token.Value);
                 }
+
+                var valueExpression = equalsIndex >= 0
+                    ? ParseExpression(memberTokens.Skip(equalsIndex + 1).ToList())
+                    : null;
+                if (equalsIndex >= 0 && valueExpression == null)
+                {
+                    throw CreateParserException($"Enum member '{memberName}' is missing the initializer expression.", memberTokens[equalsIndex]);
+                }
+
+                _currentEnumMemberDeclarations.Add(new EnumMemberInfo { Name = memberName, ValueExpression = valueExpression });
                 return;
             }
 
@@ -2109,9 +2120,9 @@ namespace Puma
                 return;
             }
 
-            ast.Add(Node.CreateEnumDeclaration(_currentEnumName, _currentEnumMembers));
+            ast.Add(Node.CreateEnumDeclaration(_currentEnumName, _currentEnumMemberDeclarations));
             _currentEnumName = null;
-            _currentEnumMembers = new List<string>();
+            _currentEnumMemberDeclarations = new List<EnumMemberInfo>();
         }
 
         private void FinalizeRecord()

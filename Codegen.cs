@@ -339,9 +339,12 @@ namespace Puma
                 sb.AppendLine("// enums");
                 sb.AppendLine($"Enums {GetEnumName(node)}");
                 sb.AppendLine("{");
-                foreach (var member in GetEnumMembers(node))
+                foreach (var member in GetEnumMemberDeclarations(node))
                 {
-                    sb.AppendLine($"    {member},");
+                    var declaration = member.ValueExpression == null
+                        ? member.Name
+                        : $"{member.Name}={GenerateExpression(member.ValueExpression)}";
+                    sb.AppendLine($"    {declaration},");
                 }
                 sb.AppendLine("}");
                 sb.AppendLine();
@@ -498,11 +501,11 @@ namespace Puma
                 : null;
         }
 
-        private static List<string> GetEnumMembers(Node node)
+        private static List<EnumMemberInfo> GetEnumMemberDeclarations(Node node)
         {
             return node is EnumDeclarationAstNode typedNode
-                ? typedNode.EnumMembers
-                : new List<string>();
+                ? typedNode.MemberDeclarations
+                : new List<EnumMemberInfo>();
         }
 
         private static string? GetRecordName(Node node)
@@ -2183,6 +2186,7 @@ namespace Puma
             FunctionDeclarationAstNode or SectionAstNode or DelegateDeclarationAstNode => GetParameters(node).Select(parameter => parameter.DefaultExpression),
             AssignmentStatementAstNode assignment => new[] { assignment.AssignmentLeftExpression, assignment.AssignmentRightExpression },
             PropertyDeclarationAstNode property => new[] { property.PropertyValueExpression },
+            EnumDeclarationAstNode declaration => declaration.MemberDeclarations.Select(member => member.ValueExpression),
             RecordDeclarationAstNode record => record.MemberDeclarations.Select(member => member.ValueExpression),
             TypeDeclarationAstNode type => type.TypeProperties.SelectMany(GetExpressionRoots),
             FunctionCallAstNode call => new[] { call.Expression },

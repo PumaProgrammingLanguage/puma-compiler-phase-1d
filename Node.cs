@@ -89,12 +89,18 @@ namespace Puma
     internal sealed class EnumDeclarationAstNode : Node
     {
         public string? EnumName { get; set; }
-        public List<string> EnumMembers { get; } = new();
+        public List<EnumMemberInfo> MemberDeclarations { get; } = new();
 
         public EnumDeclarationAstNode()
         {
             Kind = NodeKind.EnumDeclaration;
         }
+    }
+
+    internal sealed class EnumMemberInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public ExpressionNode? ValueExpression { get; set; }
     }
 
     internal sealed class RecordMemberInfo
@@ -393,7 +399,7 @@ namespace Puma
             return node;
         }
 
-        public static Node CreateEnumDeclaration(string name, IEnumerable<string> members)
+        public static Node CreateEnumDeclaration(string name, IEnumerable<EnumMemberInfo> members)
         {
             var node = new EnumDeclarationAstNode
             {
@@ -401,7 +407,7 @@ namespace Puma
             };
             foreach (var member in members)
             {
-                node.EnumMembers.Add(member);
+                node.MemberDeclarations.Add(member);
             }
             return node;
         }
