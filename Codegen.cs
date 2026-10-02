@@ -367,7 +367,7 @@ namespace Puma
                     {
                         if (member.ValueExpression != null)
                         {
-                            var initializer = FormatInitializer(member.ValueExpression);
+                            var initializer = FormatInitializer(member.ValueExpression, ast);
                             sb.AppendLine($"    auto {member.Name} = {initializer};");
                         }
                         else
@@ -391,7 +391,7 @@ namespace Puma
             }
         }
 
-        private static string FormatInitializer(ExpressionNode? expression)
+        private static string FormatInitializer(ExpressionNode? expression, IEnumerable<Node>? declarations = null)
         {
             if (expression == null)
             {
@@ -410,7 +410,7 @@ namespace Puma
             }
 
             var initializer = GenerateExpression(expression);
-            return IsObjectConstructorCall(expression) ? $"new {initializer}" : initializer;
+            return IsObjectConstructorCall(expression, declarations) ? $"new {initializer}" : initializer;
         }
 
         private static void EmitGlobals(List<Node> ast, StringBuilder sb, HashSet<Node> typeProperties)
@@ -423,7 +423,7 @@ namespace Puma
                 sb.AppendLine("// properties");
                 foreach (var node in globalProperties)
                 {
-                    var initializer = FormatInitializer(GetPropertyValueExpression(node));
+                    var initializer = FormatInitializer(GetPropertyValueExpression(node), ast);
                     sb.AppendLine($"auto {GetPropertyName(node)} = {initializer};");
                 }
 
@@ -452,7 +452,7 @@ namespace Puma
 
                 if (shouldUseAuto)
                 {
-                    var initializer = FormatInitializer(propertyExpression);
+                    var initializer = FormatInitializer(propertyExpression, ast);
                     sb.AppendLine($"{modifiers}auto {propertyName} = {initializer};");
                 }
                 else
@@ -857,13 +857,26 @@ namespace Puma
                 : null;
         }
 
-        private static bool IsObjectConstructorCall(ExpressionNode? expression)
+        private static bool IsObjectConstructorCall(ExpressionNode? expression, IEnumerable<Node>? declarations = null)
         {
-            return expression?.Kind == ExpressionKind.Call
-                && expression.Left?.Kind == ExpressionKind.Identifier
-                && expression.Left.Value is { Length: > 0 } name
-                && name is not "List" and not "Range" and not "Array"
-                && char.IsUpper(name[0]);
+            if (expression?.Kind != ExpressionKind.Call
+                || expression.Left?.Kind != ExpressionKind.Identifier
+                || expression.Left.Value is not { Length: > 0 } name
+                || name is "List" or "Range" or "Array")
+            {
+                return false;
+            }
+
+            if (declarations?.Any(node => node.Kind == NodeKind.FunctionDeclaration
+                && string.Equals(GetFunctionDeclarationName(node), name, StringComparison.Ordinal)) == true)
+            {
+                return false;
+            }
+
+            return declarations?.Any(node => node.Kind == NodeKind.TypeDeclaration
+                    && GetTypeDeclarationKind(node) == "type"
+                    && string.Equals(GetTypeDeclarationName(node), name, StringComparison.Ordinal)) == true
+                || char.IsUpper(name[0]);
         }
 
         private static string ToPumaStringLiteral(string literal)
@@ -1013,28 +1026,29 @@ namespace Puma
             var bufferedStatements = new List<Node>();
             var emittedExpressionBasedLocalDeclaration = false;
             var emittedPropertyTypedAssignment = false;
-            var heapAllocatedGlobalProperties = ast
-                .Where(n => n.Kind == NodeKind.PropertyDeclaration
-                    && !string.IsNullOrWhiteSpace(GetPropertyName(n))
-                    && IsObjectConstructorCall(GetPropertyValueExpression(n)))
-                .Select(n => GetPropertyName(n)!)
-                .ToList();
             var functionsReturningConstructedObject = ast
                 .Where(n => n.Kind == NodeKind.FunctionDeclaration
-                    && ((GetFunctionBody(n)?.Any(s => s.Kind == NodeKind.ReturnStatement
-                        && IsObjectConstructorCall(GetStatementExpression(s))))
-                        ?? false))
+                    && EnumerateAllNodes(GetFunctionBody(n) ?? new List<Node>())
+                        .Any(s => s.Kind == NodeKind.ReturnStatement
+                            && IsObjectConstructorCall(GetStatementExpression(s), ast)))
                 .Select(GetFunctionDeclarationName)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .Select(n => n!)
                 .ToHashSet(StringComparer.Ordinal);
+            var heapAllocatedGlobalProperties = ast
+                .Where(n => n.Kind == NodeKind.PropertyDeclaration
+                    && !string.IsNullOrWhiteSpace(GetPropertyName(n))
+                    && (IsObjectConstructorCall(GetPropertyValueExpression(n), ast)
+                        || CallsFunctionReturningConstructedObject(GetPropertyValueExpression(n), functionsReturningConstructedObject)))
+                .Select(n => GetPropertyName(n)!)
+                .ToList();
             var propertiesAssignedToNone = new HashSet<string>(StringComparer.Ordinal);
             var transferredOwnershipLocals = new Dictionary<string, string>(StringComparer.Ordinal);
             var ownedLocalsToDelete = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var statement in statements)
             {
-                TrackOwnershipTransfer(statement, heapAllocatedGlobalProperties, globalNames, propertiesAssignedToNone, transferredOwnershipLocals, functionsReturningConstructedObject, ownedLocalsToDelete);
+                TrackOwnershipTransfer(statement, heapAllocatedGlobalProperties, globalNames, propertiesAssignedToNone, transferredOwnershipLocals, functionsReturningConstructedObject, ownedLocalsToDelete, ast);
 
                 if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    ", out var usedExpressionFallback, out var usedPropertyTypedAssignment))
                 {
@@ -1124,7 +1138,7 @@ namespace Puma
                     EmitStatementsWithLocalDeclarations(initializeStatements, sb, "        ", new HashSet<string?>(StringComparer.Ordinal));
                     sb.AppendLine("    }");
                 }
-                EmitTypeProperties(node, sb, "    ");
+                EmitTypeProperties(node, sb, "    ", ast);
                 EmitTypeFunctions(node, sb, "    ");
                 sb.AppendLine("};");
                 sb.AppendLine();
@@ -1149,7 +1163,7 @@ namespace Puma
                     EmitTraitInitializeStatements(initializeStatements, sb, "        ");
                     sb.AppendLine("    }");
                 }
-                EmitTypeProperties(node, sb, "    ");
+                EmitTypeProperties(node, sb, "    ", ast);
                 EmitTypeFunctions(node, sb, "    ");
                 sb.AppendLine("};");
                 sb.AppendLine();
@@ -1252,7 +1266,7 @@ namespace Puma
             }
         }
 
-        private static void EmitTypeProperties(Node node, StringBuilder sb, string indent)
+        private static void EmitTypeProperties(Node node, StringBuilder sb, string indent, List<Node> ast)
         {
             var protectedProperties = new List<Node>();
             var publicProperties = new List<Node>();
@@ -1270,8 +1284,9 @@ namespace Puma
                 }
             }
 
-            EmitPropertiesForAccess(protectedProperties, "protected", sb, indent);
-            EmitPropertiesForAccess(publicProperties, "public", sb, indent);
+            var declarations = ast.Concat(GetTypeFunctions(node));
+            EmitPropertiesForAccess(protectedProperties, "protected", sb, indent, declarations);
+            EmitPropertiesForAccess(publicProperties, "public", sb, indent, declarations);
 
             if ((protectedProperties.Count > 0 || publicProperties.Count > 0) && GetTypeFunctions(node).Count > 0)
             {
@@ -1279,7 +1294,7 @@ namespace Puma
             }
         }
 
-        private static void EmitPropertiesForAccess(List<Node> properties, string access, StringBuilder sb, string indent)
+        private static void EmitPropertiesForAccess(List<Node> properties, string access, StringBuilder sb, string indent, IEnumerable<Node> declarations)
         {
             if (properties.Count == 0)
             {
@@ -1290,7 +1305,7 @@ namespace Puma
             sb.AppendLine($"{indent}{access}:");
             foreach (var property in properties)
             {
-                var value = FormatInitializer(GetPropertyValueExpression(property));
+                var value = FormatInitializer(GetPropertyValueExpression(property), declarations);
                 var modifiers = GetPropertyModifiers(property).Contains("constant") ? "const " : string.Empty;
                 sb.AppendLine($"{indent}{modifiers}auto {GetPropertyName(property)} = {value};");
             }
@@ -1680,7 +1695,8 @@ namespace Puma
             HashSet<string> propertiesAssignedToNone,
             Dictionary<string, string> transferredOwnershipLocals,
             HashSet<string> functionsReturningConstructedObject,
-            HashSet<string> ownedLocalsToDelete)
+            HashSet<string> ownedLocalsToDelete,
+            List<Node> declarations)
         {
             if (statement.Kind != NodeKind.AssignmentStatement || GetAssignmentOperator(statement) != "=")
             {
@@ -1723,7 +1739,7 @@ namespace Puma
             if (GetAssignmentRightExpression(statement)!.Left?.Kind == ExpressionKind.Identifier)
             {
                 var functionName = GetAssignmentRightExpression(statement)!.Left!.Value ?? string.Empty;
-                if (IsObjectConstructorCall(GetAssignmentRightExpression(statement)))
+                if (IsObjectConstructorCall(GetAssignmentRightExpression(statement), declarations))
                 {
                     ownedLocalsToDelete.Add(leftName);
                     return;
@@ -1748,6 +1764,13 @@ namespace Puma
             {
                 transferredOwnershipLocals[sourceName] = leftName;
             }
+        }
+
+        private static bool CallsFunctionReturningConstructedObject(ExpressionNode? expression, HashSet<string> functions)
+        {
+            return expression?.Kind == ExpressionKind.Call
+                && GetSimpleIdentifier(expression.Left) is { } name
+                && functions.Contains(name);
         }
 
         private static bool IsNoneExpression(ExpressionNode? expression)
