@@ -868,16 +868,6 @@ namespace Puma
 
         private static string ToPumaStringLiteral(string literal)
         {
-            if (string.IsNullOrWhiteSpace(literal))
-            {
-                return "PumaType::String(\"\", sizeof(\"\") - 1)";
-            }
-
-            if (literal.StartsWith("PumaType::String(", StringComparison.Ordinal))
-            {
-                return literal;
-            }
-
             return $"PumaType::String({literal}, sizeof({literal}) - 1)";
         }
 
@@ -1206,7 +1196,9 @@ namespace Puma
                     && !declared.Contains(left)
                     && ContainsStringLiteral(rightExpression))
                 {
-                    var value = ToPumaStringLiteral(GenerateExpression(rightExpression));
+                    var value = rightExpression?.Kind == ExpressionKind.Literal
+                        ? ToPumaStringLiteral(rightExpression.Value!)
+                        : GenerateExpression(rightExpression);
                     sb.AppendLine($"{indent}auto {left} = {value};");
                     declared.Add(left);
                     continue;
@@ -1398,7 +1390,7 @@ namespace Puma
                                 && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal
                                 && ContainsStringLiteral(GetAssignmentRightExpression(node)))
                             {
-                                rightExpression = ToPumaStringLiteral(rightExpression);
+                                rightExpression = ToPumaStringLiteral(GetAssignmentRightExpression(node)!.Value!);
                             }
 
                             if (GetAssignmentOperator(node) == "="
@@ -1797,74 +1789,30 @@ namespace Puma
                     && propertyNames.Contains(assignmentName));
         }
 
-        private static bool TryGetExpressionTypeAndInitializer(Node statement, out string typeName, out string initializer)
+        private static bool TryGetExpressionInitializer(Node statement, out string initializer)
         {
-            typeName = "int64_t";
             initializer = string.Empty;
 
-            if (GetAssignmentRightExpression(statement) == null)
-            {
-                return false;
-            }
-
-            var expressionText = GenerateExpression(GetAssignmentRightExpression(statement));
-            if (string.IsNullOrWhiteSpace(expressionText))
-            {
-                return false;
-            }
-
-            if (IsIdentifier(GetAssignmentRightExpression(statement), "bool"))
-            {
-                typeName = "bool";
-                initializer = "false";
-                return true;
-            }
-
-            if (IsIdentifier(GetAssignmentRightExpression(statement), "str"))
-            {
-                typeName = "PumaType::String";
-                initializer = ToPumaStringLiteral("\"\"");
-                return true;
-            }
-
-            if (ContainsBooleanKeyword(GetAssignmentRightExpression(statement)))
-            {
-                typeName = "bool";
-            }
-            else if (ContainsStringLiteral(GetAssignmentRightExpression(statement)))
-            {
-                typeName = "PumaType::String";
-            }
-            else if (ContainsDecimalLiteral(GetAssignmentRightExpression(statement)))
-            {
-                typeName = "double";
-            }
-            else
-            {
-                typeName = "int64_t";
-            }
-
-            initializer = expressionText;
-            return true;
-        }
-
-        private static bool ContainsDecimalLiteral(ExpressionNode? expression)
-        {
+            var expression = GetAssignmentRightExpression(statement);
             if (expression == null)
             {
                 return false;
             }
 
-            if (expression.Kind == ExpressionKind.Literal
-                && !string.IsNullOrWhiteSpace(expression.Value)
-                && expression.Value.Contains('.'))
+            if (IsIdentifier(expression, "bool"))
             {
+                initializer = "false";
                 return true;
             }
 
-            return ContainsDecimalLiteral(expression.Left)
-                || ContainsDecimalLiteral(expression.Right)
-                || expression.Arguments.Any(ContainsDecimalLiteral);
+            if (IsIdentifier(expression, "str"))
+            {
+                initializer = ToPumaStringLiteral("\"\"");
+                return true;
+            }
+
+            initializer = GenerateExpression(expression);
+            return true;
         }
 
         private static bool ContainsStringLiteral(ExpressionNode? expression)
@@ -2018,7 +1966,7 @@ namespace Puma
             }
             else if (!TryGetTypedLiteralDeclaration(statement, out typeName, out value))
             {
-                if (!TryGetExpressionTypeAndInitializer(statement, out typeName, out value))
+                if (!TryGetExpressionInitializer(statement, out value))
                 {
                     return false;
                 }
@@ -2047,7 +1995,6 @@ namespace Puma
                 "PumaType::String" => ToPumaStringLiteral(value),
                 "PumaType::Character" => $"Character({value})",
                 "bool" => value,
-                _ when value.StartsWith($"({typeName})", StringComparison.Ordinal) => value,
                 _ => $"({typeName}){value}"
             };
 

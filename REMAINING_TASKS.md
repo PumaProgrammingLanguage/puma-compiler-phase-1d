@@ -21,7 +21,8 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
   - [x] Remove duplicate assignment operands/inferred-type text, property initializer text, and function/section parameter text; retain AST metadata and diagnostic spans.
   - [ ] Audit and retire retained legacy expression-text fields after their remaining consumers are migrated.
 	- [x] Replace enum member initializer strings with structured declarations and initializer ASTs.
-	- [ ] Audit remaining generated-text type/ownership decisions before closing the broader migration.
+	- [x] Remove generated-string wrapping/cast-prefix decisions and unused generalized local type guesses; select initializer behavior from AST metadata.
+	- [ ] Complete the final semantic-consumer audit, including constructor/ownership classification, before closing the broader migration.
 - [ ] Remove raw string fallback generation incrementally after each syntax path has complete structured AST coverage.
   - [x] Remove record substring-based codegen and emit record initializers directly from expression nodes.
   - [x] Remove property initializer/type text-parsing helpers and share AST initializer formatting with records.
@@ -29,6 +30,7 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
   - [x] Migrate built-in `WriteLn` raw argument storage/emission to structured expressions.
   - [x] Remove function-call raw-text emission fallback and preserve complete call-containing expressions.
   - [x] Emit enum member initializers from structured expressions and discover fixed-width dependencies through their ASTs.
+  - [x] Preserve string-containing call/compound initializer ASTs instead of wrapping their generated text as string literals.
 - [ ] Add exact compiler-module regression coverage for each migrated path.
   - [x] Validate typed literal, unary, conditional, cast, and call-argument output, plus native compilation of nested integer casts.
   - [x] Validate record numeric forms, runtime headers, initializer AST changes, and parser reuse with exact-output tests.
@@ -39,8 +41,9 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
   - [x] Validate control-flow exact output/source spans, condition AST replacement/dependencies, nested match/when, bare repeat, missing-condition diagnostics, and parser reuse.
   - [x] Validate assignment AST metadata/spans, postfix lowering, missing operands, function/section parameter-list replacement, retained numeric inference diagnostics, and parser reuse; update existing tests to assert AST equivalents without changing expected C++ output.
   - [x] Validate enum compound/unary/cast/conditional/call initializers, source spans, dependencies, AST replacement, mixed/multiple declarations, exact diagnostics, and parser reuse after successful and failed parses.
+  - [x] Validate string literal versus call/compound root selection, literal/call AST replacement, single numeric casts, general local initializers, and bare bool/string defaults.
 
-Latest validation: 278/278 tests passed in Visual Studio, including 15 new enum regression cases; solution build passed. Enum members now retain declaration names and initializer expression trees instead of combined strings. Parser accumulation/finalization/reset uses structured members; missing names/initializers receive location-aware diagnostics. Codegen emits complete initializer ASTs and traverses them for fixed-width dependencies, including after AST replacement. Existing assigned/unassigned enum expected output remains unchanged. Separate Debug/Release runs are not claimed. The broader migration remains open: next audit remaining generated-text type/ownership decisions. Standard C++ enum declaration syntax/native compilation is a separate follow-up because the preserved legacy output uses `Enums` and no terminating semicolon. Postponed feature scenarios, the conversion table, and project architecture settings are unchanged; the previously observed MSB3270 architecture warning remains a separate follow-up.
+Latest validation: 294/294 tests passed in Visual Studio, including 16 new initializer regression cases; solution build passed. Fixed function locals initialized by calls/compound expressions containing string arguments: only a direct literal root receives literal string construction, while other roots preserve their full expression. String formatting no longer parses generated C++ prefixes or silently substitutes empty text. Removed generated-cast prefix checks and unused generalized type guesses/decimal scans; local fallback values come from ASTs with explicit bare bool/string defaults. Existing ownership and runtime regressions pass; ownership behavior is unchanged in this increment. Separate Debug/Release runs are not claimed. The broader migration remains open for the final semantic-consumer audit, including constructor/ownership classification. Standard C++ enum syntax and global numeric return mapping remain separate follow-ups. Postponed feature scenarios, the conversion table, and project architecture settings are unchanged; the previously observed MSB3270 architecture warning remains a separate follow-up.
 
 - [ ] Map global numeric function return signatures to C++ types (for example, `int32` to `int32_t`) and add exact-output/native compilation coverage. This pre-existing issue was discovered during typed-return testing; current return-expression regressions use the supported `int` signature.
 - [ ] Emit standard C++ enum declarations and add exact-output/native compilation coverage; the current legacy output uses `Enums` and no terminating semicolon.
