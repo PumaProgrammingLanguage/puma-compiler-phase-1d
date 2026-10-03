@@ -824,7 +824,7 @@ void Hello(void)
     PrintLn(s);
 }
 
-int Add(int64_t a, int64_t b)
+int64_t Add(int64_t a, int64_t b)
 {
     return a + b;
 }
@@ -1708,8 +1708,10 @@ int main()
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// functions
-int F(void)
+@"#include <cstdint>
+
+// functions
+int64_t F(void)
 {
     return 1;
 }

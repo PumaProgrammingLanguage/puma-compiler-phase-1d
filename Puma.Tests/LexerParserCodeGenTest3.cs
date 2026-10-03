@@ -452,7 +452,7 @@ int main()
 @"#include <cstdint>
 
 // functions
-int Increment(int64_t value)
+int64_t Increment(int64_t value)
 {
     value = value + 1;
     return value;
@@ -485,7 +485,7 @@ int Increment(int64_t value)
 @"#include <cstdint>
 
 // functions
-int Echo(int64_t value)
+int64_t Echo(int64_t value)
 {
     return value;
 }
@@ -626,7 +626,7 @@ int Echo(int64_t value)
 @"#include <cstdint>
 
 // functions
-int Update(int64_t value)
+int64_t Update(int64_t value)
 {
     value = 2;
     return value;

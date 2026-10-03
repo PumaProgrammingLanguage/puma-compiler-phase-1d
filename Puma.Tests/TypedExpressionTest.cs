@@ -15,7 +15,7 @@ namespace test
         public void TypedReturn_EmitsCastsAndRequiredHeader(string expression, string expectedExpression)
         {
             var source = $"functions\n    Value() int\n        return {expression}\n";
-            var expected = $"#include <cstdint>\n\n// functions\nint Value(void)\n{{\n    return {expectedExpression};\n}}";
+            var expected = $"#include <cstdint>\n\n// functions\nint64_t Value(void)\n{{\n    return {expectedExpression};\n}}";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
 
             var generated = new Codegen().Generate(ast);

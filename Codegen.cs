@@ -147,9 +147,10 @@ namespace Puma
                 }
             }
 
-            var needsStdIntForFunctionParameters = allNodes.Any(n => n.Kind == NodeKind.FunctionDeclaration
-                && (GetFunctionParameterList(n)?.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t") ?? false));
-            if (needsStdIntForFunctionParameters)
+            var needsStdIntForFunctionSignatures = allNodes.Any(n => n.Kind == NodeKind.FunctionDeclaration
+                && (MapNumericReturnType(GetFunctionDeclarationReturnType(n)) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t"
+                    || (GetFunctionParameterList(n)?.Any(p => MapType(p.Type) is "int64_t" or "int32_t" or "int16_t" or "int8_t" or "uint64_t" or "uint32_t" or "uint16_t" or "uint8_t") ?? false)));
+            if (needsStdIntForFunctionSignatures)
             {
                 includes.Add("<cstdint>");
             }
@@ -912,7 +913,7 @@ namespace Puma
             {
                 var returnType = string.IsNullOrWhiteSpace(GetFunctionDeclarationReturnType(node))
                     ? "void"
-                    : GetFunctionDeclarationReturnType(node);
+                    : MapNumericReturnType(GetFunctionDeclarationReturnType(node)) ?? GetFunctionDeclarationReturnType(node);
                 var functionParameterList = GetFunctionParameterList(node) ?? new List<Node.ParameterInfo>();
                 var functionBody = GetFunctionBody(node) ?? new List<Node>();
                 var parameters = functionParameterList.Count == 0
@@ -1646,6 +1647,14 @@ namespace Puma
                 _ => "0"
             };
         }
+
+        private static string? MapNumericReturnType(string? type) => type switch
+        {
+            "int" or "int64" or "int32" or "int16" or "int8"
+                or "uint" or "uint64" or "uint32" or "uint16" or "uint8"
+                or "flt" or "flt64" or "flt32" => MapType(type),
+            _ => null
+        };
 
         private static string? MapType(string? type)
         {
