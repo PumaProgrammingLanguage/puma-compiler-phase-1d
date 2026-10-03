@@ -4,7 +4,7 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
 
 ## 1. AST Semantic-Model Migration
 
-- [ ] Make structured `ExpressionNode` trees authoritative for expression semantics.
+- [x] Make structured `ExpressionNode` trees authoritative for expression semantics.
   - [x] Emit explicitly typed numeric literals from expression metadata in nested expressions, calls, and returns.
   - [x] Infer typed local declarations without consulting legacy assignment inference fields.
   - [x] Discover fixed-width integer header dependencies by traversing structured expressions.
@@ -12,19 +12,19 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
   - [x] Format global/type property initializers and select declaration forms from structured expressions; classify constructor ownership without reparsing generated calls.
   - [x] Parse and emit parameter defaults as expression nodes, including nested calls and runtime/header dependencies.
   - [x] Use AST identifiers for assignment validation and AST expressions for `has trait` generation.
-- [ ] Retain source text and source spans only for diagnostics.
+- [x] Retain source text and source spans only for diagnostics.
   - [x] Remove duplicate record `name=value` strings, member-type dictionaries, and redundant member type metadata.
   - [x] Remove duplicate property type metadata and derive parser numeric conversion types from initializer ASTs.
   - [x] Replace parameter `DefaultValue` text with `DefaultExpression` and its source span.
   - [x] Remove redundant function-call name/argument strings and unused generic statement value text; construct and validate these paths from expression trees.
   - [x] Remove redundant control-flow expression text and trait receiver text; construct conditions, loop expressions, and trait receivers directly from ASTs.
   - [x] Remove duplicate assignment operands/inferred-type text, property initializer text, and function/section parameter text; retain AST metadata and diagnostic spans.
-  - [ ] Audit and retire retained legacy expression-text fields after their remaining consumers are migrated.
+	- [x] Audit and retire retained legacy expression-text fields after their remaining consumers are migrated.
 	- [x] Replace enum member initializer strings with structured declarations and initializer ASTs.
 	- [x] Remove generated-string wrapping/cast-prefix decisions and unused generalized local type guesses; select initializer behavior from AST metadata.
 	- [x] Resolve declared function/type calls from AST declarations during constructor emission and ownership discovery; traverse nested factory return ASTs.
-	- [ ] Complete the final semantic-consumer audit, including unresolved external call/type metadata, before closing the broader migration.
-- [ ] Remove raw string fallback generation incrementally after each syntax path has complete structured AST coverage.
+	- [x] Complete the bounded semantic-consumer audit: distinguish AST lexemes and output formatting from full-expression semantic reparsing; track external symbol resolution independently.
+- [x] Remove raw string fallback generation incrementally after each syntax path has complete structured AST coverage.
   - [x] Remove record substring-based codegen and emit record initializers directly from expression nodes.
   - [x] Remove property initializer/type text-parsing helpers and share AST initializer formatting with records.
   - [x] Remove the obsolete raw-text literal parser and `has` accessors; eliminate assignment `none` text fallback and generated-text classification for repeat/string/character decisions.
@@ -32,7 +32,7 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
   - [x] Remove function-call raw-text emission fallback and preserve complete call-containing expressions.
   - [x] Emit enum member initializers from structured expressions and discover fixed-width dependencies through their ASTs.
   - [x] Preserve string-containing call/compound initializer ASTs instead of wrapping their generated text as string literals.
-- [ ] Add exact compiler-module regression coverage for each migrated path.
+- [x] Add exact compiler-module regression coverage for each migrated path.
   - [x] Validate typed literal, unary, conditional, cast, and call-argument output, plus native compilation of nested integer casts.
   - [x] Validate record numeric forms, runtime headers, initializer AST changes, and parser reuse with exact-output tests.
   - [x] Validate property numeric forms, casts, default strings, AST replacement, type properties, constructors/owner deletion, and bare-type initialization with exact-output tests.
@@ -45,10 +45,7 @@ Use this checklist to track the remaining compiler improvements. Mark a task com
   - [x] Validate string literal versus call/compound root selection, literal/call AST replacement, single numeric casts, general local initializers, and bare bool/string defaults.
   - [x] Validate declaration-aware constructor/function classification, global/local/record/type/trait initializers, nested factory ownership, numeric-result non-deletion, declared lowercase types, declaration AST changes, and codegen reuse.
 
-Latest validation: 305/305 tests passed in Visual Studio, with no skips, including 11 new constructor/ownership regression cases; solution build passed. Constructor classification now consults function/type AST declarations: declared uppercase functions are not allocated or deleted as constructors, and declared lowercase types are recognized. Property/record/type/trait initializer formatting receives declaration context, including owner methods. Factory discovery traverses nested return ASTs; global and local factory-produced owners retain cleanup, while numeric function results are not deleted. Declaration AST changes and codegen reuse update classification without stale state. Separate Debug/Release runs are not claimed. The broader migration remains open because unresolved external bare calls still use the existing uppercase convention until external symbol/type metadata is available; final semantic-consumer review remains pending. Standard C++ enum syntax and global numeric return mapping remain separate follow-ups. Postponed feature scenarios, the conversion table, and project architecture settings are unchanged; the previously observed MSB3270 architecture warning remains a separate follow-up.
-
-- [ ] Map global numeric function return signatures to C++ types (for example, `int32` to `int32_t`) and add exact-output/native compilation coverage. This pre-existing issue was discovered during typed-return testing; current return-expression regressions use the supported `int` signature.
-- [ ] Emit standard C++ enum declarations and add exact-output/native compilation coverage; the current legacy output uses `Enums` and no terminating semicolon.
+Closure validation: the bounded audit of `Node.cs`, `Parser.cs`, and `Codegen.cs` found no remaining duplicate full-expression text fields or generated-C++ semantic reparsing. Expression operands, defaults, initializers, conditions, dependency discovery, and ownership classification use AST nodes and metadata. Retained literal lexemes, declaration/type names, import/header metadata, and output-formatting helpers are not raw-expression fallbacks. No compiler or test changes were needed in the closing pass. A fresh solution build succeeded and all 305/305 tests passed in Visual Studio. Separate Debug/Release runs are not claimed. The original migration is complete; this does not claim complete language semantics or universal C++ correctness. External symbol resolution, numeric return mapping, and standard C++ enum output are independent tasks in section 6. Postponed feature scenarios, the conversion table, and project architecture settings are unchanged; the previously observed MSB3270 architecture warning remains a separate follow-up.
 
 ## 2. Broader Location-Aware Diagnostics
 
@@ -80,3 +77,9 @@ Latest validation: 305/305 tests passed in Visual Studio, with no skips, includi
 - [x] Reject a missing value after `-o` or `--output`.
 - [x] Preserve unknown flags as `clang++` pass-through arguments.
 - [x] Add CLI integration tests for exit codes and generated source files.
+
+## 6. Independent Semantic and C++ Output Follow-Ups
+
+- [ ] Resolve external call/type symbols from metadata rather than the current uppercase convention for unresolved bare-call AST identifiers; add exact-output/AST-authority coverage. This is a separate semantic capability, not a raw-expression storage or generation fallback.
+- [ ] Map global numeric function return signatures to C++ types (for example, `int32` to `int32_t`) and add exact-output/native compilation coverage. This pre-existing issue was discovered during typed-return testing; current return-expression regressions use the supported `int` signature.
+- [ ] Emit standard C++ enum declarations and add exact-output/native compilation coverage; the current legacy output uses `Enums` and no terminating semicolon.
