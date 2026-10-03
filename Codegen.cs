@@ -338,7 +338,7 @@ namespace Puma
             foreach (var node in ast.Where(n => n.Kind == NodeKind.EnumDeclaration))
             {
                 sb.AppendLine("// enums");
-                sb.AppendLine($"Enums {GetEnumName(node)}");
+                sb.AppendLine($"enum {GetEnumName(node)}");
                 sb.AppendLine("{");
                 foreach (var member in GetEnumMemberDeclarations(node))
                 {
@@ -347,7 +347,7 @@ namespace Puma
                         : $"{member.Name}={GenerateExpression(member.ValueExpression)}";
                     sb.AppendLine($"    {declaration},");
                 }
-                sb.AppendLine("}");
+                sb.AppendLine("};");
                 sb.AppendLine();
             }
         }

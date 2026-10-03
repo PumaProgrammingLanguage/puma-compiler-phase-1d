@@ -68,10 +68,11 @@ Recent updates
 
 - Completed global numeric return-signature mapping using existing numeric C++ mappings, including `int`/`int64` to `int64_t`, `int32` to `int32_t`, and `flt32`/`flt64` to `float`/`double`. Return declaration metadata now supplies `<cstdint>` even for untyped bodies. Added 16 exact-output regression cases, including 13 native clang compilations, AST return-type replacement, parser/codegen reuse, and nonnumeric signature preservation. Updated existing numeric signature expectations without changing Puma inputs or return-expression expectations. Solution build passed and all 321 tests passed in Visual Studio with no skips; separate Debug/Release runs are not claimed. Fixed-point global returns, postponed scenarios, the conversion table, and architecture settings are unchanged. External symbol resolution and standard C++ enum output remain independent follow-ups.
 
+- Completed standard C++ enum declaration output: replaced the legacy `Enums` keyword with unscoped `enum` and added the required terminating semicolon. Puma syntax, AST initializers, and unqualified member references are unchanged. Updated existing enum output expectations and added six full expected-output/native clang cases covering automatic/mixed values, typed arithmetic, negative/conditional constants, and multiple enums with cross-enum references. All six compile with C++20 and `-pedantic-errors`; solution build passed, enum tests passed 21/21, and the full IDE suite passed 327/327. Separate Debug/Release runs are not claimed. Arbitrary initializer-call constant-expression validation is outside this declaration-syntax fix. External symbol resolution and the runtime prerequisites in task #3 remain open; postponed scenarios, the conversion table, and architecture settings are unchanged.
+
 1) Unit test TODO list
 
 1. Add external symbol/type resolution coverage when that independent capability is implemented; unresolved external bare-call AST identifiers currently retain the uppercase convention. The original migration's bounded semantic-consumer audit and exact-output/AST-authority coverage are complete.
-2. Add standard C++ enum declaration output and native compilation coverage; existing enum output preserves the legacy `Enums` keyword and missing terminating semicolon.
 
 2) Separate special-feature TODO list - On hold until core language features are implemented
 

@@ -1137,12 +1137,12 @@ struct MyRecord
             var generated = codegen.Generate(ast);
             var expected =
 @"// enums
-Enums MyEnum
+enum MyEnum
 {
     A,
     B,
     C,
-}
+};
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -1184,12 +1184,12 @@ Enums MyEnum
             var generated = codegen.Generate(ast);
             var expected =
 @"// enums
-Enums MyEnum
+enum MyEnum
 {
     A=1,
     B=3,
     C=5,
-}
+};
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
