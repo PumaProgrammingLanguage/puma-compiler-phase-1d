@@ -105,8 +105,8 @@ namespace test
 // start
 int main()
 {
-    auto first = Character('A');
-    auto newline = Character('\n');
+    auto first = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
+    auto newline = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x0A""));
 
     return 0;
 }
@@ -604,8 +604,8 @@ int main()
 @"#include <PumaType/Character.hpp>
 
 // properties
-auto first = Character('A');
-auto newline = Character('\n');
+auto first = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
+auto newline = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x0A""));
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -644,12 +644,12 @@ initialize
 @"#include <PumaType/Character.hpp>
 
 // properties
-auto current = Character('A');
+auto current = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
 
 // initialize
 void initialize(void)
 {
-    current = Character('\n');
+    current = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x0A""));
 }
 ";
 
@@ -690,7 +690,7 @@ void initialize(void)
 @"#include <PumaType/Character.hpp>
 
 // functions
-char Pick(PumaType::Character a, PumaType::Character b)
+PumaType::Character Pick(PumaType::Character a, PumaType::Character b)
 {
     auto result = ((a == b) ? a : b);
     auto mirror = result;

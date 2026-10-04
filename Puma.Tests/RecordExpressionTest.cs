@@ -57,7 +57,7 @@ struct Values
 {
     auto enabled = false;
     auto label = PumaType::String(""x=y"", sizeof(""x=y"") - 1);
-    auto marker = Character('A');
+    auto marker = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
 };";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
             var result = new Codegen().GenerateResult(ast);

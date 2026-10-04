@@ -14,7 +14,7 @@ namespace test
         [DataRow("double", "(1) int16", "(int16_t) 1", "#include <cstdint>\n\n")]
         [DataRow("double", "1 uint8 + 2 int16", "((uint8_t)1 + (int16_t)2)", "#include <cstdint>\n\n")]
         [DataRow("PumaType::String", "\"hello\"", "PumaType::String(\"hello\", sizeof(\"hello\") - 1)", "#include <PumaType/String.hpp>\n\n")]
-        [DataRow("PumaType::Character", "'x'", "Character('x')", "#include <PumaType/Character.hpp>\n\n")]
+        [DataRow("PumaType::Character", "'x'", "PumaType::Character(reinterpret_cast<const uint8_t*>(\"\\x78\"))", "#include <PumaType/Character.hpp>\n\n")]
         [DataRow("bool_t", "true", "true", "#include <stdbool>\n\n")]
         public void DefaultExpression_EmitsStructuredValueAndDependencies(string type, string expression, string argument, string headers)
         {

@@ -405,7 +405,7 @@ namespace Puma
                 {
                     "bool" => literalValue,
                     "PumaType::String" => ToPumaStringLiteral(literalValue),
-                    "PumaType::Character" => $"Character({literalValue})",
+                    "PumaType::Character" => ToPumaCharacterLiteral(literalValue),
                     _ => $"({typeName}){literalValue}"
                 };
             }
@@ -885,6 +885,33 @@ namespace Puma
             return $"PumaType::String({literal}, sizeof({literal}) - 1)";
         }
 
+        private static string ToPumaCharacterLiteral(string literal)
+        {
+            var value = literal[1..^1];
+            if (value.StartsWith('\\'))
+            {
+                value = value[1] switch
+                {
+                    'x' or 'u' or 'U' => new Rune(Convert.ToInt32(value[2..], 16)).ToString(),
+                    '0' => "\0",
+                    'a' => "\a",
+                    'b' => "\b",
+                    'f' => "\f",
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    'v' => "\v",
+                    '\\' => "\\",
+                    '\'' => "'",
+                    '"' => "\"",
+                    _ => throw new InvalidOperationException("Unsupported character literal escape.")
+                };
+            }
+
+            var bytes = string.Concat(Encoding.UTF8.GetBytes(value).Select(b => $"\\x{b:X2}"));
+            return $"PumaType::Character(reinterpret_cast<const uint8_t*>(\"{bytes}\"))";
+        }
+
         private static void EmitFunctions(List<Node> ast, StringBuilder sb, HashSet<Node> typeFunctions)
         {
             var globalNames = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration)
@@ -913,7 +940,9 @@ namespace Puma
             {
                 var returnType = string.IsNullOrWhiteSpace(GetFunctionDeclarationReturnType(node))
                     ? "void"
-                    : MapNumericReturnType(GetFunctionDeclarationReturnType(node)) ?? GetFunctionDeclarationReturnType(node);
+                    : GetFunctionDeclarationReturnType(node) == "char"
+                        ? "PumaType::Character"
+                        : MapNumericReturnType(GetFunctionDeclarationReturnType(node)) ?? GetFunctionDeclarationReturnType(node);
                 var functionParameterList = GetFunctionParameterList(node) ?? new List<Node.ParameterInfo>();
                 var functionBody = GetFunctionBody(node) ?? new List<Node>();
                 var parameters = functionParameterList.Count == 0
@@ -1377,6 +1406,12 @@ namespace Puma
                             var leftExpression = GenerateExpression(GetAssignmentLeftExpression(node));
                             var rightExpression = GenerateExpression(GetAssignmentRightExpression(node));
 
+                            if (GetAssignmentRightExpression(node) is { Kind: ExpressionKind.Call, Left.Kind: ExpressionKind.Identifier } call
+                                && !string.IsNullOrWhiteSpace(call.Left.Value))
+                            {
+                                rightExpression = BuildCallWithDefaultArguments(call.Left.Value, call, ast);
+                            }
+
                             if (GetIsLoweredPostfixMutation(node) && (GetAssignmentOperator(node) == "+=" || GetAssignmentOperator(node) == "-="))
                             {
                                 var op = GetAssignmentOperator(node) == "+=" ? "++" : "--";
@@ -1409,13 +1444,6 @@ namespace Puma
                                 rightExpression = ToPumaStringLiteral(GetAssignmentRightExpression(node)!.Value!);
                             }
 
-                            if (GetAssignmentOperator(node) == "="
-                                && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal
-                                && ContainsCharacterLiteral(GetAssignmentRightExpression(node)))
-                            {
-                                rightExpression = $"Character({rightExpression})";
-                            }
-
                             var emittedTypedPropertyLiteral = false;
                             if (GetAssignmentOperator(node) == "=" && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.Literal)
                             {
@@ -1429,6 +1457,7 @@ namespace Puma
                                     rightExpression = typedLiteralName switch
                                     {
                                         "PumaType::String" => ToPumaStringLiteral(typedLiteralValue),
+                                        "PumaType::Character" => ToPumaCharacterLiteral(typedLiteralValue),
                                         "bool" => typedLiteralValue,
                                         _ => $"({typedLiteralName}){typedLiteralValue}"
                                     };
@@ -1590,6 +1619,7 @@ namespace Puma
                 ExpressionKind.Identifier => string.Equals(node.Value, "none", StringComparison.OrdinalIgnoreCase)
                     ? "null"
                     : node.Value ?? string.Empty,
+                ExpressionKind.Literal when ContainsCharacterLiteral(node) => ToPumaCharacterLiteral(node.Value!),
                 ExpressionKind.Literal => !string.IsNullOrWhiteSpace(node.DeclaredType)
                     ? $"({MapType(node.DeclaredType) ?? node.DeclaredType}){node.Value}"
                     : node.Value ?? string.Empty,
@@ -2025,7 +2055,7 @@ namespace Puma
             var initializer = typeName switch
             {
                 "PumaType::String" => ToPumaStringLiteral(value),
-                "PumaType::Character" => $"Character({value})",
+                "PumaType::Character" => ToPumaCharacterLiteral(value),
                 "bool" => value,
                 _ => $"({typeName}){value}"
             };
