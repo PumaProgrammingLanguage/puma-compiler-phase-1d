@@ -59,7 +59,7 @@ Closure validation: the bounded audit of `Node.cs`, `Parser.cs`, and `Codegen.cs
 
 - [x] Execute the generated `WriteLn` sample and assert its output and exit code.
 - [x] Add native execution coverage for string runtime dependencies.
-- [ ] Add native execution coverage for character runtime dependencies after the runtime exports the authoritative `Character` API.
+- [x] Add native execution coverage for character runtime dependencies using the authoritative `PumaType::Character` UTF-8 constructor. Character literal ASTs emit explicit UTF-8 bytes through the installed `const uint8_t*` API; global `char` return signatures map to `PumaType::Character`. Added 19 exact-output/native clang compilation, linking, and execution cases covering ASCII, control/quote/backslash escapes, hex/Unicode escapes, multibyte characters, parameters, returns, defaults, reassignment, AST replacement, and codegen reuse. Direct assignment-call defaults now reuse the existing AST declaration expansion. Solution build succeeded and all 346/346 IDE tests passed with no skips; separate Debug/Release runs are not claimed. Runtime files were not changed; character comparison/operator support and invalid Unicode scalar diagnostics are outside this task.
 - [x] Add native execution coverage for the console runtime dependency.
 - [ ] Add native execution coverage for the file runtime dependency after Puma source supports creating and calling `PumaFile` objects.
 - [x] Keep compilation, linking, and execution tests independent from test-helper behavior.
