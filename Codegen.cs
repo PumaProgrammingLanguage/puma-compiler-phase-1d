@@ -28,9 +28,9 @@ namespace Puma
         {
         }
 
-        internal string Generate(List<Node> ast) => GenerateResult(ast).SourceCode;
+        internal string Generate(List<Node> ast, IEnumerable<ExternalSymbol>? externalSymbols = null) => GenerateResult(ast, externalSymbols).SourceCode;
 
-        internal CodeGenerationResult GenerateResult(List<Node> ast)
+        internal CodeGenerationResult GenerateResult(List<Node> ast, IEnumerable<ExternalSymbol>? externalSymbols = null)
         {
             var sb = new StringBuilder();
             var includes = new HashSet<string>(StringComparer.Ordinal);
@@ -41,6 +41,11 @@ namespace Puma
             }
 
             var allNodes = EnumerateAllNodes(ast).ToList();
+            var externalSymbolTable = CreateExternalSymbolTable(externalSymbols);
+            foreach (var expression in allNodes.SelectMany(GetExpressionRoots))
+            {
+                BindExternalSymbols(expression, externalSymbolTable);
+            }
             var defaultExpressions = allNodes.SelectMany(GetParameters)
                 .Select(parameter => parameter.DefaultExpression).ToList();
             if (defaultExpressions.Any(ContainsStringLiteral)) includes.Add("<PumaType/String.hpp>");
@@ -874,10 +879,16 @@ namespace Puma
                 return false;
             }
 
-            return declarations?.Any(node => node.Kind == NodeKind.TypeDeclaration
+            if (declarations?.Any(node => node.Kind == NodeKind.TypeDeclaration
                     && GetTypeDeclarationKind(node) == "type"
-                    && string.Equals(GetTypeDeclarationName(node), name, StringComparison.Ordinal)) == true
-                || char.IsUpper(name[0]);
+                    && string.Equals(GetTypeDeclarationName(node), name, StringComparison.Ordinal)) == true)
+            {
+                return true;
+            }
+
+            return expression.Left.ResolvedExternalSymbol is { } symbol
+                ? symbol.Kind == ExternalSymbolKind.Type
+                : char.IsUpper(name[0]);
         }
 
         private static string ToPumaStringLiteral(string literal)
@@ -1056,15 +1067,7 @@ namespace Puma
             var bufferedStatements = new List<Node>();
             var emittedExpressionBasedLocalDeclaration = false;
             var emittedPropertyTypedAssignment = false;
-            var functionsReturningConstructedObject = ast
-                .Where(n => n.Kind == NodeKind.FunctionDeclaration
-                    && EnumerateAllNodes(GetFunctionBody(n) ?? new List<Node>())
-                        .Any(s => s.Kind == NodeKind.ReturnStatement
-                            && IsObjectConstructorCall(GetStatementExpression(s), ast)))
-                .Select(GetFunctionDeclarationName)
-                .Where(n => !string.IsNullOrWhiteSpace(n))
-                .Select(n => n!)
-                .ToHashSet(StringComparer.Ordinal);
+            var functionsReturningConstructedObject = GetFunctionsReturningConstructedObject(ast);
             var heapAllocatedGlobalProperties = ast
                 .Where(n => n.Kind == NodeKind.PropertyDeclaration
                     && !string.IsNullOrWhiteSpace(GetPropertyName(n))
@@ -1812,6 +1815,65 @@ namespace Puma
                 && functions.Contains(name);
         }
 
+        private static HashSet<string> GetFunctionsReturningConstructedObject(List<Node> ast)
+        {
+            var functions = ast.Where(n => n.Kind == NodeKind.FunctionDeclaration).ToList();
+            var localNames = functions.Select(GetFunctionDeclarationName)
+                .Concat(ast.Where(n => n.Kind == NodeKind.TypeDeclaration).Select(GetTypeDeclarationName))
+                .ToHashSet(StringComparer.Ordinal);
+            var ownedFunctions = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var expression in EnumerateAllNodes(ast).SelectMany(GetExpressionRoots))
+            {
+                CollectExternalOwnedFunctions(expression, ownedFunctions, localNames);
+            }
+
+            bool changed;
+            do
+            {
+                changed = false;
+                foreach (var function in functions)
+                {
+                    if (GetFunctionDeclarationName(function) is not { Length: > 0 } name
+                        || ownedFunctions.Contains(name))
+                    {
+                        continue;
+                    }
+
+                    if (EnumerateAllNodes(GetFunctionBody(function) ?? new List<Node>())
+                        .Any(statement => statement.Kind == NodeKind.ReturnStatement
+                            && (IsObjectConstructorCall(GetStatementExpression(statement), ast)
+                                || CallsFunctionReturningConstructedObject(GetStatementExpression(statement), ownedFunctions))))
+                    {
+                        changed |= ownedFunctions.Add(name);
+                    }
+                }
+            } while (changed);
+
+            return ownedFunctions;
+        }
+
+        private static void CollectExternalOwnedFunctions(ExpressionNode? expression, HashSet<string> functions, HashSet<string?> localNames)
+        {
+            if (expression == null)
+            {
+                return;
+            }
+
+            if (expression.Kind == ExpressionKind.Identifier
+                && expression.ResolvedExternalSymbol is { Kind: ExternalSymbolKind.Function, ReturnsOwnedObject: true } symbol
+                && !localNames.Contains(symbol.Name))
+            {
+                functions.Add(symbol.Name);
+            }
+
+            CollectExternalOwnedFunctions(expression.Left, functions, localNames);
+            CollectExternalOwnedFunctions(expression.Right, functions, localNames);
+            foreach (var argument in expression.Arguments)
+            {
+                CollectExternalOwnedFunctions(argument, functions, localNames);
+            }
+        }
+
         private static bool IsNoneExpression(ExpressionNode? expression)
         {
             return expression?.Kind == ExpressionKind.Identifier
@@ -2189,6 +2251,50 @@ namespace Puma
             DelegateDeclarationAstNode declaration => declaration.DelegateParameterList,
             _ => Enumerable.Empty<Node.ParameterInfo>()
         };
+
+        private static Dictionary<string, ExternalSymbol> CreateExternalSymbolTable(IEnumerable<ExternalSymbol>? symbols)
+        {
+            var table = new Dictionary<string, ExternalSymbol>(StringComparer.Ordinal);
+            foreach (var symbol in symbols ?? Enumerable.Empty<ExternalSymbol>())
+            {
+                if (string.IsNullOrWhiteSpace(symbol.Name))
+                {
+                    throw new InvalidOperationException("External symbol names must not be empty.");
+                }
+
+                if (symbol.Kind is not (ExternalSymbolKind.Type or ExternalSymbolKind.Function)
+                    || (symbol.Kind == ExternalSymbolKind.Type && symbol.ReturnsOwnedObject))
+                {
+                    throw new InvalidOperationException($"Invalid metadata for external symbol '{symbol.Name}'.");
+                }
+
+                if (!table.TryAdd(symbol.Name, symbol))
+                {
+                    throw new InvalidOperationException($"Duplicate external symbol metadata for '{symbol.Name}'.");
+                }
+            }
+
+            return table;
+        }
+
+        private static void BindExternalSymbols(ExpressionNode? expression, IReadOnlyDictionary<string, ExternalSymbol> symbols)
+        {
+            if (expression == null)
+            {
+                return;
+            }
+
+            expression.ResolvedExternalSymbol = expression.Kind == ExpressionKind.Identifier
+                && expression.Value is { } name && symbols.TryGetValue(name, out var symbol)
+                    ? symbol
+                    : null;
+            BindExternalSymbols(expression.Left, symbols);
+            BindExternalSymbols(expression.Right, symbols);
+            foreach (var argument in expression.Arguments)
+            {
+                BindExternalSymbols(argument, symbols);
+            }
+        }
 
         private static IEnumerable<ExpressionNode?> GetExpressionRoots(Node node) => node switch
         {
