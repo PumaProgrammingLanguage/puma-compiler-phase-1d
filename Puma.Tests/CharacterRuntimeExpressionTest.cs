@@ -59,11 +59,11 @@ namespace test
 
         private static void CompileAndRun(string generated)
         {
-            var runtimeRoot = Environment.GetEnvironmentVariable("PUMA_HOME")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Puma");
+            var runtime = Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
             var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
-            var includePath = Path.Combine(runtimeRoot, "include");
-            var typeLibrary = Path.Combine(runtimeRoot, "lib", "x64", "Release", "PumaType.lib");
+            var includePath = runtime.IncludeDirectory;
+            var typeLibrary = Path.Combine(runtime.LibraryDirectory, "PumaType.lib");
             var directory = Path.Combine(Path.GetTempPath(), $"PumaCharacterTests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
             try

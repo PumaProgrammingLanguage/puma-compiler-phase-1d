@@ -6,10 +6,12 @@
 - If a module/type/trait section is missing but other sections exist, the default file type is module. 
 - If a file has sections, there should be no code outside the sections. 
 - If a file has no sections, the whole file defaults to the start section.
+- Use `PUMA_STDLIB_ROOT` as the configured root for Puma standard libraries (lib and include).
 
 ## Task Management
 - Break large tasks into smaller tasks that can be completed in one session, then continue iteratively. 
 - Prioritize parser/lexer work first; do codegen unit tests last.
+- Keep task completion bounded: do not add new tasks unless necessary to complete the requested task; document optional suggestions in a separate document rather than expanding the task checklist.
 - Do as many small tasks as possible each session, then report remaining tasks.
 - Do not commit or push changes automatically. At the end of each work session, list what changed and instruct the user to commit and push; the user handles Git commits and pushes to reduce credit usage.
 
@@ -23,3 +25,6 @@
 
 ## Version Control
 - Always commit `.github/upgrades/scenarios/new-dotnet-version_7f6cdd/scenario.json` when it is modified, alongside related changes.
+
+## C++ API Updates
+- The updated PumaFile C++ API uses `PumaFile::Text::Open()` and `PumaFile::Text::Close()`, with capital O and C.

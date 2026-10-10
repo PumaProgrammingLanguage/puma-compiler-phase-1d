@@ -97,6 +97,11 @@ namespace Puma
             {
                 includes.Add("<PumaType/String.hpp>");
             }
+            if (allNodes.Any(node => GetFunctionDeclarationReturnType(node) == "str"
+                || GetParameters(node).Any(parameter => parameter.Type == "str")))
+            {
+                includes.Add("<PumaType/String.hpp>");
+            }
 
             var needsCharacter = allNodes.Any(n => n.Kind == NodeKind.AssignmentStatement
                 && GetAssignmentOperator(n) == "="
@@ -964,8 +969,8 @@ namespace Puma
             {
                 var returnType = string.IsNullOrWhiteSpace(GetFunctionDeclarationReturnType(node))
                     ? "void"
-                    : GetFunctionDeclarationReturnType(node) == "char"
-                        ? "PumaType::Character"
+                    : GetFunctionDeclarationReturnType(node) is "char" or "str"
+                        ? MapType(GetFunctionDeclarationReturnType(node))
                         : MapNumericReturnType(GetFunctionDeclarationReturnType(node)) ?? GetFunctionDeclarationReturnType(node);
                 var functionParameterList = GetFunctionParameterList(node) ?? new List<Node.ParameterInfo>();
                 var functionBody = GetFunctionBody(node) ?? new List<Node>();
@@ -1254,10 +1259,12 @@ namespace Puma
                     && !string.IsNullOrWhiteSpace(left)
                     && IsSimpleIdentifier(left)
                     && !declared.Contains(left)
-                    && ContainsStringLiteral(rightExpression))
+                    && (ContainsStringLiteral(rightExpression)
+                        || ContainsCharacterLiteral(rightExpression)
+                        || rightExpression is { Kind: ExpressionKind.Call, Left.ResolvedExternalSymbol.Kind: ExternalSymbolKind.ValueType }))
                 {
                     var value = rightExpression?.Kind == ExpressionKind.Literal
-                        ? ToPumaStringLiteral(rightExpression.Value!)
+                        ? FormatInitializer(rightExpression)
                         : GenerateExpression(rightExpression);
                     sb.AppendLine($"{indent}auto {left} = {value};");
                     declared.Add(left);

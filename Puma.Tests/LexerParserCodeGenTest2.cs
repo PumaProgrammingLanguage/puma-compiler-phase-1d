@@ -258,6 +258,63 @@ int main()
             }
         }
 
+        [DataTestMethod]
+        [DataRow(true)]
+        [DataRow(false)]
+        public void CliRuntimeLibraries_UseConfiguredStandardLibraryRoot(bool validRoot)
+        {
+            const string source = "start\n    WriteLn(\"Hello\")\n";
+            const string expected = "#include <PumaConsole/Console.hpp>\n\n// start\nint main()\n{\n    PumaConsole::WriteLn(\"Hello\");\n    return 0;\n}";
+            var runtime = Puma.Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaRuntimeCliTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var sourcePath = Path.Combine(directory, "main.puma");
+                var executablePath = Path.Combine(directory, "main.exe");
+                File.WriteAllText(sourcePath, source);
+                var startInfo = CreatePumaProcess(sourcePath, "-o", executablePath);
+                startInfo.Environment["PUMA_STDLIB_ROOT"] = validRoot
+                    ? Path.GetDirectoryName(runtime.IncludeDirectory)!
+                    : Path.Combine(directory, "missing-runtime");
+                startInfo.Environment["PUMA_HOME"] = Path.Combine(directory, "legacy-root");
+                using var process = Process.Start(startInfo);
+                Assert.IsNotNull(process);
+                var output = process.StandardOutput.ReadToEndAsync();
+                var error = process.StandardError.ReadToEndAsync();
+                process.WaitForExit();
+                output.GetAwaiter().GetResult();
+                var standardError = error.GetAwaiter().GetResult();
+                Assert.AreEqual(expected, Normalize(File.ReadAllText(Path.ChangeExtension(sourcePath, ".cpp"))).Trim());
+                if (validRoot)
+                {
+                    Assert.AreEqual(0, process.ExitCode, standardError);
+                    using var executable = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = executablePath,
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false
+                    });
+                    Assert.IsNotNull(executable);
+                    var standardOutput = executable.StandardOutput.ReadToEnd();
+                    executable.WaitForExit();
+                    Assert.AreEqual(0, executable.ExitCode);
+                    Assert.AreEqual("Hello" + Environment.NewLine, standardOutput);
+                }
+                else
+                {
+                    Assert.AreEqual(1, process.ExitCode);
+                    Assert.AreEqual("Puma build error: Unable to locate the installed Puma runtime. Set PUMA_STDLIB_ROOT to the directory containing include and lib\\x64\\Release, or install them beside the compiler executable.", standardError.Trim());
+                    Assert.IsFalse(File.Exists(executablePath));
+                }
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
         [TestMethod]
         public void GeneratedRuntimeBackedCpp_CompilesAndLinksWithClang()
         {
@@ -279,12 +336,12 @@ int main()
             var parser = new Puma.Parser();
             var codegen = new Puma.Codegen();
             var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
-            var runtimeRoot = Environment.GetEnvironmentVariable("PUMA_HOME")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Puma");
+            var runtime = Puma.Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
             var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
-            var includePath = Path.Combine(runtimeRoot, "include");
-            var consoleLibrary = Path.Combine(runtimeRoot, "lib", "x64", "Release", "PumaConsole.lib");
-            var typeLibrary = Path.Combine(runtimeRoot, "lib", "x64", "Release", "PumaType.lib");
+            var includePath = runtime.IncludeDirectory;
+            var consoleLibrary = Path.Combine(runtime.LibraryDirectory, "PumaConsole.lib");
+            var typeLibrary = Path.Combine(runtime.LibraryDirectory, "PumaType.lib");
             var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
 
@@ -341,11 +398,11 @@ int main()
             var parser = new Puma.Parser();
             var codegen = new Puma.Codegen();
             var generated = codegen.GenerateResult(parser.Parse(lexer.Tokenize(src)));
-            var runtimeRoot = Environment.GetEnvironmentVariable("PUMA_HOME")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Puma");
+            var runtime = Puma.Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
             var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
-            var includePath = Path.Combine(runtimeRoot, "include");
-            var typeLibrary = Path.Combine(runtimeRoot, "lib", "x64", "Release", "PumaType.lib");
+            var includePath = runtime.IncludeDirectory;
+            var typeLibrary = Path.Combine(runtime.LibraryDirectory, "PumaType.lib");
             var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
 

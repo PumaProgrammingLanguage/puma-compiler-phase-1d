@@ -62,6 +62,7 @@ Closure validation: the bounded audit of `Node.cs`, `Parser.cs`, and `Codegen.cs
 - [x] Add native execution coverage for character runtime dependencies using the authoritative `PumaType::Character` UTF-8 constructor. Character literal ASTs emit explicit UTF-8 bytes through the installed `const uint8_t*` API; global `char` return signatures map to `PumaType::Character`. Added 19 exact-output/native clang compilation, linking, and execution cases covering ASCII, control/quote/backslash escapes, hex/Unicode escapes, multibyte characters, parameters, returns, defaults, reassignment, AST replacement, and codegen reuse. Direct assignment-call defaults now reuse the existing AST declaration expansion. Solution build succeeded and all 346/346 IDE tests passed with no skips; separate Debug/Release runs are not claimed. Runtime files were not changed; character comparison/operator support and invalid Unicode scalar diagnostics are outside this task.
 - [x] Add native execution coverage for the console runtime dependency.
 - [ ] Add native execution coverage for the file runtime dependency after Puma source supports creating and calling `PumaFile` objects.
+  - Coverage now includes six exact-output/native cases, including explicit capitalized `Open()`/`Close()`. All exact-output assertions pass; installed-runtime private access and unresolved `Text::Close()`/`Directory::SetCurrentDirectory(const PumaType::String&)` still block native completion. The configured Release suite passed 455/461 with no skips; runtime repair/reinstallation remains external to this compiler workspace.
 - [x] Keep compilation, linking, and execution tests independent from test-helper behavior.
 
 ## 4. Compiler Installation and Publishing
@@ -70,6 +71,7 @@ Closure validation: the bounded audit of `Node.cs`, `Parser.cs`, and `Codegen.cs
 - [x] Decide whether distributions should be framework-dependent, self-contained, or native AOT.
 - [x] Document the selected deployment model and required runtime files.
 - [x] Validate the installed compiler from a clean terminal session.
+  - Standard-library lookup now uses `PUMA_STDLIB_ROOT` (`include` and `lib/x64/Release`) or, when unset, the compiler executable directory. Valid/invalid configured-root CLI tests pass; installation destination is unchanged.
 
 ## 5. CLI Quality Improvements
 

@@ -35,7 +35,7 @@ namespace Puma
         protected static string source = "";
         private static string? CommandLineError;
 
-        private sealed record InstalledPumaRuntime(string IncludeDirectory, string LibraryDirectory);
+        internal sealed record InstalledPumaRuntime(string IncludeDirectory, string LibraryDirectory);
 
         /// <summary>
         /// // Main method of the Puma compiler.
@@ -127,7 +127,7 @@ namespace Puma
                     var installedRuntime = FindInstalledPumaRuntime();
                     if (installedRuntime == null)
                     {
-                        throw new InvalidOperationException("Unable to locate the installed Puma runtime under PUMA_HOME or %USERPROFILE%\\Puma.");
+                        throw new InvalidOperationException("Unable to locate the installed Puma runtime. Set PUMA_STDLIB_ROOT to the directory containing include and lib\\x64\\Release, or install them beside the compiler executable.");
                     }
 
                     clangArguments.Add("-I");
@@ -333,39 +333,15 @@ namespace Puma
             }
         }
 
-        private static InstalledPumaRuntime? FindInstalledPumaRuntime()
+        internal static InstalledPumaRuntime? FindInstalledPumaRuntime()
         {
-            var candidateRoots = new List<string>();
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrWhiteSpace(userProfile))
-            {
-                candidateRoots.Add(Path.Combine(userProfile, "Puma"));
-            }
-
-            var pumaHome = Environment.GetEnvironmentVariable("PUMA_HOME");
-            if (!string.IsNullOrWhiteSpace(pumaHome)
-                && !candidateRoots.Contains(pumaHome, StringComparer.OrdinalIgnoreCase))
-            {
-                candidateRoots.Add(pumaHome);
-            }
-
-            foreach (var candidateRoot in candidateRoots)
-            {
-                var includeDirectory = Path.Combine(candidateRoot, "include");
-                var libraryDirectory = Path.Combine(candidateRoot, "lib", "x64", "Release");
-                if (IsInstalledPumaRuntime(includeDirectory, libraryDirectory))
-                {
-                    return new InstalledPumaRuntime(includeDirectory, libraryDirectory);
-                }
-
-                var sourceLibraryDirectory = Path.Combine(candidateRoot, "x64", "Release");
-                if (IsInstalledPumaRuntime(candidateRoot, sourceLibraryDirectory))
-                {
-                    return new InstalledPumaRuntime(candidateRoot, sourceLibraryDirectory);
-                }
-            }
-
-            return null;
+            var configuredRoot = Environment.GetEnvironmentVariable("PUMA_STDLIB_ROOT");
+            var runtimeRoot = string.IsNullOrWhiteSpace(configuredRoot) ? AppContext.BaseDirectory : configuredRoot;
+            var includeDirectory = Path.Combine(runtimeRoot, "include");
+            var libraryDirectory = Path.Combine(runtimeRoot, "lib", "x64", "Release");
+            return IsInstalledPumaRuntime(includeDirectory, libraryDirectory)
+                ? new InstalledPumaRuntime(includeDirectory, libraryDirectory)
+                : null;
         }
 
         private static bool IsInstalledPumaRuntime(string includeDirectory, string libraryDirectory)
