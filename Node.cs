@@ -127,6 +127,7 @@ namespace Puma
         public string? Target { get; set; }
         public string? Alias { get; set; }
         public bool IsFilePath { get; set; }
+        public SourceSpan? SourceSpan { get; set; }
 
         public UseStatementAstNode()
         {
@@ -370,13 +371,14 @@ namespace Puma
             };
         }
 
-        public static Node CreateUseStatement(string target, string? alias, bool isFilePath)
+        public static Node CreateUseStatement(string target, string? alias, bool isFilePath, SourceSpan? sourceSpan = null)
         {
             return new UseStatementAstNode
             {
                 Target = target,
                 Alias = alias,
-                IsFilePath = isFilePath
+                IsFilePath = isFilePath,
+                SourceSpan = sourceSpan
             };
         }
 

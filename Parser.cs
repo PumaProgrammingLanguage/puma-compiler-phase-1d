@@ -1519,6 +1519,8 @@ namespace Puma
                 return;
             }
 
+            var sourceSpan = new SourceSpan(parts[0].StartLine, parts[0].StartColumn,
+                parts[^1].StartLine, parts[^1].StartColumn + parts[^1].TokenText.Length);
             var aliasIndex = parts.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "as");
             string? alias = null;
             if (aliasIndex >= 0)
@@ -1541,7 +1543,7 @@ namespace Puma
                 throw CreateParserException("File path use statements cannot specify an alias.", parts[0]);
             }
 
-            ast.Add(Node.CreateUseStatement(target, alias, isFilePath));
+            ast.Add(Node.CreateUseStatement(target, alias, isFilePath, sourceSpan));
         }
 
         private bool UpdateIndentation(LexerTokens token)

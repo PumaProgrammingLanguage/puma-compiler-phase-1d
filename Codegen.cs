@@ -42,6 +42,19 @@ namespace Puma
 
             var allNodes = EnumerateAllNodes(ast).ToList();
             var externalSymbolTable = CreateExternalSymbolTable(externalSymbols);
+            foreach (var declaration in ast)
+            {
+                var name = declaration switch
+                {
+                    FunctionDeclarationAstNode function => function.FunctionDeclarationName,
+                    TypeDeclarationAstNode type => type.DeclarationName,
+                    _ => null
+                };
+                if (name != null)
+                {
+                    externalSymbolTable.Remove(name);
+                }
+            }
             foreach (var expression in allNodes.SelectMany(GetExpressionRoots))
             {
                 BindExternalSymbols(expression, externalSymbolTable);
@@ -1617,6 +1630,14 @@ namespace Puma
                 throw new InvalidOperationException("Expression AST node is required for code generation.");
             }
 
+            if (node.Kind == ExpressionKind.Call
+                && node.Left?.Kind == ExpressionKind.Identifier
+                && node.Left.ResolvedExternalSymbol is { Kind: ExternalSymbolKind.Trait or ExternalSymbolKind.Module } symbol)
+            {
+                var location = node.SourceSpan is { } span ? $"Line {span.StartLine}, column {span.StartColumn}: " : string.Empty;
+                throw new InvalidOperationException($"{location}Cannot instantiate imported {symbol.Kind.ToString().ToLowerInvariant()} '{symbol.Name}'.");
+            }
+
             return node.Kind switch
             {
                 ExpressionKind.Identifier => string.Equals(node.Value, "none", StringComparison.OrdinalIgnoreCase)
@@ -2262,8 +2283,8 @@ namespace Puma
                     throw new InvalidOperationException("External symbol names must not be empty.");
                 }
 
-                if (symbol.Kind is not (ExternalSymbolKind.Type or ExternalSymbolKind.Function)
-                    || (symbol.Kind == ExternalSymbolKind.Type && symbol.ReturnsOwnedObject))
+                if (!Enum.IsDefined(symbol.Kind)
+                    || (symbol.Kind != ExternalSymbolKind.Function && symbol.ReturnsOwnedObject))
                 {
                     throw new InvalidOperationException($"Invalid metadata for external symbol '{symbol.Name}'.");
                 }

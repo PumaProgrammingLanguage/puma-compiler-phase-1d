@@ -92,7 +92,8 @@ namespace Puma
 
                 var tokens = lexer.Tokenize(source);
                 var ast = parser.Parse(tokens);
-                var generated = codegen.GenerateResult(ast);
+                var externalSymbols = new PumaImportResolver().Resolve(ast, SourceFileName);
+                var generated = codegen.GenerateResult(ast, externalSymbols);
                 var cCode = generated.SourceCode;
                 var requiredRuntimeLibraries = generated.RequiredRuntimeLibraries;
 
