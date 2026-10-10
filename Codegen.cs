@@ -55,10 +55,14 @@ namespace Puma
                     externalSymbolTable.Remove(name);
                 }
             }
-            foreach (var expression in allNodes.SelectMany(GetExpressionRoots))
-            {
-                BindExternalSymbols(expression, externalSymbolTable);
-            }
+            var ownedMembers = ast.OfType<TypeDeclarationAstNode>()
+                .SelectMany(type => type.TypeProperties.Concat(type.TypeFunctions)).ToHashSet();
+            var topLevelNodes = ast.Where(node => !ownedMembers.Contains(node)).ToList();
+            var globalShadows = topLevelNodes.OfType<PropertyDeclarationAstNode>().Select(property => property.PropertyName)
+                .Concat(topLevelNodes.OfType<TypeDeclarationAstNode>().Select(type => type.DeclarationName))
+                .Concat(topLevelNodes.OfType<FunctionDeclarationAstNode>().Select(function => function.FunctionDeclarationName))
+                .Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name!).ToHashSet(StringComparer.Ordinal);
+            BindScopedExternalSymbols(topLevelNodes, externalSymbolTable, globalShadows);
             var defaultExpressions = allNodes.SelectMany(GetParameters)
                 .Select(parameter => parameter.DefaultExpression).ToList();
             if (defaultExpressions.Any(ContainsStringLiteral)) includes.Add("<PumaType/String.hpp>");
@@ -196,23 +200,10 @@ namespace Puma
 
             foreach (var node in ast.Where(n => n.Kind == NodeKind.UseStatement))
             {
-                if (GetUseStatementIsFilePath(node) && !string.IsNullOrWhiteSpace(GetUseStatementTarget(node)))
+                var include = GetUseInclude(node);
+                if (!string.IsNullOrWhiteSpace(include))
                 {
-                    var includeTarget = GetUseStatementTarget(node)!;
-                    if (includeTarget.EndsWith(".puma", StringComparison.OrdinalIgnoreCase))
-                    {
-                        includeTarget = includeTarget[..^5] + ".h";
-                    }
-
-                    includes.Add($"\"{includeTarget}\"");
-                }
-                else
-                {
-                    var include = GetUseInclude(node);
-                    if (!string.IsNullOrWhiteSpace(include))
-                    {
-                        includes.Add(include);
-                    }
+                    includes.Add(include);
                 }
             }
 
@@ -270,7 +261,7 @@ namespace Puma
                 }
 
                 var moduleBody = string.Join("\n", lines.Skip(lineIndex)).TrimEnd();
-                var wrappedModule = $"namespace {GetTypeDeclarationName(moduleNode)}\n{{\n{IndentBlock(moduleBody)}\n}}\n";
+                var wrappedModule = $"namespace {ToCppQualifiedName(GetTypeDeclarationName(moduleNode))}\n{{\n{IndentBlock(moduleBody)}\n}}\n";
                 output = includeLines.Count > 0
                     ? string.Join("\n", includeLines) + "\n\n" + wrappedModule
                     : wrappedModule;
@@ -652,6 +643,12 @@ namespace Puma
                 return string.Empty;
             }
 
+            if (node is UseStatementAstNode use && use.ResolvedImport is { } import
+                && import.Target == target && import.Alias == use.Alias)
+            {
+                return $"\"{import.Header}\"";
+            }
+
             if (GetUseStatementIsFilePath(node))
             {
                 var includeTarget = target;
@@ -878,6 +875,11 @@ namespace Puma
 
         private static bool IsObjectConstructorCall(ExpressionNode? expression, IEnumerable<Node>? declarations = null)
         {
+            if (expression?.Kind == ExpressionKind.Call && expression.Left?.ResolvedExternalSymbol is { } resolved)
+            {
+                return resolved.Kind == ExternalSymbolKind.Type;
+            }
+
             if (expression?.Kind != ExpressionKind.Call
                 || expression.Left?.Kind != ExpressionKind.Identifier
                 || expression.Left.Value is not { Length: > 0 } name
@@ -1631,18 +1633,24 @@ namespace Puma
             }
 
             if (node.Kind == ExpressionKind.Call
-                && node.Left?.Kind == ExpressionKind.Identifier
-                && node.Left.ResolvedExternalSymbol is { Kind: ExternalSymbolKind.Trait or ExternalSymbolKind.Module } symbol)
+                && node.Left?.ResolvedExternalSymbol is { Kind: ExternalSymbolKind.Trait or ExternalSymbolKind.Module } symbol)
             {
                 var location = node.SourceSpan is { } span ? $"Line {span.StartLine}, column {span.StartColumn}: " : string.Empty;
                 throw new InvalidOperationException($"{location}Cannot instantiate imported {symbol.Kind.ToString().ToLowerInvariant()} '{symbol.Name}'.");
+            }
+
+            if (node.Kind == ExpressionKind.Call && node.Left is { Kind: ExpressionKind.MemberAccess, ResolvedExternalSymbol: null } callee
+                && callee.Left?.ResolvedExternalSymbol?.Kind == ExternalSymbolKind.Module)
+            {
+                var location = node.SourceSpan is { } span ? $"Line {span.StartLine}, column {span.StartColumn}: " : string.Empty;
+                throw new InvalidOperationException($"{location}Unknown callable '{GetQualifiedIdentifier(callee)}' in imported Puma module.");
             }
 
             return node.Kind switch
             {
                 ExpressionKind.Identifier => string.Equals(node.Value, "none", StringComparison.OrdinalIgnoreCase)
                     ? "null"
-                    : node.Value ?? string.Empty,
+                    : node.ResolvedExternalSymbol?.CppName ?? node.Value ?? string.Empty,
                 ExpressionKind.Literal when ContainsCharacterLiteral(node) => ToPumaCharacterLiteral(node.Value!),
                 ExpressionKind.Literal => !string.IsNullOrWhiteSpace(node.DeclaredType)
                     ? $"({MapType(node.DeclaredType) ?? node.DeclaredType}){node.Value}"
@@ -1653,7 +1661,8 @@ namespace Puma
                 ExpressionKind.Cast => $"({MapType(node.Value) ?? node.Value}) {GenerateExpression(node.Left)}",
                 ExpressionKind.Conditional => $"({GenerateExpression(node.Left)} ? {GenerateExpression(node.Right)} : {GenerateExpression(node.Arguments.FirstOrDefault())})",
                 ExpressionKind.Binary => $"({GenerateExpression(node.Left)} {MapBinaryOperator(node.Value)} {GenerateExpression(node.Right)})",
-                ExpressionKind.MemberAccess => $"{GenerateExpression(node.Left)}.{node.Value}",
+                ExpressionKind.MemberAccess => node.ResolvedExternalSymbol?.CppName
+                    ?? $"{GenerateExpression(node.Left)}{(node.Left?.ResolvedExternalSymbol?.Kind == ExternalSymbolKind.Module ? "::" : ".")}{node.Value}",
                 ExpressionKind.Index => $"{GenerateExpression(node.Left)}[{GenerateExpression(node.Right)}]",
                 ExpressionKind.Call => $"{GenerateExpression(node.Left)}({string.Join(", ", node.Arguments.Select(GenerateExpression))})",
                 _ => throw new InvalidOperationException($"Unsupported expression kind '{node.Kind}'.")
@@ -1799,9 +1808,11 @@ namespace Puma
                 return;
             }
 
-            if (GetAssignmentRightExpression(statement)!.Left?.Kind == ExpressionKind.Identifier)
+            if (GetAssignmentRightExpression(statement)!.Left?.Kind == ExpressionKind.Identifier
+                || GetAssignmentRightExpression(statement)!.Left?.ResolvedExternalSymbol != null)
             {
-                var functionName = GetAssignmentRightExpression(statement)!.Left!.Value ?? string.Empty;
+                var functionName = GetAssignmentRightExpression(statement)!.Left!.ResolvedExternalSymbol?.Name
+                    ?? GetAssignmentRightExpression(statement)!.Left!.Value ?? string.Empty;
                 if (IsObjectConstructorCall(GetAssignmentRightExpression(statement), declarations))
                 {
                     ownedLocalsToDelete.Add(leftName);
@@ -1832,7 +1843,7 @@ namespace Puma
         private static bool CallsFunctionReturningConstructedObject(ExpressionNode? expression, HashSet<string> functions)
         {
             return expression?.Kind == ExpressionKind.Call
-                && GetSimpleIdentifier(expression.Left) is { } name
+                && (expression.Left?.ResolvedExternalSymbol?.Name ?? GetSimpleIdentifier(expression.Left)) is { } name
                 && functions.Contains(name);
         }
 
@@ -1880,8 +1891,7 @@ namespace Puma
                 return;
             }
 
-            if (expression.Kind == ExpressionKind.Identifier
-                && expression.ResolvedExternalSymbol is { Kind: ExternalSymbolKind.Function, ReturnsOwnedObject: true } symbol
+            if (expression.ResolvedExternalSymbol is { Kind: ExternalSymbolKind.Function, ReturnsOwnedObject: true } symbol
                 && !localNames.Contains(symbol.Name))
             {
                 functions.Add(symbol.Name);
@@ -2116,6 +2126,11 @@ namespace Puma
                     return false;
                 }
 
+                if (GetAssignmentRightExpression(statement) is { Kind: ExpressionKind.Call, Left.ResolvedExternalSymbol.Kind: ExternalSymbolKind.Type })
+                {
+                    value = $"new {value}";
+                }
+
                 expressionFallback = true;
             }
 
@@ -2298,22 +2313,70 @@ namespace Puma
             return table;
         }
 
-        private static void BindExternalSymbols(ExpressionNode? expression, IReadOnlyDictionary<string, ExternalSymbol> symbols)
+        private static string? GetQualifiedIdentifier(ExpressionNode? expression) => expression?.Kind switch
+        {
+            ExpressionKind.Identifier => expression.Value,
+            ExpressionKind.MemberAccess when GetQualifiedIdentifier(expression.Left) is { } receiver => receiver + "." + expression.Value,
+            _ => null
+        };
+
+        private static void BindScopedExternalSymbols(IEnumerable<Node> nodes, IReadOnlyDictionary<string, ExternalSymbol> symbols, HashSet<string> inheritedShadows)
+        {
+            var shadows = new HashSet<string>(inheritedShadows, StringComparer.Ordinal);
+            foreach (var node in nodes)
+            {
+                if (node is TypeDeclarationAstNode type)
+                {
+                    var ownerShadows = new HashSet<string>(inheritedShadows, StringComparer.Ordinal);
+                    ownerShadows.UnionWith(type.TypeProperties.OfType<PropertyDeclarationAstNode>()
+                        .Select(property => property.PropertyName).Where(name => name != null).Select(name => name!));
+                    BindScopedExternalSymbols(type.TypeProperties.Concat(type.TypeFunctions), symbols, ownerShadows);
+                    continue;
+                }
+                if (node is FunctionDeclarationAstNode function)
+                {
+                    var functionShadows = new HashSet<string>(inheritedShadows, StringComparer.Ordinal);
+                    functionShadows.UnionWith(function.FunctionParameterList.Select(parameter => parameter.Name));
+                    foreach (var expression in GetExpressionRoots(function)) BindExternalSymbols(expression, symbols, functionShadows);
+                    BindScopedExternalSymbols(function.FunctionBody, symbols, functionShadows);
+                    continue;
+                }
+                if (node is SectionAstNode section)
+                {
+                    shadows = new HashSet<string>(inheritedShadows, StringComparer.Ordinal);
+                    shadows.UnionWith(section.SectionParameterList.Select(parameter => parameter.Name));
+                }
+                foreach (var expression in GetExpressionRoots(node)) BindExternalSymbols(expression, symbols, shadows);
+                if (node is AssignmentStatementAstNode assignment && GetSimpleIdentifier(assignment.AssignmentLeftExpression) is { } local)
+                {
+                    assignment.AssignmentLeftExpression!.ResolvedExternalSymbol = null;
+                    shadows.Add(local);
+                }
+                var bodyShadows = new HashSet<string>(shadows, StringComparer.Ordinal);
+                if (GetForVariable(node) is { } loopVariable) bodyShadows.Add(loopVariable);
+                BindScopedExternalSymbols(GetStatementBody(node), symbols, bodyShadows);
+                if (node is IfStatementAstNode) BindScopedExternalSymbols(GetIfElseBody(node), symbols, shadows);
+            }
+        }
+
+        private static void BindExternalSymbols(ExpressionNode? expression, IReadOnlyDictionary<string, ExternalSymbol> symbols, HashSet<string> shadows)
         {
             if (expression == null)
             {
                 return;
             }
 
-            expression.ResolvedExternalSymbol = expression.Kind == ExpressionKind.Identifier
-                && expression.Value is { } name && symbols.TryGetValue(name, out var symbol)
+            var name = GetQualifiedIdentifier(expression);
+            var root = name?.Split('.')[0];
+            expression.ResolvedExternalSymbol = name != null && root != null && !shadows.Contains(root)
+                && symbols.TryGetValue(name, out var symbol)
                     ? symbol
                     : null;
-            BindExternalSymbols(expression.Left, symbols);
-            BindExternalSymbols(expression.Right, symbols);
+            BindExternalSymbols(expression.Left, symbols, shadows);
+            BindExternalSymbols(expression.Right, symbols, shadows);
             foreach (var argument in expression.Arguments)
             {
-                BindExternalSymbols(argument, symbols);
+                BindExternalSymbols(argument, symbols, shadows);
             }
         }
 

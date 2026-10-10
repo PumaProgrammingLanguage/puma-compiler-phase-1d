@@ -128,6 +128,7 @@ namespace Puma
         public string? Alias { get; set; }
         public bool IsFilePath { get; set; }
         public SourceSpan? SourceSpan { get; set; }
+        public ResolvedPumaImport? ResolvedImport { get; set; }
 
         public UseStatementAstNode()
         {
