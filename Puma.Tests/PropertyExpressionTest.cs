@@ -78,7 +78,7 @@ int main()
     return 0;
 }";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
-            Assert.AreEqual(expected.Replace("\r\n", "\n"), new Codegen().Generate(ast).Replace("\r\n", "\n").Trim());
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), new Codegen().Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) }).Replace("\r\n", "\n").Trim());
         }
 
         [TestMethod]

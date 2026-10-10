@@ -901,9 +901,7 @@ namespace Puma
                 return true;
             }
 
-            return expression.Left.ResolvedExternalSymbol is { } symbol
-                ? symbol.Kind == ExternalSymbolKind.Type
-                : char.IsUpper(name[0]);
+            return false;
         }
 
         private static string ToPumaStringLiteral(string literal)

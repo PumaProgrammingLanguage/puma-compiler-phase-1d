@@ -13,6 +13,9 @@
 - Do as many small tasks as possible each session, then report remaining tasks.
 - Do not commit or push changes automatically. At the end of each work session, list what changed and instruct the user to commit and push; the user handles Git commits and pushes to reduce credit usage.
 
+## Implementation Options
+- When presenting implementation options, proceed with the recommended option by default rather than repeatedly asking the user to choose, unless a genuine blocker or required approval prevents proceeding.
+
 ## Unit Testing
 
 ## Specification Reference

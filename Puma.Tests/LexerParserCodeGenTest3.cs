@@ -1773,7 +1773,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1821,7 +1821,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1890,7 +1890,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1930,7 +1930,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1972,7 +1972,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -2017,13 +2017,13 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
         [TestMethod]
-        public void ObjectReference_OptionalLocal_AssignAndNone_LexerParserCodegen_AreConsistent()
+        public void ObjectReference_OptionalLocalOwnedFactory_AssignAndNone_LexerParserCodegen_AreConsistent()
         {
             const string src =
 @"use
@@ -2054,7 +2054,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Function, ReturnsOwnedObject: true) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -2097,7 +2097,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }

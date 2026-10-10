@@ -60,7 +60,7 @@ namespace test
             const string source = "start\n    value = makeShape()\nfunctions\n    makeShape() Shape own\n        if flag\n            return Shape()\n";
             const string expected = "// functions\nShape makeShape(void)\n{\n    if (flag)\n    {\n        return Shape();\n    }\n}\n\n// start\nint main()\n{\n    auto value = makeShape();\n\n    delete value;\n    return 0;\n}";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
-            Assert.AreEqual(expected, new Codegen().Generate(ast).Replace("\r\n", "\n").Trim());
+            Assert.AreEqual(expected, new Codegen().Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) }).Replace("\r\n", "\n").Trim());
         }
 
         [TestMethod]
@@ -78,7 +78,7 @@ namespace test
             const string source = "properties\n    value = makeShape()\nstart\nfunctions\n    makeShape() Shape own\n        return Shape()\n";
             const string expected = "auto value = makeShape();\n\n// functions\nShape makeShape(void)\n{\n    return Shape();\n}\n\n// start\nint main()\n{\n    delete value;\n    return 0;\n}";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
-            Assert.AreEqual(expected, new Codegen().Generate(ast).Replace("\r\n", "\n").Trim());
+            Assert.AreEqual(expected, new Codegen().Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) }).Replace("\r\n", "\n").Trim());
         }
 
         [TestMethod]
@@ -98,9 +98,10 @@ namespace test
             const string secondSource = "properties\n    value = Shape()\nstart\n";
             const string expected = "auto value = new Shape();\n\n// start\nint main()\n{\n    delete value;\n    return 0;\n}";
             var codegen = new Codegen();
-            codegen.Generate(new Parser().Parse(new Lexer().Tokenize(firstSource)));
+            var symbols = new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) };
+            codegen.Generate(new Parser().Parse(new Lexer().Tokenize(firstSource)), symbols);
             var ast = new Parser().Parse(new Lexer().Tokenize(secondSource));
-            Assert.AreEqual(expected, codegen.Generate(ast).Replace("\r\n", "\n").Trim());
+            Assert.AreEqual(expected, codegen.Generate(ast, symbols).Replace("\r\n", "\n").Trim());
         }
     }
 }

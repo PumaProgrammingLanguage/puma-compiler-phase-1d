@@ -105,7 +105,7 @@ namespace test
             var codegen = new Codegen();
             Assert.AreEqual(OwnedFunctionCpp, Normalize(codegen.Generate(ast, new[] { new ExternalSymbol("Fetch", ExternalSymbolKind.Function, true) })));
             Assert.AreEqual(FunctionCpp, Normalize(codegen.Generate(ast, new[] { new ExternalSymbol("Fetch", ExternalSymbolKind.Function) })));
-            Assert.AreEqual(ConstructorCpp, Normalize(codegen.Generate(ast)));
+            Assert.AreEqual(FunctionCpp, Normalize(codegen.Generate(ast)));
             Assert.IsNull(ast.OfType<PropertyDeclarationAstNode>().Single().PropertyValueExpression?.Left?.ResolvedExternalSymbol);
             Assert.AreEqual(FunctionCpp, Normalize(codegen.Generate(ast, new[] { new ExternalSymbol("Fetch", ExternalSymbolKind.Function) })));
         }
@@ -130,14 +130,16 @@ namespace test
             const string source = "properties\n    value = Fetch()\nstart\n";
             var codegen = new Codegen();
             Assert.AreEqual(FunctionCpp, Normalize(codegen.Generate(Parse(source), new[] { new ExternalSymbol("Fetch", ExternalSymbolKind.Function) })));
-            Assert.AreEqual(ConstructorCpp, Normalize(codegen.Generate(Parse(source))));
+            Assert.AreEqual(FunctionCpp, Normalize(codegen.Generate(Parse(source))));
         }
 
         [TestMethod]
         public void MetadataNames_AreCaseSensitive()
         {
             const string source = "properties\n    value = Fetch()\nstart\n";
-            Assert.AreEqual(ConstructorCpp, Normalize(new Codegen().Generate(Parse(source), new[] { new ExternalSymbol("fetch", ExternalSymbolKind.Function) })));
+            var ast = Parse(source);
+            Assert.AreEqual(FunctionCpp, Normalize(new Codegen().Generate(ast, new[] { new ExternalSymbol("fetch", ExternalSymbolKind.Function) })));
+            Assert.IsNull(ast.OfType<PropertyDeclarationAstNode>().Single().PropertyValueExpression?.Left?.ResolvedExternalSymbol);
         }
 
         [TestMethod]
