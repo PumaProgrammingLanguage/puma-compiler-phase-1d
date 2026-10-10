@@ -2,6 +2,7 @@ General notes
 
 Recent updates
 
+- Refreshed `doc/LineCounts.md` through October 2026 from monthly last commits on the current branch and documented reproducible LF newline counting across tracked file blobs, excluding uncommitted changes.
 - Renamed the Puma built-in output statement from `WriteLine` to `WriteLn` while preserving generated `PumaConsole::WriteLn` output.
 - Added post-build installation of Puma.exe, Puma.dll, and required .NET runtime metadata to `%USERPROFILE%\Puma`.
 - Matched clang++ native builds to the Puma runtime's dynamic MSVC runtime with `-fms-runtime-lib=dll`; runtime-backed compilation and linking coverage now passes.
