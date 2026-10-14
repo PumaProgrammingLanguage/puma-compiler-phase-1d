@@ -7,8 +7,8 @@
     <Nullable>enable</Nullable>
     <StartupObject>Puma.Program</StartupObject>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
-    <AssemblyVersion>0.1</AssemblyVersion>
-    <FileVersion>0.0.2.0</FileVersion>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
     <PublishAot>False</PublishAot>
     <SelfContained>False</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -19,7 +19,7 @@
     <Company>Puma Programming Language Project</Company>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>compiler; translator</PackageTags>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <PumaInstallDirectory>$(USERPROFILE)\Puma</PumaInstallDirectory>
   </PropertyGroup>
 
