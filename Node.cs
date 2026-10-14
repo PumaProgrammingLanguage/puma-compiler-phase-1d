@@ -63,18 +63,23 @@ namespace Puma
         Call
     }
 
+    internal readonly record struct SourceSpan(int StartLine, int StartColumn, int EndLine, int EndColumn);
+
     internal sealed class ExpressionNode
     {
         public ExpressionKind Kind { get; set; }
         public string? Value { get; set; }
         public ExpressionNode? Left { get; set; }
         public ExpressionNode? Right { get; set; }
+        public string? DeclaredType { get; set; }
+        public ExternalSymbol? ResolvedExternalSymbol { get; set; }
         public List<ExpressionNode> Arguments { get; } = new();
+        public SourceSpan? SourceSpan { get; set; }
     }
 
     internal sealed class WriteLineAstNode : Node
     {
-        public string? StringValue { get; set; }
+        public ExpressionNode? ArgumentExpression { get; set; }
 
         public WriteLineAstNode()
         {
@@ -85,7 +90,7 @@ namespace Puma
     internal sealed class EnumDeclarationAstNode : Node
     {
         public string? EnumName { get; set; }
-        public List<string> EnumMembers { get; } = new();
+        public List<EnumMemberInfo> MemberDeclarations { get; } = new();
 
         public EnumDeclarationAstNode()
         {
@@ -93,12 +98,23 @@ namespace Puma
         }
     }
 
+    internal sealed class EnumMemberInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public ExpressionNode? ValueExpression { get; set; }
+    }
+
+    internal sealed class RecordMemberInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public ExpressionNode? ValueExpression { get; set; }
+    }
+
     internal sealed class RecordDeclarationAstNode : Node
     {
         public string? RecordName { get; set; }
         public int? RecordPackSize { get; set; }
-        public List<string> RecordMembers { get; } = new();
-        public Dictionary<string, string> RecordMemberTypes { get; } = new(StringComparer.Ordinal);
+        public List<RecordMemberInfo> MemberDeclarations { get; } = new();
 
         public RecordDeclarationAstNode()
         {
@@ -111,6 +127,8 @@ namespace Puma
         public string? Target { get; set; }
         public string? Alias { get; set; }
         public bool IsFilePath { get; set; }
+        public SourceSpan? SourceSpan { get; set; }
+        public ResolvedPumaImport? ResolvedImport { get; set; }
 
         public UseStatementAstNode()
         {
@@ -120,8 +138,6 @@ namespace Puma
 
     internal sealed class FunctionCallAstNode : Node
     {
-        public string? Name { get; set; }
-        public string? Arguments { get; set; }
         public ExpressionNode? Expression { get; set; }
 
         public FunctionCallAstNode()
@@ -132,7 +148,6 @@ namespace Puma
 
     internal sealed class IfStatementAstNode : Node
     {
-        public string? IfCondition { get; set; }
         public ExpressionNode? ConditionExpression { get; set; }
         public List<Node> IfBody { get; } = new();
         public List<Node> ElseBody { get; } = new();
@@ -145,7 +160,6 @@ namespace Puma
 
     internal sealed class MatchStatementAstNode : Node
     {
-        public string? Expression { get; set; }
         public ExpressionNode? ExpressionNode { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -157,7 +171,6 @@ namespace Puma
 
     internal sealed class WhenStatementAstNode : Node
     {
-        public string? WhenCondition { get; set; }
         public ExpressionNode? WhenExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -169,7 +182,6 @@ namespace Puma
 
     internal sealed class WhileStatementAstNode : Node
     {
-        public string? WhileCondition { get; set; }
         public ExpressionNode? WhileExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -182,7 +194,6 @@ namespace Puma
     internal sealed class ForStatementAstNode : Node
     {
         public string? ForVariable { get; set; }
-        public string? ForContainer { get; set; }
         public ExpressionNode? ForContainerExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -195,7 +206,6 @@ namespace Puma
     internal sealed class ForAllStatementAstNode : Node
     {
         public string? ForVariable { get; set; }
-        public string? ForContainer { get; set; }
         public ExpressionNode? ForContainerExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -207,7 +217,6 @@ namespace Puma
 
     internal sealed class RepeatStatementAstNode : Node
     {
-        public string? RepeatExpression { get; set; }
         public ExpressionNode? RepeatExpressionNode { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -219,7 +228,6 @@ namespace Puma
 
     internal sealed class HasStatementAstNode : Node
     {
-        public string? HasCondition { get; set; }
         public ExpressionNode? HasExpression { get; set; }
         public List<Node> StatementBody { get; } = new();
 
@@ -231,10 +239,8 @@ namespace Puma
 
     internal sealed class HasTraitStatementAstNode : Node
     {
-        public string? HasTraitCondition { get; set; }
         public ExpressionNode? HasTraitExpression { get; set; }
         public string? HasTraitTypeName { get; set; }
-        public string? HasTraitVariableName { get; set; }
         public List<Node> StatementBody { get; } = new();
 
         public HasTraitStatementAstNode()
@@ -245,14 +251,10 @@ namespace Puma
 
     internal sealed class AssignmentStatementAstNode : Node
     {
-        public string? Left { get; set; }
-        public string? Right { get; set; }
-        public string? Operator { get; set; }
-        public string? AssignmentLeft { get; set; }
-        public string? AssignmentRight { get; set; }
         public string? AssignmentOperator { get; set; }
         public ExpressionNode? AssignmentLeftExpression { get; set; }
         public ExpressionNode? AssignmentRightExpression { get; set; }
+        public SourceSpan? AssignmentLeftSourceSpan { get; set; }
         public bool IsLoweredPostfixMutation { get; set; }
 
         public AssignmentStatementAstNode()
@@ -279,8 +281,7 @@ namespace Puma
     internal sealed class PropertyDeclarationAstNode : Node
     {
         public string? PropertyName { get; set; }
-        public string? PropertyValue { get; set; }
-        public string? PropertyType { get; set; }
+        public ExpressionNode? PropertyValueExpression { get; set; }
         public List<string> PropertyModifiers { get; } = new();
 
         public PropertyDeclarationAstNode()
@@ -292,7 +293,6 @@ namespace Puma
     internal sealed class FunctionDeclarationAstNode : Node
     {
         public string? FunctionDeclarationName { get; set; }
-        public string? FunctionDeclarationParameters { get; set; }
         public string? FunctionDeclarationReturnType { get; set; }
         public List<string> FunctionModifiers { get; } = new();
         public List<Node> FunctionBody { get; } = new();
@@ -317,7 +317,6 @@ namespace Puma
 
     internal sealed class StatementAstNode : Node
     {
-        public string? StatementValue { get; set; }
         public List<Node> StatementBody { get; } = new();
         public ExpressionNode? StatementExpression { get; set; }
 
@@ -330,7 +329,6 @@ namespace Puma
     internal sealed class SectionAstNode : Node
     {
         public string? SectionName { get; set; }
-        public string? SectionParameters { get; set; }
         public List<Node.ParameterInfo> SectionParameterList { get; } = new();
         public int LeadingBlankLines { get; set; }
 
@@ -348,7 +346,7 @@ namespace Puma
         {
             public string Name { get; set; } = string.Empty;
             public string Type { get; set; } = string.Empty;
-            public string? DefaultValue { get; set; }
+            public ExpressionNode? DefaultExpression { get; set; }
             public List<string> Modifiers { get; } = new();
         }
         public NodeKind Kind { get; set; } = NodeKind.Section;
@@ -366,21 +364,22 @@ namespace Puma
             };
         }
 
-        public static Node CreateWriteLine(string literal)
+        public static Node CreateWriteLine(ExpressionNode argument)
         {
             return new WriteLineAstNode
             {
-                StringValue = literal
+                ArgumentExpression = argument
             };
         }
 
-        public static Node CreateUseStatement(string target, string? alias, bool isFilePath)
+        public static Node CreateUseStatement(string target, string? alias, bool isFilePath, SourceSpan? sourceSpan = null)
         {
             return new UseStatementAstNode
             {
                 Target = target,
                 Alias = alias,
-                IsFilePath = isFilePath
+                IsFilePath = isFilePath,
+                SourceSpan = sourceSpan
             };
         }
 
@@ -404,7 +403,7 @@ namespace Puma
             return node;
         }
 
-        public static Node CreateEnumDeclaration(string name, IEnumerable<string> members)
+        public static Node CreateEnumDeclaration(string name, IEnumerable<EnumMemberInfo> members)
         {
             var node = new EnumDeclarationAstNode
             {
@@ -412,12 +411,12 @@ namespace Puma
             };
             foreach (var member in members)
             {
-                node.EnumMembers.Add(member);
+                node.MemberDeclarations.Add(member);
             }
             return node;
         }
 
-        public static Node CreateRecordDeclaration(string name, int? packSize, IEnumerable<string> members)
+        public static Node CreateRecordDeclaration(string name, int? packSize, IEnumerable<RecordMemberInfo> members)
         {
             var node = new RecordDeclarationAstNode
             {
@@ -426,18 +425,17 @@ namespace Puma
             };
             foreach (var member in members)
             {
-                node.RecordMembers.Add(member);
+                node.MemberDeclarations.Add(member);
             }
             return node;
         }
 
-        public static Node CreatePropertyDeclaration(string name, string? value, string? type, IEnumerable<string>? modifiers = null)
+        public static Node CreatePropertyDeclaration(string name, ExpressionNode? valueExpression, IEnumerable<string>? modifiers = null)
         {
             var node = new PropertyDeclarationAstNode
             {
                 PropertyName = name,
-                PropertyValue = value,
-                PropertyType = type
+                PropertyValueExpression = valueExpression
             };
 
             if (modifiers != null)
@@ -448,111 +446,106 @@ namespace Puma
             return node;
         }
 
-        public static Node CreateAssignmentStatement(string left, string right, string assignmentOperator)
+        public static Node CreateAssignmentStatement(ExpressionNode? left, ExpressionNode? right, string assignmentOperator, bool isLoweredPostfixMutation = false)
         {
             return new AssignmentStatementAstNode
             {
-                AssignmentLeft = left,
-                AssignmentRight = right,
+                AssignmentLeftExpression = left,
+                AssignmentRightExpression = right,
                 AssignmentOperator = assignmentOperator,
-                Left = left,
-                Right = right,
-                Operator = assignmentOperator
+                AssignmentLeftSourceSpan = left?.SourceSpan,
+                IsLoweredPostfixMutation = isLoweredPostfixMutation
             };
         }
 
-        public static Node CreateFunctionCall(string name, string arguments, ExpressionNode? expression = null)
+        public static Node CreateFunctionCall(ExpressionNode? expression)
         {
             return new FunctionCallAstNode
             {
-                Name = name,
-                Arguments = arguments,
                 Expression = expression
             };
         }
 
-        public static Node CreateIfStatement(string condition)
+        public static Node CreateIfStatement(ExpressionNode? condition)
         {
             return new IfStatementAstNode
             {
-                IfCondition = condition
+                ConditionExpression = condition
             };
         }
 
-        public static Node CreateMatchStatement(string expression)
+        public static Node CreateMatchStatement(ExpressionNode? expression)
         {
             return new MatchStatementAstNode
             {
-                Expression = expression
+                ExpressionNode = expression
             };
         }
 
-        public static Node CreateWhenStatement(string condition)
+        public static Node CreateWhenStatement(ExpressionNode? condition)
         {
             return new WhenStatementAstNode
             {
-                WhenCondition = condition
+                WhenExpression = condition
             };
         }
 
-        public static Node CreateWhileStatement(string condition)
+        public static Node CreateWhileStatement(ExpressionNode? condition)
         {
             return new WhileStatementAstNode
             {
-                WhileCondition = condition
+                WhileExpression = condition
             };
         }
 
-        public static Node CreateForStatement(string variable, string container)
+        public static Node CreateForStatement(string variable, ExpressionNode? container)
         {
             return new ForStatementAstNode
             {
                 ForVariable = variable,
-                ForContainer = container
+                ForContainerExpression = container
             };
         }
 
-        public static Node CreateForAllStatement(string variable, string container)
+        public static Node CreateForAllStatement(string variable, ExpressionNode? container)
         {
             return new ForAllStatementAstNode
             {
                 ForVariable = variable,
-                ForContainer = container
+                ForContainerExpression = container
             };
         }
 
-        public static Node CreateRepeatStatement(string expression)
+        public static Node CreateRepeatStatement(ExpressionNode? expression)
         {
             return new RepeatStatementAstNode
             {
-                RepeatExpression = expression
+                RepeatExpressionNode = expression
             };
         }
 
-        public static Node CreateHasStatement(string condition)
+        public static Node CreateHasStatement(ExpressionNode? condition)
         {
             return new HasStatementAstNode
             {
-                HasCondition = condition
+                HasExpression = condition
             };
         }
 
-        public static Node CreateHasTraitStatement(string condition, string? traitTypeName = null, string? traitVariableName = null)
+        public static Node CreateHasTraitStatement(ExpressionNode? expression, string traitTypeName)
         {
             return new HasTraitStatementAstNode
             {
-                HasTraitCondition = condition,
-                HasTraitTypeName = traitTypeName,
-                HasTraitVariableName = traitVariableName
+                HasTraitExpression = expression,
+                HasTraitTypeName = traitTypeName
             };
         }
 
-        public static Node CreateFunctionDeclaration(string name, string? parameters, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList, IEnumerable<string>? modifiers = null)
+        public static Node CreateFunctionDeclaration(string name, string? returnType, IEnumerable<Node> body, IEnumerable<ParameterInfo> parameterList, IEnumerable<string>? modifiers = null)
         {
             var node = new FunctionDeclarationAstNode
             {
                 FunctionDeclarationName = name,
-                FunctionDeclarationParameters = parameters,
                 FunctionDeclarationReturnType = returnType
             };
 
@@ -565,11 +558,11 @@ namespace Puma
             return node;
         }
 
-        public static Node CreateStatement(NodeKind kind, string? value = null)
+        public static Node CreateStatement(NodeKind kind, ExpressionNode? expression = null)
         {
             return new StatementAstNode(kind)
             {
-                StatementValue = value
+                StatementExpression = expression
             };
         }
 

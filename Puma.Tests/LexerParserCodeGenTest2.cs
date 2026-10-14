@@ -15,6 +15,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
+using System.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Puma;
 
@@ -25,6 +26,37 @@ namespace test
     {
         private static string Normalize(string s) =>
             s.Replace("\r\n", "\n").Replace("\r", "\n");
+
+        private static void ConfigureX64LibraryPath(ProcessStartInfo startInfo)
+        {
+            var libraryPaths = (Environment.GetEnvironmentVariable("LIB") ?? string.Empty)
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+                .Select(path => path.Replace("\\x86", "\\x64", StringComparison.OrdinalIgnoreCase))
+                .Where(Directory.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (libraryPaths.Length > 0)
+            {
+                startInfo.Environment["LIB"] = string.Join(Path.PathSeparator, libraryPaths);
+            }
+        }
+
+        private static ProcessStartInfo CreatePumaProcess(params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = Path.Combine(AppContext.BaseDirectory, "Puma.exe"),
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+            return startInfo;
+        }
 
         private static List<Puma.Lexer.LexerTokens> GetSignificantTokens(List<Puma.Lexer.LexerTokens> tokens)
         {
@@ -73,14 +105,421 @@ namespace test
 // start
 int main()
 {
-    auto first = Character('A');
-    auto newline = Character('\n');
+    auto first = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
+    auto newline = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x0A""));
 
     return 0;
 }
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void Codegen_UsesStructuredExpressions_WhenRetainedSourceTextDiffers()
+        {
+            const string src =
+@"properties
+    enabled = true
+
+start
+    value = 42
+";
+            const string expected =
+@"#include <cstdint>
+
+auto enabled = true;
+
+// start
+int main()
+{
+    auto value = (int64_t)42;
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var ast = parser.Parse(lexer.Tokenize(src));
+            var property = (PropertyDeclarationAstNode)ast.Single(node => node.Kind == NodeKind.PropertyDeclaration);
+            var assignment = (AssignmentStatementAstNode)ast.Single(node => node.Kind == NodeKind.AssignmentStatement);
+            property.PropertyValueExpression = new ExpressionNode { Kind = ExpressionKind.Identifier, Value = "true" };
+            assignment.AssignmentLeftExpression = new ExpressionNode { Kind = ExpressionKind.Identifier, Value = "value" };
+            assignment.AssignmentRightExpression = new ExpressionNode { Kind = ExpressionKind.Literal, Value = "42" };
+
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
+        public void NumericExpression_AstRetainsSuffixTypesAndSourceSpans()
+        {
+            const string src =
+@"start
+    value = 1 uint8 + 2 int16
+";
+            const string expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto value = (uint8_t)1 + (int16_t)2;
+
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var ast = parser.Parse(lexer.Tokenize(src));
+            var assignment = (AssignmentStatementAstNode)ast.Single(node => node.Kind == NodeKind.AssignmentStatement);
+            var expression = assignment.AssignmentRightExpression;
+
+            Assert.IsNotNull(expression);
+            Assert.AreEqual(ExpressionKind.Binary, expression.Kind);
+            Assert.AreEqual(new SourceSpan(2, 13, 2, 30), expression.SourceSpan);
+            Assert.AreEqual("uint8", expression.Left?.DeclaredType);
+            Assert.AreEqual(new SourceSpan(2, 13, 2, 20), expression.Left?.SourceSpan);
+            Assert.AreEqual("int16", expression.Right?.DeclaredType);
+            Assert.AreEqual(new SourceSpan(2, 23, 2, 30), expression.Right?.SourceSpan);
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(codegen.Generate(ast)).Trim());
+        }
+
+        [TestMethod]
+        public void StringAssignment_CodegenDependencies_AreExplicit()
+        {
+            const string src =
+@"start
+    value = ""Hello""
+";
+            const string expected =
+@"#include <PumaType/String.hpp>
+
+// start
+int main()
+{
+    auto value = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
+    return 0;
+}
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var result = codegen.GenerateResult(parser.Parse(lexer.Tokenize(src)));
+
+            CollectionAssert.AreEqual(new[] { "PumaType" }, result.RequiredRuntimeLibraries.ToArray());
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(result.SourceCode).Trim());
+        }
+
+        [DataTestMethod]
+        [DataRow("42", "(int64_t)42;\n")]
+        [DataRow("1 uint8 + 2 int16", "(uint8_t)1 + (int16_t)2;\n\n")]
+        public void GeneratedRuntimeIndependentCpp_CompilesWithClang(string expression, string expectedInitializer)
+        {
+            var src = $"start\n    value = {expression}\n";
+            var expected = $"#include <cstdint>\n\n// start\nint main()\n{{\n    auto value = {expectedInitializer}    return 0;\n}}";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
+            Assert.AreEqual(expected, Normalize(generated).Trim());
+            var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            try
+            {
+                Assert.IsTrue(File.Exists(compilerPath), $"clang++ was not found at '{compilerPath}'.");
+                var sourcePath = Path.Combine(directory, "generated.cpp");
+                var objectPath = Path.Combine(directory, "generated.obj");
+                File.WriteAllText(sourcePath, generated);
+                using var process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = compilerPath,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    ArgumentList = { "-std=c++20", "-c", sourcePath, "-o", objectPath }
+                });
+                Assert.IsNotNull(process);
+                var standardError = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                Assert.AreEqual(0, process.ExitCode, standardError);
+                Assert.IsTrue(File.Exists(objectPath));
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [DataTestMethod]
+        [DataRow(true)]
+        [DataRow(false)]
+        public void CliRuntimeLibraries_UseConfiguredStandardLibraryRoot(bool validRoot)
+        {
+            const string source = "start\n    WriteLn(\"Hello\")\n";
+            const string expected = "#include <PumaConsole/Console.hpp>\n\n// start\nint main()\n{\n    PumaConsole::WriteLn(\"Hello\");\n    return 0;\n}";
+            var runtime = Puma.Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaRuntimeCliTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var sourcePath = Path.Combine(directory, "main.puma");
+                var executablePath = Path.Combine(directory, "main.exe");
+                File.WriteAllText(sourcePath, source);
+                var startInfo = CreatePumaProcess(sourcePath, "-o", executablePath);
+                startInfo.Environment["PUMA_STDLIB_ROOT"] = validRoot
+                    ? Path.GetDirectoryName(runtime.IncludeDirectory)!
+                    : Path.Combine(directory, "missing-runtime");
+                startInfo.Environment["PUMA_HOME"] = Path.Combine(directory, "legacy-root");
+                using var process = Process.Start(startInfo);
+                Assert.IsNotNull(process);
+                var output = process.StandardOutput.ReadToEndAsync();
+                var error = process.StandardError.ReadToEndAsync();
+                process.WaitForExit();
+                output.GetAwaiter().GetResult();
+                var standardError = error.GetAwaiter().GetResult();
+                Assert.AreEqual(expected, Normalize(File.ReadAllText(Path.ChangeExtension(sourcePath, ".cpp"))).Trim());
+                if (validRoot)
+                {
+                    Assert.AreEqual(0, process.ExitCode, standardError);
+                    using var executable = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = executablePath,
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false
+                    });
+                    Assert.IsNotNull(executable);
+                    var standardOutput = executable.StandardOutput.ReadToEnd();
+                    executable.WaitForExit();
+                    Assert.AreEqual(0, executable.ExitCode);
+                    Assert.AreEqual("Hello" + Environment.NewLine, standardOutput);
+                }
+                else
+                {
+                    Assert.AreEqual(1, process.ExitCode);
+                    Assert.AreEqual("Puma build error: Unable to locate the installed Puma runtime. Set PUMA_STDLIB_ROOT to the directory containing include and lib\\x64\\Release, or install them beside the compiler executable.", standardError.Trim());
+                    Assert.IsFalse(File.Exists(executablePath));
+                }
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void GeneratedRuntimeBackedCpp_CompilesAndLinksWithClang()
+        {
+            const string src =
+@"start
+    WriteLn(""Hello"")
+";
+            const string expected =
+@"#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{
+    PumaConsole::WriteLn(""Hello"");
+    return 0;
+}
+";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
+            var runtime = Puma.Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
+            var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
+            var includePath = runtime.IncludeDirectory;
+            var consoleLibrary = Path.Combine(runtime.LibraryDirectory, "PumaConsole.lib");
+            var typeLibrary = Path.Combine(runtime.LibraryDirectory, "PumaType.lib");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            try
+            {
+                Assert.IsTrue(File.Exists(compilerPath), $"clang++ was not found at '{compilerPath}'.");
+                Assert.IsTrue(Directory.Exists(includePath), $"Puma headers were not found at '{includePath}'.");
+                Assert.IsTrue(File.Exists(consoleLibrary), $"PumaConsole library was not found at '{consoleLibrary}'.");
+                Assert.IsTrue(File.Exists(typeLibrary), $"PumaType library was not found at '{typeLibrary}'.");
+                var sourcePath = Path.Combine(directory, "generated.cpp");
+                var executablePath = Path.Combine(directory, "generated.exe");
+                File.WriteAllText(sourcePath, generated);
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = compilerPath,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    ArgumentList = { "-std=c++20", "--target=x86_64-pc-windows-msvc", "-fms-runtime-lib=dll", "-I", includePath, sourcePath, consoleLibrary, typeLibrary, "-o", executablePath }
+                };
+                ConfigureX64LibraryPath(startInfo);
+                using var process = Process.Start(startInfo);
+                Assert.IsNotNull(process);
+                var standardError = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                Assert.AreEqual(0, process.ExitCode, standardError);
+                Assert.IsTrue(File.Exists(executablePath));
+                using var executable = Process.Start(new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false
+                });
+                Assert.IsNotNull(executable);
+                var standardOutput = executable.StandardOutput.ReadToEnd();
+                executable.WaitForExit();
+                Assert.AreEqual(0, executable.ExitCode);
+                Assert.AreEqual("Hello" + Environment.NewLine, standardOutput);
+                Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void GeneratedStringRuntimeBackedCpp_CompilesLinksAndRunsWithClang()
+        {
+            const string src =
+@"start
+    value = ""Hello""
+";
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var generated = codegen.GenerateResult(parser.Parse(lexer.Tokenize(src)));
+            var runtime = Puma.Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
+            var compilerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "LLVM", "bin", "clang++.exe");
+            var includePath = runtime.IncludeDirectory;
+            var typeLibrary = Path.Combine(runtime.LibraryDirectory, "PumaType.lib");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            try
+            {
+                Assert.IsTrue(File.Exists(compilerPath), $"clang++ was not found at '{compilerPath}'.");
+                Assert.IsTrue(Directory.Exists(includePath), $"Puma headers were not found at '{includePath}'.");
+                Assert.IsTrue(File.Exists(typeLibrary), $"PumaType library was not found at '{typeLibrary}'.");
+                CollectionAssert.AreEqual(new[] { "PumaType" }, generated.RequiredRuntimeLibraries.ToArray());
+                var sourcePath = Path.Combine(directory, "generated.cpp");
+                var executablePath = Path.Combine(directory, "generated.exe");
+                File.WriteAllText(sourcePath, generated.SourceCode);
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = compilerPath,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    ArgumentList = { "-std=c++20", "--target=x86_64-pc-windows-msvc", "-fms-runtime-lib=dll", "-I", includePath, sourcePath, typeLibrary, "-o", executablePath }
+                };
+                ConfigureX64LibraryPath(startInfo);
+                using var process = Process.Start(startInfo);
+                Assert.IsNotNull(process);
+                var standardError = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                Assert.AreEqual(0, process.ExitCode, standardError);
+                Assert.IsTrue(File.Exists(executablePath));
+                using var executable = Process.Start(new ProcessStartInfo { FileName = executablePath, UseShellExecute = false });
+                Assert.IsNotNull(executable);
+                executable.WaitForExit();
+                Assert.AreEqual(0, executable.ExitCode);
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void Cli_DuplicateSourceFiles_ReturnsUsageError()
+        {
+            using var process = Process.Start(CreatePumaProcess("first.puma", "second.puma"));
+            Assert.IsNotNull(process);
+            var standardError = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            Assert.AreEqual(2, process.ExitCode);
+            StringAssert.Contains(standardError, "Only one Puma source file may be specified.");
+        }
+
+        [TestMethod]
+        public void Cli_MissingOutputValue_ReturnsUsageError()
+        {
+            using var process = Process.Start(CreatePumaProcess("input.puma", "--output"));
+            Assert.IsNotNull(process);
+            var standardError = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            Assert.AreEqual(2, process.ExitCode);
+            StringAssert.Contains(standardError, "Expected an output file name after -o or --output.");
+        }
+
+        [TestMethod]
+        public void Cli_EmitC_WritesGeneratedSource()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            try
+            {
+                var sourcePath = Path.Combine(directory, "sample.puma");
+                var generatedPath = Path.Combine(directory, "sample.cpp");
+                File.WriteAllText(sourcePath, "start\n    value = 42\n");
+                using var process = Process.Start(CreatePumaProcess("-emit-c", sourcePath));
+                Assert.IsNotNull(process);
+                process.WaitForExit();
+
+                Assert.AreEqual(0, process.ExitCode);
+                Assert.IsTrue(File.Exists(generatedPath));
+                StringAssert.Contains(File.ReadAllText(generatedPath), "int main()");
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void Cli_UnknownFlags_ArePassedToClangWithoutSplittingArguments()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            var originalCompiler = Environment.GetEnvironmentVariable("PUMA_CLANGXX");
+            var originalCaptureFile = Environment.GetEnvironmentVariable("PUMA_CLANG_ARGUMENTS_FILE");
+
+            try
+            {
+                var sourcePath = Path.Combine(directory, "sample.puma");
+                var compilerPath = Path.Combine(directory, "capture-clang-arguments.cmd");
+                var capturePath = Path.Combine(directory, "clang-arguments.txt");
+                File.WriteAllText(sourcePath, "start\n    value = 42\n");
+                File.WriteAllText(compilerPath, "@echo off\r\n> \"%PUMA_CLANG_ARGUMENTS_FILE%\" echo %*\r\n");
+                Environment.SetEnvironmentVariable("PUMA_CLANGXX", compilerPath);
+                Environment.SetEnvironmentVariable("PUMA_CLANG_ARGUMENTS_FILE", capturePath);
+
+                using var process = Process.Start(CreatePumaProcess(sourcePath, "-DNAME=Puma Test"));
+                Assert.IsNotNull(process);
+                process.WaitForExit();
+
+                Assert.AreEqual(0, process.ExitCode);
+                StringAssert.Contains(File.ReadAllText(capturePath), "\"-DNAME=Puma Test\"");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("PUMA_CLANGXX", originalCompiler);
+                Environment.SetEnvironmentVariable("PUMA_CLANG_ARGUMENTS_FILE", originalCaptureFile);
+                Directory.Delete(directory, recursive: true);
+            }
         }
 
         [TestMethod]
@@ -113,7 +552,7 @@ int main()
 @"#include <PumaType/Character.hpp>
 
 // functions
-void DoNothing(Puma::Type::Character c)
+void DoNothing(PumaType::Character c)
 {
     return;
 }
@@ -154,6 +593,42 @@ void DoNothing(Puma::Type::Character c)
         }
 
         [TestMethod]
+        public void LexerTokenPositions_AreOneBased_AndCodegenIsConsistent()
+        {
+            const string src =
+@"start
+    value = 42
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <cstdint>
+
+// start
+int main()
+{
+    auto value = (int64_t)42;
+    return 0;
+}
+";
+
+            Assert.AreEqual(1, significantTokens[0].StartLine);
+            Assert.AreEqual(1, significantTokens[0].StartColumn);
+            Assert.AreEqual(2, significantTokens[1].StartLine);
+            Assert.AreEqual(5, significantTokens[1].StartColumn);
+            Assert.AreEqual(2, significantTokens[3].StartLine);
+            Assert.AreEqual(13, significantTokens[3].StartColumn);
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void PropertiesExample_CharacterLiterals_LexerParserCodegen_AreConsistent()
         {
             const string src =
@@ -186,8 +661,8 @@ void DoNothing(Puma::Type::Character c)
 @"#include <PumaType/Character.hpp>
 
 // properties
-auto first = Character('A');
-auto newline = Character('\n');
+auto first = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
+auto newline = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x0A""));
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -226,12 +701,12 @@ initialize
 @"#include <PumaType/Character.hpp>
 
 // properties
-auto current = Character('A');
+auto current = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
 
 // initialize
 void initialize(void)
 {
-    current = Character('\n');
+    current = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x0A""));
 }
 ";
 
@@ -272,7 +747,7 @@ void initialize(void)
 @"#include <PumaType/Character.hpp>
 
 // functions
-char Pick(Puma::Type::Character a, Puma::Type::Character b)
+PumaType::Character Pick(PumaType::Character a, PumaType::Character b)
 {
     auto result = ((a == b) ? a : b);
     auto mirror = result;
@@ -402,11 +877,11 @@ char Pick(Puma::Type::Character a, Puma::Type::Character b)
 // functions
 void Hello(void)
 {
-    auto s = String(""Hello, World!"");
+    auto s = PumaType::String(""Hello, World!"", sizeof(""Hello, World!"") - 1);
     PrintLn(s);
 }
 
-int Add(int64_t a, int64_t b)
+int64_t Add(int64_t a, int64_t b)
 {
     return a + b;
 }
@@ -459,9 +934,9 @@ void Consume(int32_t a, int32_t b, int32_t c)
 
 void Caller(void)
 {
-    x = 1;
-    y = 2;
-    z = 3;
+    x = (int16_t)1;
+    y = (int16_t)2;
+    z = (int16_t)3;
     Consume((x + y), ((x > 0) ? x : y), z);
 }
 ";
@@ -560,9 +1035,9 @@ void F(void)
     x = a - b;
     x = a * b;
     x = a / b;
-    y = c and d;
-    y = c or d;
-    y = not c;
+    y = c && d;
+    y = c || d;
+    y = !c;
     x = a << b;
     x = a >> b;
     z = a & b;
@@ -980,6 +1455,39 @@ void H(void)
         }
 
         [TestMethod]
+        public void StartIf_StringAssignment_IncludesStringHeader()
+        {
+            const string src =
+@"start
+    if 1 == 1
+        message = ""Hello""
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+            var expected =
+@"#include <PumaType/String.hpp>
+
+// start
+int main()
+{
+    if (1 == 1)
+    {
+        message = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
+    }
+    return 0;
+}
+";
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
+        }
+
+        [TestMethod]
         public void FunctionsExample_MissingParameterType_Parser_ThrowsCompilerError()
         {
             const string src =
@@ -1072,9 +1580,9 @@ void H(void)
                 ("start\n    a = 1\nproperties\n    b = 2\n", "is out of order after 'start'"),
                 ("a = 1\nfunctions\n    F()\n", "Sections are not allowed after implicit start statements"),
                 ("type\n    MyType is object\nstart\n    a = 1\n", "start section is only allowed in module files"),
-                ("start\n    WriteLine \"x\")\n", "Expected '(' after WriteLine."),
-                ("start\n    WriteLine(1)\n", "Expected string literal in WriteLine"),
-                ("start\n    WriteLine(\"x\"\n", "Expected ')' after WriteLine argument."),
+                ("start\n    WriteLn \"x\")\n", "Expected '(' after WriteLn."),
+                ("start\n    WriteLn(1)\n", "Expected string literal in WriteLn"),
+                ("start\n    WriteLn(\"x\"\n", "Expected ')' after WriteLn argument."),
                 ("trait\n    MyTrait is object\n", "Unexpected inheritance in trait declaration"),
                 ("type\n    MyType object\n", "must include an 'is' base type"),
                 ("type\n    MyType is\n", "Missing base type after 'is'."),
@@ -1115,13 +1623,64 @@ void H(void)
             {
                 (
                     "properties\n    a = 1\nproperties\n    b = 2\n",
-                    "Duplicate section 'properties'. Remove the extra 'properties' section."),
+                    "Line 3, column 1: Duplicate section 'properties'. Remove the extra 'properties' section."),
                 (
                     "start\n    a = 1\nproperties\n    b = 2\n",
-                    "Section 'properties' is out of order after 'start'. Fix: move 'properties' to match this order (all optional): use, type/trait/module, enums, records, properties, start/initialize, finalize, functions."),
+                    "Line 3, column 1: Section 'properties' is out of order after 'start'. Fix: move 'properties' to match this order (all optional): use, type/trait/module, enums, records, properties, start/initialize, finalize, functions."),
                 (
                     "initialize\n    a = 1\nstart\n    b = 2\n",
-                    "Only one of 'start' or 'initialize' sections may appear in a file.")
+                    "Line 3, column 1: Only one of 'start' or 'initialize' sections may appear in a file.")
+            };
+
+            foreach (var (source, expectedMessage) in cases)
+            {
+                var lexer = new Puma.Lexer();
+                var parser = new Puma.Parser();
+                var tokens = lexer.Tokenize(source);
+
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+                Assert.AreEqual(expectedMessage, ex.Message);
+            }
+        }
+
+        [TestMethod]
+        public void ParserAssignmentAndExpressionDiagnostics_IncludeLocations()
+        {
+            var cases = new (string Source, string ExpectedMessage)[]
+            {
+                (
+                    "properties\n    value = 1 const\nstart\n    value = 2\n",
+                    "Line 4, column 5: Cannot assign to constant property 'value'."),
+                (
+                    "start\n    value = left if condition\n",
+                    "Line 2, column 18: Conditional expressions require an 'else' branch.")
+            };
+
+            foreach (var (source, expectedMessage) in cases)
+            {
+                var lexer = new Puma.Lexer();
+                var parser = new Puma.Parser();
+                var tokens = lexer.Tokenize(source);
+
+                var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
+                Assert.AreEqual(expectedMessage, ex.Message);
+            }
+        }
+
+        [TestMethod]
+        public void ParserTypeUseAndLoopDiagnostics_IncludeLocations()
+        {
+            var cases = new (string Source, string ExpectedMessage)[]
+            {
+                (
+                    "type\n    MyType object\n",
+                    "Line 2, column 5: Type declarations must include an 'is' base type."),
+                (
+                    "use\n    a/b.h as\n",
+                    "Line 2, column 11: Expected alias identifier after 'as' in use statement."),
+                (
+                    "start\n    while\n",
+                    "Line 2, column 5: While statements require a condition.")
             };
 
             foreach (var (source, expectedMessage) in cases)
@@ -1145,7 +1704,7 @@ void H(void)
                 "properties\n    a = 1\nstart\n    b = 2\n",
                 "functions\n    F()\n",
                 "module\n    M\nstart\n    a = 1\n",
-                "start\n    WriteLine(\"x\")\n",
+                "start\n    WriteLn(\"x\")\n",
                 "trait\n    MyTrait\n",
                 "type\n    MyType is object\n",
                 "type\n    MyType is object has IPrintable\n",
@@ -1206,8 +1765,10 @@ void H(void)
 
             var generated = codegen.Generate(ast);
             var expected =
-@"// functions
-int F(void)
+@"#include <cstdint>
+
+// functions
+int64_t F(void)
 {
     return 1;
 }
@@ -1290,8 +1851,8 @@ void F(void)
             var ast = parser.Parse(tokens);
             var logValues = (FunctionDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.FunctionDeclaration && ((FunctionDeclarationAstNode)n).FunctionDeclarationName == "LogValues");
             Assert.AreEqual(3, logValues.FunctionParameterList.Count);
-            Assert.AreEqual("10", logValues.FunctionParameterList[1].DefaultValue);
-            Assert.AreEqual("20", logValues.FunctionParameterList[2].DefaultValue);
+            Assert.AreEqual("10", logValues.FunctionParameterList[1].DefaultExpression?.Value);
+            Assert.AreEqual("20", logValues.FunctionParameterList[2].DefaultExpression?.Value);
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1356,12 +1917,11 @@ void Caller(void)
 int main()
 {
     auto decNeg = (int64_t)-42;
-    auto exp64 = 1.25e+3;
-    auto exp32 = 6.5e-1;
+    auto exp64 = (double)1.25e+3;
+    auto exp32 = (float)6.5e-1;
     auto hex32 = (uint32_t)0x1F;
     auto bin8 = (uint8_t)0b1010;
     auto oct16 = (uint16_t)0o17;
-
     return 0;
 }
 ";
@@ -1404,31 +1964,19 @@ int main()
         }
 
         [TestMethod]
-        public void CodegenFallbackPaths_AreCovered_WithIncompleteAstData()
+        public void CodegenIncompleteExpressionAst_ThrowsCompilerError()
         {
             var ast = new List<Node>
             {
                 Node.CreateSection(Puma.Parser.Section.Properties),
-                Node.CreatePropertyDeclaration("p", "mysteryType", null),
+                Node.CreatePropertyDeclaration("p", null),
                 Node.CreateSection(Puma.Parser.Section.Start)
             };
 
             var codegen = new Puma.Codegen();
-            var generated = codegen.Generate(ast);
+            var ex = Assert.ThrowsException<InvalidOperationException>(() => codegen.Generate(ast));
 
-            var expected =
-@"mysteryType p = {0};
-
-// start
-int main()
-{
-    return 0;
-}
-";
-
-            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
-            StringAssert.Contains(generated, "mysteryType p = {0};");
-            StringAssert.Contains(generated, "int main()");
+            StringAssert.Contains(ex.Message, "Expression AST node is required");
         }
 
         [TestMethod]
@@ -1467,6 +2015,26 @@ int main()
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
             Assert.IsFalse(generated.Contains("{0}", StringComparison.Ordinal));
             Assert.IsFalse(generated.Contains(" = ;", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public void Properties_LogicalExpression_LexerParserCodegen_AreConsistent()
+        {
+            const string src =
+@"properties
+    enabled = ready and not disabled
+";
+            const string expected =
+@"// properties
+auto enabled = (ready && !disabled);
+";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+            var generated = codegen.Generate(parser.Parse(lexer.Tokenize(src)));
+
+            Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
     }
 }

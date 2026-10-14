@@ -117,12 +117,11 @@ namespace Puma
         private int _currentIndentLevel;
         private int? _enumSectionIndent;
         private string? _currentEnumName;
-        private List<string> _currentEnumMembers = new();
+        private List<EnumMemberInfo> _currentEnumMemberDeclarations = new();
         private int? _recordSectionIndent;
         private string? _currentRecordName;
         private int? _currentRecordPackSize;
-        private List<string> _currentRecordMembers = new();
-        private Dictionary<string, string> _currentRecordMemberTypes = new(StringComparer.Ordinal);
+        private List<RecordMemberInfo> _currentRecordMemberDeclarations = new();
         private int? _propertiesSectionIndent;
         private FileDeclarationKind _currentFileKind;
         private Node? _currentSectionNode;
@@ -228,10 +227,14 @@ namespace Puma
             }
         }
 
-        private void ValidateImplicitPropertyAssignment(string left, string right)
+        private void ValidateImplicitPropertyAssignment(ExpressionNode left, ExpressionNode right)
         {
-            if (!TryGetKnownIdentifierType(right, out var fromType)
-                || !TryGetKnownIdentifierType(left, out var toType))
+            if (left.Kind != ExpressionKind.Identifier
+                || right.Kind != ExpressionKind.Identifier
+                || string.IsNullOrWhiteSpace(left.Value)
+                || string.IsNullOrWhiteSpace(right.Value)
+                || !TryGetKnownIdentifierType(right.Value, out var fromType)
+                || !TryGetKnownIdentifierType(left.Value, out var toType))
             {
                 return;
             }
@@ -269,59 +272,7 @@ namespace Puma
             }
         }
 
-        private static bool TryGetTypedLiteralConvertionType(string? expressionText, out Convertion.Type type)
-        {
-            type = default;
-            if (string.IsNullOrWhiteSpace(expressionText))
-            {
-                return false;
-            }
-
-            var text = expressionText.Trim();
-            var signOffset = (text.StartsWith("-", StringComparison.Ordinal) || text.StartsWith("+", StringComparison.Ordinal)) ? 1 : 0;
-            var index = signOffset;
-            var dotSeen = false;
-
-            while (index < text.Length)
-            {
-                var ch = text[index];
-                if (char.IsDigit(ch))
-                {
-                    index++;
-                    continue;
-                }
-
-                if (ch == '.' && !dotSeen)
-                {
-                    dotSeen = true;
-                    index++;
-                    continue;
-                }
-
-                if ((ch == 'e' || ch == 'E') && index + 1 < text.Length)
-                {
-                    index++;
-                    if (index < text.Length && (text[index] == '+' || text[index] == '-'))
-                    {
-                        index++;
-                    }
-
-                    while (index < text.Length && char.IsDigit(text[index]))
-                    {
-                        index++;
-                    }
-
-                    continue;
-                }
-
-                break;
-            }
-
-            var suffix = text[index..];
-            return TryMapConvertionType(suffix, out type);
-        }
-
-        private void ValidateImplicitExpressionConversion(ExpressionNode? expression, Convertion.Type toType, string? expressionText = null)
+        private void ValidateImplicitExpressionConversion(ExpressionNode? expression, Convertion.Type toType)
         {
             if (expression == null)
             {
@@ -337,7 +288,7 @@ namespace Puma
             }
 
             if (expression.Kind == ExpressionKind.Literal
-                && TryGetTypedLiteralConvertionType(expressionText, out fromType))
+                && TryMapConvertionType(expression.DeclaredType, out fromType))
             {
                 ValidateImplicitConversion(fromType, toType);
                 return;
@@ -365,74 +316,25 @@ namespace Puma
                 && string.Equals(GetFunctionDeclarationName(n), functionName, StringComparison.Ordinal));
         }
 
-        private static List<string> SplitCallArgumentTexts(List<LexerTokens> argumentTokens)
+        private void ValidateImplicitFunctionCallArguments(ExpressionNode? callExpression)
         {
-            var result = new List<string>();
-            var current = new List<LexerTokens>();
-            var parenDepth = 0;
-            var bracketDepth = 0;
-
-            foreach (var token in argumentTokens)
-            {
-                if (token.Category == TokenCategory.Delimiter)
-                {
-                    if (token.TokenText == "(")
-                    {
-                        parenDepth++;
-                    }
-                    else if (token.TokenText == ")" && parenDepth > 0)
-                    {
-                        parenDepth--;
-                    }
-                    else if (token.TokenText == "[")
-                    {
-                        bracketDepth++;
-                    }
-                    else if (token.TokenText == "]" && bracketDepth > 0)
-                    {
-                        bracketDepth--;
-                    }
-                }
-
-                if (token.Category == TokenCategory.Punctuation
-                    && token.TokenText == ","
-                    && parenDepth == 0
-                    && bracketDepth == 0)
-                {
-                    result.Add(BuildQualifiedName(current));
-                    current.Clear();
-                    continue;
-                }
-
-                current.Add(token);
-            }
-
-            if (current.Count > 0)
-            {
-                result.Add(BuildQualifiedName(current));
-            }
-
-            return result;
-        }
-
-        private void ValidateImplicitFunctionCallArguments(string functionName, ExpressionNode? callExpression, List<LexerTokens> argumentTokens)
-        {
-            if (callExpression?.Kind != ExpressionKind.Call)
+            if (callExpression?.Kind != ExpressionKind.Call
+                || callExpression.Left?.Kind != ExpressionKind.Identifier
+                || string.IsNullOrWhiteSpace(callExpression.Left.Value))
             {
                 return;
             }
 
-            var declaration = GetFunctionDeclarationForCall(functionName);
+            var declaration = GetFunctionDeclarationForCall(callExpression.Left.Value);
             if (declaration == null)
             {
                 return;
             }
 
-            var argumentTexts = SplitCallArgumentTexts(argumentTokens);
             var declarationParameters = declaration is FunctionDeclarationAstNode typedDeclaration
                 ? typedDeclaration.FunctionParameterList
                 : new List<Node.ParameterInfo>();
-            var max = Math.Min(Math.Min(callExpression.Arguments.Count, declarationParameters.Count), argumentTexts.Count);
+            var max = Math.Min(callExpression.Arguments.Count, declarationParameters.Count);
             for (var i = 0; i < max; i++)
             {
                 var parameter = declarationParameters[i];
@@ -441,7 +343,7 @@ namespace Puma
                     continue;
                 }
 
-                ValidateImplicitExpressionConversion(callExpression.Arguments[i], toType, argumentTexts[i]);
+                ValidateImplicitExpressionConversion(callExpression.Arguments[i], toType);
             }
         }
 
@@ -492,12 +394,11 @@ namespace Puma
             _currentIndentLevel = 0;
             _enumSectionIndent = null;
             _currentEnumName = null;
-            _currentEnumMembers = new List<string>();
+            _currentEnumMemberDeclarations = new List<EnumMemberInfo>();
             _recordSectionIndent = null;
             _currentRecordName = null;
             _currentRecordPackSize = null;
-            _currentRecordMembers = new List<string>();
-            _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+            _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
             _propertiesSectionIndent = null;
             _currentFileKind = FileDeclarationKind.None;
             _currentSectionNode = null;
@@ -621,40 +522,40 @@ namespace Puma
                 {
                     if (_implicitStartSection)
                     {
-                        throw new InvalidOperationException("Sections are not allowed after implicit start statements.");
+                        throw CreateParserException("Sections are not allowed after implicit start statements.", t);
                     }
 
                     if ((next == Section.Start && _seen.Contains(Section.Initialize))
                         || (next == Section.Initialize && _seen.Contains(Section.Start)))
                     {
-                        throw new InvalidOperationException("Only one of 'start' or 'initialize' sections may appear in a file.");
+                        throw CreateParserException("Only one of 'start' or 'initialize' sections may appear in a file.", t);
                     }
 
                     if ((next == Section.Module || next == Section.Type || next == Section.Trait)
                         && (_seen.Contains(Section.Module) || _seen.Contains(Section.Type) || _seen.Contains(Section.Trait)))
                     {
-                        throw new InvalidOperationException("Only one of 'module', 'type', or 'trait' sections may appear in a file.");
+                        throw CreateParserException("Only one of 'module', 'type', or 'trait' sections may appear in a file.", t);
                     }
 
                     // Duplicate check
                     if (_seen.Contains(next))
                     {
-                        throw new InvalidOperationException(
-                            $"Duplicate section '{DisplayName(next)}'. Remove the extra '{DisplayName(next)}' section.");
+                        throw CreateParserException(
+                            $"Duplicate section '{DisplayName(next)}'. Remove the extra '{DisplayName(next)}' section.", t);
                     }
 
                     // Order check
                     if (!SectionRank.TryGetValue(next, out var rank))
                     {
-                        throw new InvalidOperationException(
-                            $"Section '{DisplayName(next)}' is not allowed here. Sections must appear in this order (all optional): {ExpectedOrderText}.");
+                        throw CreateParserException(
+                            $"Section '{DisplayName(next)}' is not allowed here. Sections must appear in this order (all optional): {ExpectedOrderText}.", t);
                     }
 
                     if (rank < _lastRank)
                     {
-                        throw new InvalidOperationException(
+                        throw CreateParserException(
                             $"Section '{DisplayName(next)}' is out of order after '{DisplayName(_lastSection)}'. " +
-                            $"Fix: move '{DisplayName(next)}' to match this order (all optional): {ExpectedOrderText}.");
+                            $"Fix: move '{DisplayName(next)}' to match this order (all optional): {ExpectedOrderText}.", t);
                     }
 
                     _lastRank = rank;
@@ -688,6 +589,20 @@ namespace Puma
                 }
             }
             return false;
+        }
+
+        private static InvalidOperationException CreateParserException(string message, LexerTokens? token = null)
+        {
+            return token is LexerTokens location && location.StartLine > 0 && location.StartColumn > 0
+                ? new InvalidOperationException($"Line {location.StartLine}, column {location.StartColumn}: {message}")
+                : new InvalidOperationException(message);
+        }
+
+        private static InvalidOperationException CreateParserException(string message, SourceSpan? sourceSpan)
+        {
+            return sourceSpan is SourceSpan location && location.StartLine > 0 && location.StartColumn > 0
+                ? new InvalidOperationException($"Line {location.StartLine}, column {location.StartColumn}: {message}")
+                : new InvalidOperationException(message);
         }
 
         private static (string Value, List<string> Modifiers) SplitTrailingModifiers(List<LexerTokens> tokens, HashSet<string> allowedModifiers)
@@ -727,13 +642,20 @@ namespace Puma
             }
 
             var current = new List<LexerTokens>();
+            var depth = 0;
             foreach (var token in tokens)
             {
-                if (token.Category == TokenCategory.Punctuation && token.TokenText == ",")
+                if (token.Category == TokenCategory.Delimiter)
+                {
+                    if (token.TokenText is "(" or "[") depth++;
+                    if (token.TokenText is ")" or "]") depth--;
+                }
+
+                if (depth == 0 && token.Category == TokenCategory.Punctuation && token.TokenText == ",")
                 {
                     if (current.Count == 0)
                     {
-                        throw new InvalidOperationException("Parameter is missing the name and type.");
+                        throw CreateParserException("Parameter is missing the name and type.", token);
                     }
 
                     AddParameterFromTokens(parameters, current);
@@ -746,7 +668,7 @@ namespace Puma
 
             if (current.Count == 0 && tokens.Any(t => t.Category == TokenCategory.Punctuation && t.TokenText == ","))
             {
-                throw new InvalidOperationException("Parameter is missing the name and type.");
+                throw CreateParserException("Parameter is missing the name and type.", tokens[^1]);
             }
 
             AddParameterFromTokens(parameters, current);
@@ -774,10 +696,10 @@ namespace Puma
                 var single = nameAndTypeTokens[0];
                 if (single.Category == TokenCategory.Keyword)
                 {
-                    throw new InvalidOperationException($"Parameter of type '{single.TokenText}' is missing the name.");
+                    throw CreateParserException($"Parameter of type '{single.TokenText}' is missing the name.", single);
                 }
 
-                throw new InvalidOperationException($"Parameter '{single.TokenText}' is missing the type.");
+                throw CreateParserException($"Parameter '{single.TokenText}' is missing the type.", single);
             }
 
             var name = nameAndTypeTokens[0].TokenText;
@@ -785,16 +707,19 @@ namespace Puma
             var (type, modifiers) = SplitTrailingModifiers(typeTokens, ParameterModifiers);
             if (string.IsNullOrWhiteSpace(type))
             {
-                throw new InvalidOperationException($"Parameter '{name}' is missing the type.");
+                throw CreateParserException($"Parameter '{name}' is missing the type.", nameAndTypeTokens[0]);
             }
 
-            var defaultValue = defaultTokens.Count > 0 ? BuildQualifiedName(defaultTokens) : null;
+            if (equalsIndex >= 0 && defaultTokens.Count == 0)
+            {
+                throw CreateParserException($"Parameter '{name}' is missing the default expression.", tokens[equalsIndex]);
+            }
 
             parameters.Add(new Node.ParameterInfo
             {
                 Name = name,
                 Type = type,
-                DefaultValue = defaultValue
+                DefaultExpression = ParseExpression(defaultTokens)
             });
 
             if (modifiers.Count > 0)
@@ -822,21 +747,31 @@ namespace Puma
             }
 
             var openIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == "(");
-            var closeIndex = tokens.FindIndex(t => t.Category == TokenCategory.Delimiter && t.TokenText == ")");
+            var closeIndex = -1;
+            var depth = 0;
+            for (var i = openIndex; i >= 0 && i < tokens.Count; i++)
+            {
+                if (tokens[i].Category != TokenCategory.Delimiter) continue;
+                if (tokens[i].TokenText == "(") depth++;
+                if (tokens[i].TokenText == ")" && --depth == 0)
+                {
+                    closeIndex = i;
+                    break;
+                }
+            }
             if (openIndex < 0 || closeIndex < openIndex)
             {
-                throw new InvalidOperationException("Function declarations require a parameter list.");
+                throw CreateParserException("Function declarations require a parameter list.", firstToken);
             }
 
             var nameTokens = tokens.Skip(tokenIndex).Take(openIndex - tokenIndex).ToList();
             var name = BuildQualifiedName(nameTokens);
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new InvalidOperationException("Function declarations require a name.");
+                throw CreateParserException("Function declarations require a name.", firstToken);
             }
 
             var parameterTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();
-            var parameters = BuildQualifiedName(parameterTokens);
             var parameterList = ParseParameterList(parameterTokens);
 
             var returnTokens = tokens.Skip(closeIndex + 1).ToList();
@@ -859,7 +794,7 @@ namespace Puma
                 return;
             }
 
-            _currentFunctionNode = Node.CreateFunctionDeclaration(name, parameters, returnType, Array.Empty<Node>(), parameterList, functionModifiers);
+            _currentFunctionNode = Node.CreateFunctionDeclaration(name, returnType, Array.Empty<Node>(), parameterList, functionModifiers);
             _currentFunctionBody = new List<Node>();
             _currentFunctionIsDelegate = false;
 
@@ -1065,7 +1000,7 @@ namespace Puma
                 if (!string.IsNullOrWhiteSpace(name))
                 {
                     _currentEnumName = name;
-                    _currentEnumMembers = new List<string>();
+                    _currentEnumMemberDeclarations = new List<EnumMemberInfo>();
                 }
                 return;
             }
@@ -1078,11 +1013,22 @@ namespace Puma
                 }
 
                 var memberTokens = ReadTokensUntilEol(token.Value);
-                var memberName = BuildQualifiedName(memberTokens);
-                if (!string.IsNullOrWhiteSpace(memberName))
+                var equalsIndex = memberTokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
+                var memberName = BuildQualifiedName(equalsIndex >= 0 ? memberTokens.Take(equalsIndex) : memberTokens);
+                if (string.IsNullOrWhiteSpace(memberName))
                 {
-                    _currentEnumMembers.Add(memberName);
+                    throw CreateParserException("Enum members require a name.", token.Value);
                 }
+
+                var valueExpression = equalsIndex >= 0
+                    ? ParseExpression(memberTokens.Skip(equalsIndex + 1).ToList())
+                    : null;
+                if (equalsIndex >= 0 && valueExpression == null)
+                {
+                    throw CreateParserException($"Enum member '{memberName}' is missing the initializer expression.", memberTokens[equalsIndex]);
+                }
+
+                _currentEnumMemberDeclarations.Add(new EnumMemberInfo { Name = memberName, ValueExpression = valueExpression });
                 return;
             }
 
@@ -1130,8 +1076,7 @@ namespace Puma
                 if (!string.IsNullOrWhiteSpace(name))
                 {
                     _currentRecordName = name;
-                    _currentRecordMembers = new List<string>();
-                    _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+                    _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
                     _currentRecordPackSize = null;
 
                     if (packIndex >= 0)
@@ -1169,27 +1114,21 @@ namespace Puma
                 }
 
                 var equalsIndex = memberTokens.FindIndex(t => t.Category == TokenCategory.Operator && t.TokenText == "=");
-                string memberName;
+                var memberName = BuildQualifiedName(equalsIndex >= 0 ? memberTokens.Take(equalsIndex) : memberTokens);
+                ExpressionNode? valueExpression = null;
                 if (equalsIndex >= 0)
                 {
-                    var left = BuildQualifiedName(memberTokens.Take(equalsIndex));
                     var rightTokens = memberTokens.Skip(equalsIndex + 1).ToList();
-                    var right = NormalizeAssignedValueTokens(rightTokens);
-                    if (TryExtractNumericLiteralWithSuffix(rightTokens, out _, out var memberType)
-                        && !string.IsNullOrWhiteSpace(left))
-                    {
-                        _currentRecordMemberTypes[left] = memberType;
-                    }
-                    memberName = $"{left}={right}";
-                }
-                else
-                {
-                    memberName = BuildQualifiedName(memberTokens);
+                    valueExpression = ParseExpression(rightTokens);
                 }
 
                 if (!string.IsNullOrWhiteSpace(memberName))
                 {
-                    _currentRecordMembers.Add(memberName);
+                    _currentRecordMemberDeclarations.Add(new RecordMemberInfo
+                    {
+                        Name = memberName,
+                        ValueExpression = valueExpression
+                    });
                 }
                 return;
             }
@@ -1250,18 +1189,20 @@ namespace Puma
             if (TrySwitchSection(token))
                 return;
 
-            if (!_startHeaderParsed && TryParseSectionParameters(token, out var parameters))
+            if (token?.Category == TokenCategory.EndOfLine)
             {
-                if (_currentSectionNode is SectionAstNode sectionNode)
-                {
-                    sectionNode.SectionParameters = parameters;
-                }
+                _startHeaderParsed = true;
+            }
+
+            if (!_startHeaderParsed && TryParseSectionParameters(token))
+            {
                 _startHeaderParsed = true;
                 return;
             }
 
-            // Recognize built-in WriteLine in start section: WriteLine("...") [EOL]
-            if (token is LexerTokens t && t.Category == TokenCategory.Identifier && t.TokenText == "WriteLine")
+            // Recognize built-in WriteLn in start section: WriteLn("...") [EOL]
+            if (token is LexerTokens t && t.Category == TokenCategory.Identifier && t.TokenText == "WriteLn"
+                && ReferenceEquals(GetStatementTarget(ast), ast))
             {
                 ParseWriteLineCall();
                 return;
@@ -1291,12 +1232,13 @@ namespace Puma
                 return;
             }
 
-            if (!_initializeHeaderParsed && TryParseSectionParameters(token, out var parameters))
+            if (token?.Category == TokenCategory.EndOfLine)
             {
-                if (_currentSectionNode is SectionAstNode sectionNode)
-                {
-                    sectionNode.SectionParameters = parameters;
-                }
+                _initializeHeaderParsed = true;
+            }
+
+            if (!_initializeHeaderParsed && TryParseSectionParameters(token))
+            {
                 _initializeHeaderParsed = true;
                 return;
             }
@@ -1391,23 +1333,23 @@ namespace Puma
             var open = GetNextToken(_tokens);
             if (open == null || open.Value.Category != TokenCategory.Delimiter || open.Value.TokenText != "(")
             {
-                throw new InvalidOperationException("Expected '(' after WriteLine.");
+                throw new InvalidOperationException("Expected '(' after WriteLn.");
             }
 
             var textTok = GetNextToken(_tokens);
             if (textTok == null || textTok.Value.Category != TokenCategory.StringLiteral)
             {
-                throw new InvalidOperationException("Expected string literal in WriteLine(...)");
+                throw new InvalidOperationException("Expected string literal in WriteLn(...)");
             }
-            var literal = textTok.Value.TokenText; // keep quotes
+            var argument = ParseExpression(new List<LexerTokens> { textTok.Value })!;
 
             var close = GetNextToken(_tokens);
             if (close == null || close.Value.Category != TokenCategory.Delimiter || close.Value.TokenText != ")")
             {
-                throw new InvalidOperationException("Expected ')' after WriteLine argument.");
+                throw new InvalidOperationException("Expected ')' after WriteLn argument.");
             }
 
-            ast.Add(Node.CreateWriteLine(literal));
+            ast.Add(Node.CreateWriteLine(argument));
         }
 
         private static bool IsIgnorable(LexerTokens token)
@@ -1426,13 +1368,13 @@ namespace Puma
 
             if (tokens.Any(t => t.Category == TokenCategory.Keyword && (t.TokenText == "is" || t.TokenText == "has")))
             {
-                throw new InvalidOperationException($"Unexpected inheritance in {declarationKind} declaration.");
+                throw CreateParserException($"Unexpected inheritance in {declarationKind} declaration.", firstToken);
             }
 
             var name = BuildQualifiedName(tokens);
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new InvalidOperationException($"Missing {declarationKind} name.");
+                throw CreateParserException($"Missing {declarationKind} name.", firstToken);
             }
 
             ast.Add(Node.CreateTypeDeclaration(declarationKind, name, null));
@@ -1449,13 +1391,13 @@ namespace Puma
             var isIndex = tokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "is");
             if (isIndex < 0)
             {
-                throw new InvalidOperationException("Type declarations must include an 'is' base type.");
+                throw CreateParserException("Type declarations must include an 'is' base type.", firstToken);
             }
 
             var nameTokens = tokens.Take(isIndex).ToList();
             if (nameTokens.Count == 0)
             {
-                throw new InvalidOperationException("Missing type name.");
+                throw CreateParserException("Missing type name.", tokens[isIndex]);
             }
 
             var hasIndex = tokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "has");
@@ -1465,7 +1407,7 @@ namespace Puma
 
             if (baseTokens.Count == 0)
             {
-                throw new InvalidOperationException("Missing base type after 'is'.");
+                throw CreateParserException("Missing base type after 'is'.", tokens[isIndex]);
             }
 
             var name = BuildQualifiedName(nameTokens);
@@ -1501,7 +1443,7 @@ namespace Puma
 
                 if (traits.Count == 0)
                 {
-                    throw new InvalidOperationException("Missing trait list after 'has'.");
+                    throw CreateParserException("Missing trait list after 'has'.", tokens[hasIndex]);
                 }
             }
 
@@ -1546,51 +1488,6 @@ namespace Puma
             return string.Concat(tokens.Select(t => t.TokenText));
         }
 
-        private static string NormalizeAssignedValueTokens(List<LexerTokens> tokens)
-        {
-            if (tokens.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            if (TryExtractNumericLiteralWithSuffix(tokens, out var literal, out _))
-            {
-                return literal;
-            }
-
-            return BuildQualifiedName(tokens);
-        }
-
-        private static bool TryExtractNumericLiteralWithSuffix(List<LexerTokens> tokens, out string literal, out string suffix)
-        {
-            literal = string.Empty;
-            suffix = string.Empty;
-
-            if (tokens.Count != 2)
-            {
-                return false;
-            }
-
-            if (tokens[0].Category != TokenCategory.NumericLiteral)
-            {
-                return false;
-            }
-
-            if (tokens[1].Category is not (TokenCategory.Keyword or TokenCategory.Identifier))
-            {
-                return false;
-            }
-
-            if (!NumericCastSuffixes.Contains(tokens[1].TokenText))
-            {
-                return false;
-            }
-
-            literal = tokens[0].TokenText;
-            suffix = tokens[1].TokenText;
-            return true;
-        }
-
         private void ParseUseStatement(LexerTokens firstToken)
         {
             var parts = new List<LexerTokens> { firstToken };
@@ -1622,13 +1519,15 @@ namespace Puma
                 return;
             }
 
+            var sourceSpan = new SourceSpan(parts[0].StartLine, parts[0].StartColumn,
+                parts[^1].StartLine, parts[^1].StartColumn + parts[^1].TokenText.Length);
             var aliasIndex = parts.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "as");
             string? alias = null;
             if (aliasIndex >= 0)
             {
                 if (aliasIndex + 1 >= parts.Count)
                 {
-                    throw new InvalidOperationException("Expected alias identifier after 'as' in use statement.");
+                    throw CreateParserException("Expected alias identifier after 'as' in use statement.", parts[aliasIndex]);
                 }
 
                 alias = parts[aliasIndex + 1].TokenText;
@@ -1641,10 +1540,10 @@ namespace Puma
 
             if (isFilePath && alias != null)
             {
-                throw new InvalidOperationException("File path use statements cannot specify an alias.");
+                throw CreateParserException("File path use statements cannot specify an alias.", parts[0]);
             }
 
-            ast.Add(Node.CreateUseStatement(target, alias, isFilePath));
+            ast.Add(Node.CreateUseStatement(target, alias, isFilePath, sourceSpan));
         }
 
         private bool UpdateIndentation(LexerTokens token)
@@ -1720,10 +1619,59 @@ namespace Puma
             var expression = parser.ParseExpression();
             if (parser.HasRemainingTokens())
             {
-                throw new InvalidOperationException("Unable to parse full expression.");
+                throw CreateParserException("Unable to parse full expression.", tokens.FirstOrDefault());
+            }
+
+            if (expression != null)
+            {
+                PopulateExpressionSourceSpans(expression);
+                var firstToken = tokens[0];
+                var lastToken = tokens[^1];
+                expression.SourceSpan = new SourceSpan(
+                    firstToken.StartLine,
+                    firstToken.StartColumn,
+                    lastToken.StartLine,
+                    lastToken.StartColumn + lastToken.TokenText.Length);
             }
 
             return expression;
+        }
+
+        private static void PopulateExpressionSourceSpans(ExpressionNode expression)
+        {
+            if (expression.Left != null)
+            {
+                PopulateExpressionSourceSpans(expression.Left);
+            }
+
+            if (expression.Right != null)
+            {
+                PopulateExpressionSourceSpans(expression.Right);
+            }
+
+            foreach (var argument in expression.Arguments)
+            {
+                PopulateExpressionSourceSpans(argument);
+            }
+
+            if (expression.SourceSpan != null)
+            {
+                return;
+            }
+
+            var children = new[] { expression.Left, expression.Right }
+                .Concat(expression.Arguments)
+                .Where(child => child?.SourceSpan != null)
+                .Select(child => child!.SourceSpan!.Value)
+                .ToList();
+            if (children.Count == 0)
+            {
+                return;
+            }
+
+            var first = children[0];
+            var last = children[^1];
+            expression.SourceSpan = new SourceSpan(first.StartLine, first.StartColumn, last.EndLine, last.EndColumn);
         }
 
         private sealed class ExpressionParser
@@ -1755,10 +1703,11 @@ namespace Puma
                 var expression = ParseOr();
                 while (MatchKeyword("if"))
                 {
+                    var ifToken = _tokens[_index - 1];
                     var condition = ParseOr();
                     if (!MatchKeyword("else"))
                     {
-                        throw new InvalidOperationException("Conditional expressions require an 'else' branch.");
+                        throw CreateParserException("Conditional expressions require an 'else' branch.", ifToken);
                     }
 
                     var whenFalse = ParseOr();
@@ -1814,7 +1763,7 @@ namespace Puma
                 {
                     if (matched)
                     {
-                        throw new InvalidOperationException("Only one consecutive equality expression is allowed.");
+                        throw CreateParserException("Only one consecutive equality expression is allowed.", _tokens[_index - 1]);
                     }
 
                     matched = true;
@@ -1833,7 +1782,7 @@ namespace Puma
                 {
                     if (matched)
                     {
-                        throw new InvalidOperationException("Only one consecutive relational expression is allowed.");
+                        throw CreateParserException("Only one consecutive relational expression is allowed.", _tokens[_index - 1]);
                     }
 
                     matched = true;
@@ -1924,7 +1873,7 @@ namespace Puma
                 {
                     if (seenPairOrRange)
                     {
-                        throw new InvalidOperationException("Only one consecutive pair or range expression is allowed.");
+                        throw CreateParserException("Only one consecutive pair or range expression is allowed.", _tokens[_index - 1]);
                     }
 
                     seenPairOrRange = true;
@@ -1944,7 +1893,12 @@ namespace Puma
                     var castOperand = ParseUnary();
                     if (castOperand != null)
                     {
-                        return new ExpressionNode { Kind = ExpressionKind.Cast, Value = castType, Left = castOperand };
+                        return new ExpressionNode
+                        {
+                            Kind = ExpressionKind.Cast,
+                            Value = castType,
+                            Left = castOperand
+                        };
                     }
                 }
                 _index = castStart;
@@ -1961,9 +1915,15 @@ namespace Puma
                     var operand = ParseUnary();
                     if (operand?.Kind == ExpressionKind.Unary)
                     {
-                        throw new InvalidOperationException("Unary operators cannot be repeated consecutively.");
+                        throw CreateParserException("Unary operators cannot be repeated consecutively.", _tokens[_index - 1]);
                     }
-                    return new ExpressionNode { Kind = ExpressionKind.Unary, Value = op, Left = operand };
+                    return new ExpressionNode
+                    {
+                        Kind = ExpressionKind.Unary,
+                        Value = op,
+                        Left = operand,
+                        DeclaredType = operand?.DeclaredType
+                    };
                 }
 
                 return ParsePostfix();
@@ -1981,7 +1941,12 @@ namespace Puma
                     {
                         var castType = _tokens[_index].TokenText;
                         _index++;
-                        expr = new ExpressionNode { Kind = ExpressionKind.Cast, Value = castType, Left = expr };
+                        expr = new ExpressionNode
+                        {
+                            Kind = ExpressionKind.Cast,
+                            Value = castType,
+                            Left = expr
+                        };
                         continue;
                     }
 
@@ -2044,25 +2009,44 @@ namespace Puma
                 }
 
                 var token = _tokens[_index++];
+                var sourceSpan = new SourceSpan(
+                    token.StartLine,
+                    token.StartColumn,
+                    token.StartLine,
+                    token.StartColumn + token.TokenText.Length);
                 if (token.Category is TokenCategory.Identifier or TokenCategory.Keyword)
                 {
-                    return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = token.TokenText };
+                    return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = token.TokenText, SourceSpan = sourceSpan };
                 }
 
                 if (token.Category is TokenCategory.StringLiteral or TokenCategory.NumericLiteral or TokenCategory.CharLiteral)
                 {
+                    string? declaredType = null;
                     if (token.Category == TokenCategory.NumericLiteral
                         && _index < _tokens.Count
                         && (_tokens[_index].Category is TokenCategory.Identifier or TokenCategory.Keyword)
                         && IsNumericTypeSuffix(_tokens[_index].TokenText))
                     {
+                        declaredType = _tokens[_index].TokenText;
+                        var suffix = _tokens[_index];
+                        sourceSpan = new SourceSpan(
+                            token.StartLine,
+                            token.StartColumn,
+                            suffix.StartLine,
+                            suffix.StartColumn + suffix.TokenText.Length);
                         _index++;
                     }
 
-                    return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText };
+                    return new ExpressionNode
+                    {
+                        Kind = ExpressionKind.Literal,
+                        Value = token.TokenText,
+                        DeclaredType = declaredType,
+                        SourceSpan = sourceSpan
+                    };
                 }
 
-                return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText };
+                return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText, SourceSpan = sourceSpan };
             }
 
             private bool MatchOperator(string op)
@@ -2138,9 +2122,9 @@ namespace Puma
                 return;
             }
 
-            ast.Add(Node.CreateEnumDeclaration(_currentEnumName, _currentEnumMembers));
+            ast.Add(Node.CreateEnumDeclaration(_currentEnumName, _currentEnumMemberDeclarations));
             _currentEnumName = null;
-            _currentEnumMembers = new List<string>();
+            _currentEnumMemberDeclarations = new List<EnumMemberInfo>();
         }
 
         private void FinalizeRecord()
@@ -2150,20 +2134,10 @@ namespace Puma
                 return;
             }
 
-            var node = Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMembers);
-            if (node is RecordDeclarationAstNode typedRecordNode)
-            {
-                foreach (var pair in _currentRecordMemberTypes)
-                {
-                    typedRecordNode.RecordMemberTypes[pair.Key] = pair.Value;
-                }
-            }
-
-            ast.Add(node);
+            ast.Add(Node.CreateRecordDeclaration(_currentRecordName, _currentRecordPackSize, _currentRecordMemberDeclarations));
             _currentRecordName = null;
             _currentRecordPackSize = null;
-            _currentRecordMembers = new List<string>();
-            _currentRecordMemberTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+            _currentRecordMemberDeclarations = new List<RecordMemberInfo>();
         }
 
         private Node? ParsePropertyDeclaration(LexerTokens firstToken)
@@ -2198,16 +2172,10 @@ namespace Puma
                 }
 
                 var coreValueTokens = valueEnd >= 0 ? valueTokens.Take(valueEnd + 1).ToList() : new List<LexerTokens>();
-                string? propertyType = null;
-                if (TryExtractNumericLiteralWithSuffix(coreValueTokens, out _, out var suffixType))
-                {
-                    propertyType = suffixType;
-                }
-                var value = NormalizeAssignedValueTokens(coreValueTokens);
 
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    var node = Node.CreatePropertyDeclaration(name, value, propertyType, modifiers);
+                    var node = Node.CreatePropertyDeclaration(name, ParseExpression(coreValueTokens), modifiers);
                     ast.Add(node);
                     if (modifiers.Contains("optional"))
                     {
@@ -2290,7 +2258,7 @@ namespace Puma
         private static string? GetPropertyType(Node node)
         {
             return node is PropertyDeclarationAstNode typedNode
-                ? typedNode.PropertyType
+                ? typedNode.PropertyValueExpression?.DeclaredType
                 : null;
         }
 
@@ -2352,92 +2320,6 @@ namespace Puma
             return node is StatementAstNode typedNode
                 ? typedNode.StatementExpression
                 : null;
-        }
-
-        private static void SetStatementExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is StatementAstNode typedNode)
-            {
-                typedNode.StatementExpression = expression;
-            }
-        }
-
-        private static void SetAssignmentExpressions(Node node, ExpressionNode? leftExpression, ExpressionNode? rightExpression, bool isLoweredPostfixMutation)
-        {
-            if (node is AssignmentStatementAstNode typedNode)
-            {
-                typedNode.AssignmentLeftExpression = leftExpression;
-                typedNode.AssignmentRightExpression = rightExpression;
-                typedNode.IsLoweredPostfixMutation = isLoweredPostfixMutation;
-            }
-        }
-
-        private static void SetIfConditionExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is IfStatementAstNode typedNode)
-            {
-                typedNode.ConditionExpression = expression;
-            }
-        }
-
-        private static void SetMatchExpressionNode(Node node, ExpressionNode? expression)
-        {
-            if (node is MatchStatementAstNode typedNode)
-            {
-                typedNode.ExpressionNode = expression;
-            }
-        }
-
-        private static void SetWhenExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is WhenStatementAstNode typedNode)
-            {
-                typedNode.WhenExpression = expression;
-            }
-        }
-
-        private static void SetWhileExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is WhileStatementAstNode typedNode)
-            {
-                typedNode.WhileExpression = expression;
-            }
-        }
-
-        private static void SetForContainerExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is ForStatementAstNode typedForNode)
-            {
-                typedForNode.ForContainerExpression = expression;
-            }
-            else if (node is ForAllStatementAstNode typedForAllNode)
-            {
-                typedForAllNode.ForContainerExpression = expression;
-            }
-        }
-
-        private static void SetRepeatExpressionNode(Node node, ExpressionNode? expression)
-        {
-            if (node is RepeatStatementAstNode typedNode)
-            {
-                typedNode.RepeatExpressionNode = expression;
-            }
-        }
-
-        private static void SetHasExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is HasStatementAstNode typedNode)
-            {
-                typedNode.HasExpression = expression;
-            }
-        }
-
-        private static void SetHasTraitExpression(Node node, ExpressionNode? expression)
-        {
-            if (node is HasTraitStatementAstNode typedNode)
-            {
-                typedNode.HasTraitExpression = expression;
-            }
         }
 
         private void ParseStatement(LexerTokens firstToken) => ParseStatement(firstToken, ast);
@@ -2573,75 +2455,73 @@ namespace Puma
             EnsureReadonlyLocalScope();
             EnsureReadwriteLocalScope();
             var assignmentOperator = tokens[assignmentIndex].TokenText;
-            var left = BuildQualifiedName(leftTokens);
-            var right = BuildQualifiedName(rightTokens);
             var leftExpression = ParseExpression(leftTokens);
             var rightExpression = ParseExpression(rightTokens);
+            if (leftExpression == null || rightExpression == null)
+            {
+                throw CreateParserException("Assignment statements require left and right expressions.", tokens.FirstOrDefault());
+            }
+
+            var left = leftExpression.Kind == ExpressionKind.Identifier ? leftExpression.Value ?? string.Empty : string.Empty;
+            var node = Node.CreateAssignmentStatement(leftExpression, rightExpression, assignmentOperator);
+            var assignmentSourceSpan = ((AssignmentStatementAstNode)node).AssignmentLeftSourceSpan;
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
-                && TryExtractNumericLiteralWithSuffix(rightTokens, out _, out var inferredSuffix)
-                && TryMapConvertionType(inferredSuffix, out var inferredType))
+                && rightExpression?.DeclaredType is { } inferredSuffix)
             {
-                _inferredIdentifierTypes[left] = inferredType;
+                if (TryMapConvertionType(inferredSuffix, out var inferredType))
+                {
+                    _inferredIdentifierTypes[left] = inferredType;
+                }
             }
 
             if (assignmentOperator == "=" && _constantProperties.Contains(left))
             {
-                throw new InvalidOperationException($"Cannot assign to constant property '{left}'.");
+                throw CreateParserException($"Cannot assign to constant property '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && _readonlyProperties.Contains(left))
             {
-                throw new InvalidOperationException($"Cannot assign to readonly property '{left}'.");
+                throw CreateParserException($"Cannot assign to readonly property '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && IsKnownConstantParameter(left))
             {
-                throw new InvalidOperationException($"Cannot assign to constant parameter '{left}'.");
+                throw CreateParserException($"Cannot assign to constant parameter '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "="
                 && !string.IsNullOrWhiteSpace(left)
-                && IsNoneAssignment(rightExpression, right)
+                && rightExpression is { Kind: ExpressionKind.Identifier, Value: "none" }
                 && IsKnownNonOptionalProperty(left))
             {
-                throw new InvalidOperationException($"Cannot assign none to non-optional property '{left}'.");
+                throw CreateParserException($"Cannot assign none to non-optional property '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && IsKnownReadonlyLocal(left))
             {
-                throw new InvalidOperationException($"Cannot assign to readonly local variable '{left}'.");
+                throw CreateParserException($"Cannot assign to readonly local variable '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "=" && IsKnownReadonlyParameter(left))
             {
-                throw new InvalidOperationException($"Cannot assign to readonly parameter '{left}'.");
+                throw CreateParserException($"Cannot assign to readonly parameter '{left}'.", assignmentSourceSpan);
             }
 
             if (assignmentOperator == "="
-                && !string.IsNullOrWhiteSpace(left)
-                && !string.IsNullOrWhiteSpace(right)
                 && leftExpression is ExpressionNode { Kind: ExpressionKind.Identifier }
                 && rightExpression is ExpressionNode { Kind: ExpressionKind.Identifier })
             {
-                ValidateImplicitPropertyAssignment(left, right);
+                ValidateImplicitPropertyAssignment(leftExpression, rightExpression);
             }
 
-            if ((string.IsNullOrWhiteSpace(left) && leftExpression == null)
-                || (string.IsNullOrWhiteSpace(right) && rightExpression == null))
-            {
-                throw new InvalidOperationException("Assignment statements require left and right expressions.");
-            }
-
-            var node = Node.CreateAssignmentStatement(left, right, assignmentOperator);
-            SetAssignmentExpressions(node, leftExpression, rightExpression, isLoweredPostfixMutation: false);
             target.Add(node);
 
             if (assignmentOperator == "="
                 && _readonlyLocalScopes.Count > 0
                 && !string.IsNullOrWhiteSpace(left)
-                && IsSimpleIdentifier(left)
+                && leftExpression.Kind == ExpressionKind.Identifier
                 && !IsKnownReadonlyLocal(left)
                 && !IsKnownReadwriteLocal(left)
                 && !IsKnownReadonlyParameter(left)
@@ -2678,40 +2558,6 @@ namespace Puma
             }
 
             return true;
-        }
-
-        private static bool IsSimpleIdentifier(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            if (!(char.IsLetter(value[0]) || value[0] == '_'))
-            {
-                return false;
-            }
-
-            for (var i = 1; i < value.Length; i++)
-            {
-                if (!(char.IsLetterOrDigit(value[i]) || value[i] == '_'))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool IsNoneAssignment(ExpressionNode? rightExpression, string? right)
-        {
-            if (rightExpression?.Kind == ExpressionKind.Identifier
-                && string.Equals(rightExpression.Value, "none", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            return string.Equals(right?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
         }
 
         private bool IsKnownNonOptionalProperty(string name)
@@ -2854,15 +2700,14 @@ namespace Puma
             }
 
             var leftTokens = tokens.Take(tokens.Count - 1).ToList();
-            var left = BuildQualifiedName(leftTokens);
-            if (string.IsNullOrWhiteSpace(left))
+            var left = ParseExpression(leftTokens);
+            if (left == null)
             {
                 return false;
             }
 
             var assignmentOperator = last.TokenText == "++" ? "+=" : "-=";
-            var node = Node.CreateAssignmentStatement(left, "1", assignmentOperator);
-            SetAssignmentExpressions(node, ParseExpression(leftTokens), new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" }, isLoweredPostfixMutation: true);
+            var node = Node.CreateAssignmentStatement(left, new ExpressionNode { Kind = ExpressionKind.Literal, Value = "1" }, assignmentOperator, isLoweredPostfixMutation: true);
             target.Add(node);
             return true;
         }
@@ -2988,10 +2833,9 @@ namespace Puma
             }
 
             var expressionTokens = tokens.Skip(1).ToList();
-            var expression = BuildQualifiedName(expressionTokens);
+            var expression = ParseExpression(expressionTokens);
 
             var node = Node.CreateRepeatStatement(expression);
-            SetRepeatExpressionNode(node, ParseExpression(expressionTokens));
             target.Add(node);
             return true;
         }
@@ -3021,14 +2865,13 @@ namespace Puma
             }
 
             var conditionTokens = tokens.Skip(1).ToList();
-            var condition = BuildQualifiedName(conditionTokens);
-            if (string.IsNullOrWhiteSpace(condition))
+            var condition = ParseExpression(conditionTokens);
+            if (condition == null)
             {
                 throw new InvalidOperationException("Has statements require a condition.");
             }
 
             var node = Node.CreateHasStatement(condition);
-            SetHasExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -3060,19 +2903,15 @@ namespace Puma
                 return false;
             }
 
-            var traitTypeTokens = new List<LexerTokens> { tokens[offset] };
             var variableTokens = tokens.Skip(offset + 1).ToList();
-            var traitType = BuildQualifiedName(traitTypeTokens);
-            var traitVariable = BuildQualifiedName(variableTokens);
-            var conditionTokens = tokens.Skip(offset).ToList();
-            var condition = BuildQualifiedName(conditionTokens);
-            if (string.IsNullOrWhiteSpace(condition) || string.IsNullOrWhiteSpace(traitType) || string.IsNullOrWhiteSpace(traitVariable))
+            var traitType = tokens[offset].TokenText;
+            var expression = ParseExpression(variableTokens);
+            if (string.IsNullOrWhiteSpace(traitType) || expression == null)
             {
                 throw new InvalidOperationException("Has trait statements require a condition.");
             }
 
-            var node = Node.CreateHasTraitStatement(condition, traitType, traitVariable);
-            SetHasTraitExpression(node, ParseExpression(variableTokens));
+            var node = Node.CreateHasTraitStatement(expression, traitType);
             target.Add(node);
             return true;
         }
@@ -3091,20 +2930,9 @@ namespace Puma
                 return false;
             }
 
-            var nameTokens = tokens.Take(openIndex).ToList();
-            var argsTokens = tokens.Skip(openIndex + 1).Take(closeIndex - openIndex - 1).ToList();
-            var name = BuildQualifiedName(nameTokens);
-            var args = BuildQualifiedName(argsTokens);
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return false;
-            }
-
             var callExpression = ParseExpression(tokens);
-            ValidateImplicitFunctionCallArguments(name, callExpression, argsTokens);
-            var callNode = Node.CreateFunctionCall(name, args, callExpression);
-            SetStatementExpression(callNode, callExpression);
+            ValidateImplicitFunctionCallArguments(callExpression);
+            var callNode = Node.CreateFunctionCall(callExpression);
             target.Add(callNode);
             return true;
         }
@@ -3122,14 +2950,13 @@ namespace Puma
             }
 
             var conditionTokens = tokens.Skip(1).ToList();
-            var condition = BuildQualifiedName(conditionTokens);
-            if (string.IsNullOrWhiteSpace(condition))
+            var condition = ParseExpression(conditionTokens);
+            if (condition == null)
             {
                 throw new InvalidOperationException("If statements require a condition expression.");
             }
 
             var node = Node.CreateIfStatement(condition);
-            SetIfConditionExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -3146,9 +2973,7 @@ namespace Puma
                 return false;
             }
 
-            var valueTokens = tokens.Skip(1).ToList();
-            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-            target.Add(Node.CreateStatement(NodeKind.ElseStatement, value));
+            target.Add(Node.CreateStatement(NodeKind.ElseStatement));
             return true;
         }
 
@@ -3187,14 +3012,13 @@ namespace Puma
             }
 
             var expressionTokens = tokens.Skip(1).ToList();
-            var expression = BuildQualifiedName(expressionTokens);
-            if (string.IsNullOrWhiteSpace(expression))
+            var expression = ParseExpression(expressionTokens);
+            if (expression == null)
             {
                 throw new InvalidOperationException("Match statements require an expression.");
             }
 
             var node = Node.CreateMatchStatement(expression);
-            SetMatchExpressionNode(node, ParseExpression(expressionTokens));
             target.Add(node);
             return true;
         }
@@ -3212,14 +3036,13 @@ namespace Puma
             }
 
             var conditionTokens = tokens.Skip(1).ToList();
-            var condition = BuildQualifiedName(conditionTokens);
-            if (string.IsNullOrWhiteSpace(condition))
+            var condition = ParseExpression(conditionTokens);
+            if (condition == null)
             {
                 throw new InvalidOperationException("When statements require a condition.");
             }
 
             var node = Node.CreateWhenStatement(condition);
-            SetWhenExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -3237,14 +3060,13 @@ namespace Puma
             }
 
             var conditionTokens = tokens.Skip(1).ToList();
-            var condition = BuildQualifiedName(conditionTokens);
-            if (string.IsNullOrWhiteSpace(condition))
+            var condition = ParseExpression(conditionTokens);
+            if (condition == null)
             {
-                throw new InvalidOperationException("While statements require a condition.");
+                throw CreateParserException("While statements require a condition.", tokens[0]);
             }
 
             var node = Node.CreateWhileStatement(condition);
-            SetWhileExpression(node, ParseExpression(conditionTokens));
             target.Add(node);
             return true;
         }
@@ -3264,26 +3086,24 @@ namespace Puma
             var inIndex = tokens.FindIndex(t => t.Category == TokenCategory.Keyword && t.TokenText == "in");
             if (inIndex <= 1)
             {
-                throw new InvalidOperationException("For statements require the 'in' keyword and a variable name.");
+                throw CreateParserException("For statements require the 'in' keyword and a variable name.", tokens[0]);
             }
 
             var variable = BuildQualifiedName(tokens.Skip(1).Take(inIndex - 1));
-            var container = BuildQualifiedName(tokens.Skip(inIndex + 1));
-            if (string.IsNullOrWhiteSpace(variable) || string.IsNullOrWhiteSpace(container))
+            var container = ParseExpression(tokens.Skip(inIndex + 1).ToList());
+            if (string.IsNullOrWhiteSpace(variable) || container == null)
             {
-                throw new InvalidOperationException("For statements require a variable and container expression.");
+                throw CreateParserException("For statements require a variable and container expression.", tokens[0]);
             }
 
             if (tokens[0].TokenText == "for")
             {
                 var node = Node.CreateForStatement(variable, container);
-                SetForContainerExpression(node, ParseExpression(tokens.Skip(inIndex + 1).ToList()));
                 target.Add(node);
             }
             else
             {
                 var node = Node.CreateForAllStatement(variable, container);
-                SetForContainerExpression(node, ParseExpression(tokens.Skip(inIndex + 1).ToList()));
                 target.Add(node);
             }
 
@@ -3312,10 +3132,8 @@ namespace Puma
             return false;
         }
 
-        private bool TryParseSectionParameters(LexerTokens? token, out string parameters)
+        private bool TryParseSectionParameters(LexerTokens? token)
         {
-            parameters = string.Empty;
-
             if (token == null)
             {
                 return false;
@@ -3332,6 +3150,7 @@ namespace Puma
             }
 
             var parameterTokens = new List<LexerTokens>();
+            var depth = 1;
 
             while (true)
             {
@@ -3341,7 +3160,12 @@ namespace Puma
                     throw new InvalidOperationException("Unterminated parameter list in section header.");
                 }
 
-                if (next.Value.Category == TokenCategory.Delimiter && next.Value.TokenText == ")")
+                if (next.Value.Category == TokenCategory.Delimiter && next.Value.TokenText == "(")
+                {
+                    depth++;
+                }
+
+                if (next.Value.Category == TokenCategory.Delimiter && next.Value.TokenText == ")" && --depth == 0)
                 {
                     break;
                 }
@@ -3354,7 +3178,6 @@ namespace Puma
                 parameterTokens.Add(next.Value);
             }
 
-            parameters = BuildQualifiedName(parameterTokens);
             if (_currentSectionNode is SectionAstNode sectionNode)
             {
                 sectionNode.SectionParameterList.Clear();
@@ -3386,14 +3209,12 @@ namespace Puma
             }
 
             var valueTokens = tokens.Skip(1).ToList();
-            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-            var node = Node.CreateStatement(NodeKind.ReturnStatement, value);
-            SetStatementExpression(node, ParseExpression(valueTokens));
+            var node = Node.CreateStatement(NodeKind.ReturnStatement, ParseExpression(valueTokens));
 
             if (_currentFunctionNode != null
                 && TryMapConvertionType(GetFunctionDeclarationReturnType(_currentFunctionNode), out var returnType))
             {
-                ValidateImplicitExpressionConversion(GetStatementExpression(node), returnType, value);
+                ValidateImplicitExpressionConversion(GetStatementExpression(node), returnType);
             }
 
             target.Add(node);
@@ -3408,9 +3229,7 @@ namespace Puma
             }
 
             var valueTokens = tokens.Skip(1).ToList();
-            var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-            var node = Node.CreateStatement(NodeKind.YieldStatement, value);
-            SetStatementExpression(node, ParseExpression(valueTokens));
+            var node = Node.CreateStatement(NodeKind.YieldStatement, ParseExpression(valueTokens));
             target.Add(node);
             return true;
         }
@@ -3425,10 +3244,8 @@ namespace Puma
             if (tokens[0].Category == TokenCategory.Keyword && (tokens[0].TokenText == "break" || tokens[0].TokenText == "continue"))
             {
                 var valueTokens = tokens.Skip(1).ToList();
-                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
                 var kind = tokens[0].TokenText == "break" ? NodeKind.BreakStatement : NodeKind.ContinueStatement;
-                var node = Node.CreateStatement(kind, value);
-                SetStatementExpression(node, ParseExpression(valueTokens));
+                var node = Node.CreateStatement(kind, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
@@ -3446,9 +3263,7 @@ namespace Puma
             if (tokens[0].Category == TokenCategory.Keyword && tokens[0].TokenText == "error")
             {
                 var valueTokens = tokens.Skip(1).ToList();
-                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-                var node = Node.CreateStatement(NodeKind.ErrorStatement, value);
-                SetStatementExpression(node, ParseExpression(valueTokens));
+                var node = Node.CreateStatement(NodeKind.ErrorStatement, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }
@@ -3456,9 +3271,7 @@ namespace Puma
             if (tokens[0].Category == TokenCategory.Keyword && tokens[0].TokenText == "catch")
             {
                 var valueTokens = tokens.Skip(1).ToList();
-                var value = valueTokens.Count > 0 ? BuildQualifiedName(valueTokens) : null;
-                var node = Node.CreateStatement(NodeKind.CatchStatement, value);
-                SetStatementExpression(node, ParseExpression(valueTokens));
+                var node = Node.CreateStatement(NodeKind.CatchStatement, ParseExpression(valueTokens));
                 target.Add(node);
                 return true;
             }

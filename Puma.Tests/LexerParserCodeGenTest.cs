@@ -38,6 +38,26 @@ namespace test
         }
 
         [TestMethod]
+        public void EmptySource_LexerParserCodegen_AreConsistent()
+        {
+            const string src = "";
+            const string expected = "";
+
+            var lexer = new Puma.Lexer();
+            var parser = new Puma.Parser();
+            var codegen = new Puma.Codegen();
+
+            var tokens = lexer.Tokenize(src);
+            var significantTokens = GetSignificantTokens(tokens);
+            var ast = parser.Parse(tokens);
+            var generated = codegen.Generate(ast);
+
+            Assert.AreEqual(0, significantTokens.Count);
+            Assert.AreEqual(0, ast.Count);
+            Assert.AreEqual(Normalize(expected), Normalize(generated));
+        }
+
+        [TestMethod]
         public void StartExample_Integers_LexerParserCodegen_AreConsistent()
         {
             const string src =
@@ -84,8 +104,9 @@ namespace test
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(6, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
+            CollectionAssert.AreEqual(new string?[] { null, "int", "int64", "int32", "int16", "int8" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.DeclaredType).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -225,14 +246,14 @@ initialize
 // properties
 auto a = (int64_t)0;
 auto b = (double)0.0;
-auto c = String("""");
+auto c = PumaType::String("""", sizeof("""") - 1);
 
 // initialize
 void initialize(void)
 {
     a = 5;
     b = 6.5;
-    c = String(""Hello"");
+    c = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
 }
 ";
 
@@ -398,8 +419,8 @@ class MyTrait
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 };
 ";
 
@@ -451,7 +472,7 @@ class MyTrait
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(5, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
@@ -572,7 +593,7 @@ namespace MyModule
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(4, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "1.1", "2.2", "3.3", "4.4" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
@@ -674,7 +695,7 @@ public:
             var ast = parser.Parse(tokens);
             var assignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement).ToList();
             Assert.AreEqual(5, assignments.Count);
-            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeft).ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentLeftExpression?.Value).ToArray());
             CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, assignments.Select(a => ((AssignmentStatementAstNode)a).AssignmentRightExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
@@ -688,8 +709,8 @@ void initialize(void)
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 }
 ";
 
@@ -744,8 +765,8 @@ public:
         auto a = false;
         auto b = true;
         auto c = false;
-        auto d = String("""");
-        auto e = String("""");
+        auto d = PumaType::String("""", sizeof("""") - 1);
+        auto e = PumaType::String("""", sizeof("""") - 1);
     }
 };
 ";
@@ -787,7 +808,7 @@ public:
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(5, properties.Count);
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -798,8 +819,8 @@ public:
 auto a = false;
 auto b = true;
 auto c = false;
-auto d = String("""");
-auto e = String("""");
+auto d = PumaType::String("""", sizeof("""") - 1);
+auto e = PumaType::String("""", sizeof("""") - 1);
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -841,7 +862,7 @@ auto e = String("""");
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(6, properties.Count);
             CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -893,7 +914,7 @@ auto f = (int8_t)6;
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(5, properties.Count);
             CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyName).ToArray());
-            CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValue).ToArray());
+            CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, properties.Select(p => ((PropertyDeclarationAstNode)p).PropertyValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -944,7 +965,8 @@ auto f = (uint8_t)6;
 
             var ast = parser.Parse(tokens);
             var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "a=false", "b=true", "c=bool", "d=\"\"", "e=str" }, record.RecordMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e" }, record.MemberDeclarations.Select(member => member.Name).ToArray());
+            CollectionAssert.AreEqual(new[] { "false", "true", "bool", "\"\"", "str" }, record.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -957,8 +979,8 @@ struct MyRecord
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 };
 ";
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -1000,7 +1022,9 @@ struct MyRecord
 
             var ast = parser.Parse(tokens);
             var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "a=1", "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "a", "b", "c", "d", "e", "f" }, record.MemberDeclarations.Select(member => member.Name).ToArray());
+            CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "5", "6" }, record.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
+            CollectionAssert.AreEqual(new string?[] { null, "int", "int64", "int32", "int16", "int8" }, record.MemberDeclarations.Select(member => member.ValueExpression?.DeclaredType).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1055,7 +1079,9 @@ struct MyRecord
 
             var ast = parser.Parse(tokens);
             var record = (RecordDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.RecordDeclaration && ((RecordDeclarationAstNode)n).RecordName == "MyRecord");
-            CollectionAssert.AreEqual(new[] { "b=2", "c=3", "d=4", "e=5", "f=6" }, record.RecordMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "b", "c", "d", "e", "f" }, record.MemberDeclarations.Select(member => member.Name).ToArray());
+            CollectionAssert.AreEqual(new[] { "2", "3", "4", "5", "6" }, record.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
+            CollectionAssert.AreEqual(new[] { "uint", "uint64", "uint32", "uint16", "uint8" }, record.MemberDeclarations.Select(member => member.ValueExpression?.DeclaredType).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
@@ -1105,17 +1131,18 @@ struct MyRecord
 
             var ast = parser.Parse(tokens);
             var enumNode = (EnumDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.EnumDeclaration && ((EnumDeclarationAstNode)n).EnumName == "MyEnum");
-            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.EnumMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.MemberDeclarations.Select(member => member.Name).ToArray());
+            Assert.IsTrue(enumNode.MemberDeclarations.All(member => member.ValueExpression == null));
 
             var generated = codegen.Generate(ast);
             var expected =
 @"// enums
-Enums MyEnum
+enum MyEnum
 {
     A,
     B,
     C,
-}
+};
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -1151,17 +1178,18 @@ Enums MyEnum
 
             var ast = parser.Parse(tokens);
             var enumNode = (EnumDeclarationAstNode)ast.Single(n => n.Kind == NodeKind.EnumDeclaration && ((EnumDeclarationAstNode)n).EnumName == "MyEnum");
-            CollectionAssert.AreEqual(new[] { "A=1", "B=3", "C=5" }, enumNode.EnumMembers.ToArray());
+            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, enumNode.MemberDeclarations.Select(member => member.Name).ToArray());
+            CollectionAssert.AreEqual(new[] { "1", "3", "5" }, enumNode.MemberDeclarations.Select(member => member.ValueExpression?.Value).ToArray());
 
             var generated = codegen.Generate(ast);
             var expected =
 @"// enums
-Enums MyEnum
+enum MyEnum
 {
     A=1,
     B=3,
     C=5,
-}
+};
 ";
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
@@ -1200,11 +1228,11 @@ finalize
             var properties = ast.Where(n => n.Kind == NodeKind.PropertyDeclaration).ToList();
             Assert.AreEqual(1, properties.Count);
             Assert.AreEqual("s", ((PropertyDeclarationAstNode)properties[0]).PropertyName);
-            Assert.AreEqual("\"Hello, World!\\n\"", ((PropertyDeclarationAstNode)properties[0]).PropertyValue);
+            Assert.AreEqual("\"Hello, World!\\n\"", ((PropertyDeclarationAstNode)properties[0]).PropertyValueExpression?.Value);
 
             var finalizeSection = ast.Single(n => n.Kind == NodeKind.Section && n.Section == Puma.Parser.Section.Finalize);
             Assert.IsNotNull(finalizeSection);
-            var finalizeAssignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement && ((AssignmentStatementAstNode)n).AssignmentLeft == "s").ToList();
+            var finalizeAssignments = ast.Where(n => n.Kind == NodeKind.AssignmentStatement && ((AssignmentStatementAstNode)n).AssignmentLeftExpression?.Value == "s").ToList();
             Assert.AreEqual(1, finalizeAssignments.Count);
             Assert.AreEqual("\"\"", ((AssignmentStatementAstNode)finalizeAssignments[0]).AssignmentRightExpression?.Value);
 
@@ -1213,12 +1241,12 @@ finalize
 @"#include <PumaType/String.hpp>
 
 // properties
-auto s = String(""Hello, World!\n"");
+auto s = PumaType::String(""Hello, World!\n"", sizeof(""Hello, World!\n"") - 1);
 
 // finalize
 void finalize(void)
 {
-    s = String("""");
+    s = PumaType::String("""", sizeof("""") - 1);
 }
 ";
 
@@ -1268,14 +1296,14 @@ start
 
 auto a = (int64_t)0;
 auto b = (double)0.0;
-auto c = String("""");
+auto c = PumaType::String("""", sizeof("""") - 1);
 
 // start
 int main()
 {
     a = 5;
     b = 6.5;
-    c = String(""Hello"");
+    c = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
     return 0;
 }
 ";

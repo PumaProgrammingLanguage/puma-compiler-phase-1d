@@ -199,8 +199,8 @@ void F(void)
     x = (a * b) - f;
     x = ~a % b;
     x = ~(a % b);
-    y = (c and d) or g;
-    y = c or (d and h);
+    y = (c && d) || g;
+    y = c || (d && h);
     z = (a & b) | e;
     z = a | (b & f);
     z = (a & b) ^ e;
@@ -452,7 +452,7 @@ int main()
 @"#include <cstdint>
 
 // functions
-int Increment(int64_t value)
+int64_t Increment(int64_t value)
 {
     value = value + 1;
     return value;
@@ -485,7 +485,7 @@ int Increment(int64_t value)
 @"#include <cstdint>
 
 // functions
-int Echo(int64_t value)
+int64_t Echo(int64_t value)
 {
     return value;
 }
@@ -509,8 +509,7 @@ int Echo(int64_t value)
             var tokens = lexer.Tokenize(src);
 
             var ex = Assert.ThrowsException<InvalidOperationException>(() => parser.Parse(tokens));
-            StringAssert.Contains(ex.Message, "Cannot assign to constant parameter");
-            StringAssert.Contains(ex.Message, "value");
+            Assert.AreEqual("Line 3, column 9: Cannot assign to constant parameter 'value'.", ex.Message);
         }
 
         [TestMethod]
@@ -627,7 +626,7 @@ int Echo(int64_t value)
 @"#include <cstdint>
 
 // functions
-int Update(int64_t value)
+int64_t Update(int64_t value)
 {
     value = 2;
     return value;
@@ -1774,7 +1773,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1822,7 +1821,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1891,7 +1890,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1931,7 +1930,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -1973,7 +1972,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -2018,13 +2017,13 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
 
         [TestMethod]
-        public void ObjectReference_OptionalLocal_AssignAndNone_LexerParserCodegen_AreConsistent()
+        public void ObjectReference_OptionalLocalOwnedFactory_AssignAndNone_LexerParserCodegen_AreConsistent()
         {
             const string src =
 @"use
@@ -2055,7 +2054,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Function, ReturnsOwnedObject: true) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -2098,7 +2097,7 @@ int main()
 
             var tokens = lexer.Tokenize(src);
             var ast = parser.Parse(tokens);
-            var generated = codegen.Generate(ast);
+            var generated = codegen.Generate(ast, new[] { new ExternalSymbol("Shape", ExternalSymbolKind.Type) });
 
             Assert.AreEqual(Normalize(expected).Trim(), Normalize(generated).Trim());
         }
@@ -2186,7 +2185,7 @@ functions
             var generated = codegen.Generate(ast);
             var expected =
 @"// properties
-auto arr = Array(items,2);
+auto arr = Array(items, 2);
 
 // functions
 void F(void)
@@ -2244,8 +2243,8 @@ struct MyRecord [[gnu::packed]]
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = String("""");
-    auto e = String("""");
+    auto d = PumaType::String("""", sizeof("""") - 1);
+    auto e = PumaType::String("""", sizeof("""") - 1);
 };
 ";
 

@@ -1,1 +1,0 @@
-C:\Users\dburc\source\repos\puma-compiler-phase-1d\bin\Debug\net8.0\Puma.exe C:\Users\dburc\source\repos\puma-compiler-phase-1d\ExampleCode/Sections.puma

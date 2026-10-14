@@ -84,7 +84,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (uint8_t)0;
 auto b = (uint8_t)1;
 auto c = (uint8_t)2;
@@ -156,7 +158,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (int32_t)0;
 auto b = (int32_t)1;
 auto c = (int32_t)2;
@@ -229,7 +233,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (int8_t)0;
 auto b = (int8_t)1;
 auto c = (int8_t)2;
@@ -302,7 +308,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (uint64_t)0;
 auto b = (uint64_t)1;
 auto c = (uint64_t)2;
@@ -375,7 +383,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (uint32_t)0;
 auto b = (uint32_t)1;
 auto c = (uint32_t)2;
@@ -448,7 +458,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (double)0;
 auto b = (double)1;
 auto c = (double)2;
@@ -521,7 +533,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (float)0;
 auto b = (float)1;
 auto c = (float)2;
@@ -593,7 +607,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (int64_t)0;
 auto b = (int64_t)1;
 auto c = (int64_t)2;
@@ -664,7 +680,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (int16_t)0;
 auto b = (int16_t)1;
 auto c = (int16_t)2;
@@ -735,7 +753,9 @@ start
 ";
 
             var expected =
-@"// properties
+@"#include <cstdint>
+
+// properties
 auto a = (uint16_t)0;
 auto b = (uint16_t)1;
 auto c = (uint16_t)2;

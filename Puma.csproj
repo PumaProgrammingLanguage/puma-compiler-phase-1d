@@ -9,7 +9,9 @@
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <AssemblyVersion>0.1</AssemblyVersion>
     <FileVersion>0.0.2.0</FileVersion>
-    <PublishAot>True</PublishAot>
+    <PublishAot>False</PublishAot>
+    <SelfContained>False</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <Description>LLVM compiler for the puma programming language.</Description>
     <Copyright>Copyright © 2024 - 2026 by Darryl Anthony Burchfield</Copyright>
     <PackageReleaseNotes>Initial release</PackageReleaseNotes>
@@ -18,23 +20,28 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>compiler; translator</PackageTags>
     <Version>0.1.0</Version>
+    <PumaInstallDirectory>$(USERPROFILE)\Puma</PumaInstallDirectory>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DebugType>full</DebugType>
-    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <DebugType>full</DebugType>
-    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
-    <PackageReference Include="MSTest" Version="3.1.1" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.1.1" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.1.1" />
+    <InternalsVisibleTo Include="Puma.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Puma.Tests\**" />
+    <Compile Remove="test\**" />
+    <None Remove="Puma.Tests\**" />
+    <None Remove="test\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,10 +61,20 @@
     <None Include=".github\DOCOWNERS" />
     <None Include=".github\FUNDING.yml" />
     <None Include=".github\upgrades\scenarios\new-dotnet-version_7f6cdd\plan.md" />
+    <None Include="Puma.Tests\Puma.Tests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="ExampleCode\" />
     <Folder Include="tmp\" />
   </ItemGroup>
+
+  <Target Name="PublishAndInstallPumaCompiler" DependsOnTargets="Publish">
+    <MakeDir Directories="$(PumaInstallDirectory)" />
+    <ItemGroup>
+      <PumaCompilerArtifacts Include="$(PublishDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PumaCompilerArtifacts)" DestinationFolder="$(PumaInstallDirectory)\%(RecursiveDir)" />
+  </Target>
 
 </Project>
