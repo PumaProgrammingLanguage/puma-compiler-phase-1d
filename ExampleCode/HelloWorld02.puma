@@ -3,5 +3,5 @@ use
 	PumaConsole
 
 start
-    WriteLn("Hello, World!");
+    WriteLn("Hello, World! - 02");
     ReadLn(); // Wait for user input before closing the program
