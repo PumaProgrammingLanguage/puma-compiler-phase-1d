@@ -6,7 +6,7 @@
 - If a module/type/trait section is missing but other sections exist, the default file type is module. 
 - If a file has sections, there should be no code outside the sections. 
 - If a file has no sections, the whole file defaults to the start section.
-- Use `PUMA_STDLIB_ROOT` as the configured root for Puma standard libraries (lib and include).
+- Use `PUMA_STDLIB_ROOT` as the configured root for Puma standard libraries (lib and include). Install the compiler executable and required .NET files into `PUMA_STDLIB_ROOT` only when publishing, not during normal builds.
 - Puma standard-library String and Character `ToUTF8()` return non-NUL-terminated UTF-8 byte pointers. Always use `Size()` for byte length; do not assume NUL termination or use `strlen`/C-string APIs on these pointers.
 
 ## Task Management

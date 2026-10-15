@@ -70,23 +70,14 @@
     <Folder Include="tmp\" />
   </ItemGroup>
 
-  <Target Name="InstallPumaCompiler" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
-    <MakeDir Directories="$(PumaInstallDirectory)" />
-    <ItemGroup>
-      <PumaBuildArtifacts Include="$(TargetPath)" />
-      <PumaBuildArtifacts Include="$(TargetDir)$(AssemblyName).exe" Condition="Exists('$(TargetDir)$(AssemblyName).exe')" />
-      <PumaBuildArtifacts Include="$(TargetDir)$(AssemblyName).deps.json" Condition="Exists('$(TargetDir)$(AssemblyName).deps.json')" />
-      <PumaBuildArtifacts Include="$(TargetDir)$(AssemblyName).runtimeconfig.json" Condition="Exists('$(TargetDir)$(AssemblyName).runtimeconfig.json')" />
-    </ItemGroup>
-    <Copy SourceFiles="@(PumaBuildArtifacts)" DestinationFolder="$(PumaInstallDirectory)\" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="PublishAndInstallPumaCompiler" DependsOnTargets="Publish">
+  <Target Name="InstallPumaCompiler" AfterTargets="Publish" Condition="'$(DesignTimeBuild)' != 'true'">
     <MakeDir Directories="$(PumaInstallDirectory)" />
     <ItemGroup>
       <PumaCompilerArtifacts Include="$(PublishDir)**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(PumaCompilerArtifacts)" DestinationFolder="$(PumaInstallDirectory)\%(RecursiveDir)" />
   </Target>
+
+  <Target Name="PublishAndInstallPumaCompiler" DependsOnTargets="Publish" />
 
 </Project>

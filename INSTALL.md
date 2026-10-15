@@ -6,21 +6,23 @@ Puma is published as a framework-dependent `win-x64` application. The installati
 
 Install the .NET 10 runtime for Windows x64 before running the compiler.
 
-## Build and install
+## Build without installing
 
-Normal Visual Studio and command-line builds automatically copy `Puma.exe`, `Puma.dll`, `Puma.deps.json`, and `Puma.runtimeconfig.json` to the folder configured by `PUMA_STDLIB_ROOT`:
+Normal Visual Studio and command-line builds produce compiler artifacts without changing the installed compiler:
 
 	dotnet build Puma.csproj -c Release
 
-The destination is an explicit `PumaInstallDirectory` override first, then `PUMA_STDLIB_ROOT`, or `%USERPROFILE%\Puma` when the variable is unset. Installation preserves separately installed runtime headers and libraries. Restart Visual Studio after changing the persistent environment variable so builds inherit the new value.
-
 ## Publish and install
 
-From the repository root, run the Release publish-and-install target:
+Publishing automatically installs the complete publish output, including `Puma.exe`, `Puma.dll`, and required .NET host metadata, into the folder configured by `PUMA_STDLIB_ROOT`. From the repository root, run:
+
+	dotnet publish Puma.csproj -c Release
+
+The existing explicit publish-and-install target also remains available:
 
 	dotnet msbuild Puma.csproj -t:PublishAndInstallPumaCompiler -p:Configuration=Release
 
-The target publishes the compiler and copies the complete publish output to the same destination used by normal builds, preserving separately installed Puma runtime headers and libraries. To use a different destination, set `PumaInstallDirectory`:
+The destination is an explicit `PumaInstallDirectory` override first, then `PUMA_STDLIB_ROOT`, or `%USERPROFILE%\Puma` when the variable is unset. Installation preserves separately installed runtime headers and libraries. Restart Visual Studio after changing the persistent environment variable so publishing inherits the new value. To use a different destination, set `PumaInstallDirectory`:
 
 	dotnet msbuild Puma.csproj -t:PublishAndInstallPumaCompiler -p:Configuration=Release -p:PumaInstallDirectory=C:\Tools\Puma
 
