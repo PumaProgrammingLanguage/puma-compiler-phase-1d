@@ -34,14 +34,9 @@ namespace Puma
         {
             var sb = new StringBuilder();
             var includes = new HashSet<string>(StringComparer.Ordinal);
-            var hasWriteLine = ast.Any(n => n.Kind == NodeKind.WriteLine);
-            if (hasWriteLine)
-            {
-                includes.Add("<PumaConsole/Console.hpp>");
-            }
-
             var allNodes = EnumerateAllNodes(ast).ToList();
             var externalSymbolTable = CreateExternalSymbolTable(externalSymbols);
+            AddConsoleSymbols(externalSymbolTable, ast);
             foreach (var declaration in ast)
             {
                 var name = declaration switch
@@ -63,6 +58,11 @@ namespace Puma
                 .Concat(topLevelNodes.OfType<FunctionDeclarationAstNode>().Select(function => function.FunctionDeclarationName))
                 .Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name!).ToHashSet(StringComparer.Ordinal);
             BindScopedExternalSymbols(topLevelNodes, externalSymbolTable, globalShadows);
+            if (allNodes.Any(node => node.Kind == NodeKind.WriteLine)
+                || allNodes.SelectMany(GetExpressionRoots).Any(RequiresConsoleHeader))
+            {
+                includes.Add("<PumaConsole/Console.hpp>");
+            }
             var defaultExpressions = allNodes.SelectMany(GetParameters)
                 .Select(parameter => parameter.DefaultExpression).ToList();
             if (defaultExpressions.Any(ContainsStringLiteral)) includes.Add("<PumaType/String.hpp>");
@@ -663,6 +663,11 @@ namespace Puma
                 }
 
                 return $"\"{includeTarget}\"";
+            }
+
+            if (target == "PumaConsole")
+            {
+                return "<PumaConsole/Console.hpp>";
             }
 
             var normalizedTarget = target.Replace('.', '/');
@@ -1279,14 +1284,14 @@ namespace Puma
         {
             if (ast == null)
             {
-                return $"{functionName}({string.Join(", ", callExpressionNode.Arguments.Select(GenerateExpression))})";
+                return GenerateExpression(callExpressionNode);
             }
 
             var declaration = ast.FirstOrDefault(n => n.Kind == NodeKind.FunctionDeclaration
                 && string.Equals(GetFunctionDeclarationName(n), functionName, StringComparison.Ordinal));
             if (declaration == null)
             {
-                return $"{functionName}({string.Join(", ", callExpressionNode.Arguments.Select(GenerateExpression))})";
+                return GenerateExpression(callExpressionNode);
             }
 
             var arguments = callExpressionNode.Arguments
@@ -2293,6 +2298,28 @@ namespace Puma
             _ => Enumerable.Empty<Node.ParameterInfo>()
         };
 
+        private static void AddConsoleSymbols(Dictionary<string, ExternalSymbol> symbols, List<Node> ast)
+        {
+            var imports = ast.OfType<UseStatementAstNode>()
+                .Where(use => !use.IsFilePath && use.Target == "PumaConsole" && use.ResolvedImport == null)
+                .ToList();
+            foreach (var name in new[] { "WriteLn", "ReadLn" })
+            {
+                var qualifiedName = $"PumaConsole.{name}";
+                var symbol = new ExternalSymbol(qualifiedName, ExternalSymbolKind.Function, CppName: $"PumaConsole::{name}");
+                symbols.TryAdd(qualifiedName, symbol);
+                if (imports.Count > 0)
+                {
+                    symbols.TryAdd(name, symbol with { Name = name });
+                    foreach (var import in imports.Where(use => use.Alias != null))
+                    {
+                        var aliasName = $"{import.Alias}.{name}";
+                        symbols.TryAdd(aliasName, symbol with { Name = aliasName });
+                    }
+                }
+            }
+        }
+
         private static Dictionary<string, ExternalSymbol> CreateExternalSymbolTable(IEnumerable<ExternalSymbol>? symbols)
         {
             var table = new Dictionary<string, ExternalSymbol>(StringComparer.Ordinal);
@@ -2407,6 +2434,16 @@ namespace Puma
             StatementAstNode statement => new[] { statement.StatementExpression },
             _ => Enumerable.Empty<ExpressionNode?>()
         };
+
+        private static bool RequiresConsoleHeader(ExpressionNode? expression)
+        {
+            return expression != null
+                && (expression.ResolvedExternalSymbol is
+                    { Kind: ExternalSymbolKind.Function, CppName: "PumaConsole::WriteLn" or "PumaConsole::ReadLn" }
+                    || RequiresConsoleHeader(expression.Left)
+                    || RequiresConsoleHeader(expression.Right)
+                    || expression.Arguments.Any(RequiresConsoleHeader));
+        }
 
         private static bool RequiresTypedIntegerHeader(ExpressionNode? expression)
         {

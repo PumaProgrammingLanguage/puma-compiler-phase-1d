@@ -6,6 +6,60 @@ namespace test
     [TestClass]
     public class WriteLineExpressionTest
     {
+        [TestMethod]
+        public void HelloWorldWithoutSections_EmitsExactCppOutput()
+        {
+            const string source =
+@"// Hello World program in Puma language
+PumaConsole.WriteLn(""Hello, World!"");
+PumaConsole.ReadLn(); // Wait for user input before closing the program
+";
+            const string expected =
+@"#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{
+    PumaConsole::WriteLn(""Hello, World!"");
+    PumaConsole::ReadLn();
+    return 0;
+}";
+            var tokens = new Lexer().Tokenize(source);
+            var ast = new Parser().Parse(tokens);
+            var generated = new Codegen().Generate(ast);
+
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), generated.Replace("\r\n", "\n").Trim());
+        }
+
+        [TestMethod]
+        public void HelloWorldWithConsoleImport_EmitsExactCppOutput()
+        {
+            const string source =
+@"// Hello World program in Puma language
+use
+    PumaConsole
+
+start
+    WriteLn(""Hello, World!"");
+    ReadLn(); // Wait for user input before closing the program
+";
+            const string expected =
+@"#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{
+    PumaConsole::WriteLn(""Hello, World!"");
+    PumaConsole::ReadLn();
+    return 0;
+}";
+            var tokens = new Lexer().Tokenize(source);
+            var ast = new Parser().Parse(tokens);
+            var generated = new Codegen().Generate(ast);
+
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), generated.Replace("\r\n", "\n").Trim());
+        }
+
         [DataTestMethod]
         [DataRow("\"Hello\"")]
         [DataRow("\"\"")]

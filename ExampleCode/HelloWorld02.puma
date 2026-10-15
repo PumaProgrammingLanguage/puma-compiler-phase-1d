@@ -1,0 +1,7 @@
+// Hello World program in Puma language
+use 
+	PumaConsole
+
+start
+    WriteLn("Hello, World!");
+    ReadLn(); // Wait for user input before closing the program
