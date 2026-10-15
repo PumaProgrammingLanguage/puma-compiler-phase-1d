@@ -6,13 +6,21 @@ Puma is published as a framework-dependent `win-x64` application. The installati
 
 Install the .NET 10 runtime for Windows x64 before running the compiler.
 
+## Build and install
+
+Normal Visual Studio and command-line builds automatically copy `Puma.exe`, `Puma.dll`, `Puma.deps.json`, and `Puma.runtimeconfig.json` to the folder configured by `PUMA_STDLIB_ROOT`:
+
+	dotnet build Puma.csproj -c Release
+
+The destination is an explicit `PumaInstallDirectory` override first, then `PUMA_STDLIB_ROOT`, or `%USERPROFILE%\Puma` when the variable is unset. Installation preserves separately installed runtime headers and libraries. Restart Visual Studio after changing the persistent environment variable so builds inherit the new value.
+
 ## Publish and install
 
 From the repository root, run the Release publish-and-install target:
 
 	dotnet msbuild Puma.csproj -t:PublishAndInstallPumaCompiler -p:Configuration=Release
 
-The target publishes the compiler and copies the complete publish output to `%USERPROFILE%\Puma`, preserving separately installed Puma runtime headers and libraries. To use a different destination, set `PumaInstallDirectory`:
+The target publishes the compiler and copies the complete publish output to the same destination used by normal builds, preserving separately installed Puma runtime headers and libraries. To use a different destination, set `PumaInstallDirectory`:
 
 	dotnet msbuild Puma.csproj -t:PublishAndInstallPumaCompiler -p:Configuration=Release -p:PumaInstallDirectory=C:\Tools\Puma
 
@@ -28,6 +36,7 @@ When the variable is unset or blank, the compiler searches beside its executable
 
 Open a new PowerShell session and run:
 
-	& "$env:USERPROFILE\Puma\Puma.exe" --version
+	$installRoot = if ($env:PUMA_STDLIB_ROOT) { $env:PUMA_STDLIB_ROOT } else { "$env:USERPROFILE\Puma" }
+	& "$installRoot\Puma.exe" --version
 
-The command should print the Puma compiler version and return exit code `0`.
+If you used an explicit `PumaInstallDirectory` override, use that folder instead. The command should print the Puma compiler version and return exit code `0`.

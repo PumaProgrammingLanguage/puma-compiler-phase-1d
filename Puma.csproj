@@ -20,7 +20,8 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>compiler; translator</PackageTags>
     <Version>0.2.0</Version>
-    <PumaInstallDirectory>$(USERPROFILE)\Puma</PumaInstallDirectory>
+    <PumaInstallDirectory Condition="'$(PumaInstallDirectory)' == '' and '$(PUMA_STDLIB_ROOT)' != ''">$(PUMA_STDLIB_ROOT)</PumaInstallDirectory>
+    <PumaInstallDirectory Condition="'$(PumaInstallDirectory)' == ''">$(USERPROFILE)\Puma</PumaInstallDirectory>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -68,6 +69,17 @@
     <Folder Include="ExampleCode\" />
     <Folder Include="tmp\" />
   </ItemGroup>
+
+  <Target Name="InstallPumaCompiler" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <MakeDir Directories="$(PumaInstallDirectory)" />
+    <ItemGroup>
+      <PumaBuildArtifacts Include="$(TargetPath)" />
+      <PumaBuildArtifacts Include="$(TargetDir)$(AssemblyName).exe" Condition="Exists('$(TargetDir)$(AssemblyName).exe')" />
+      <PumaBuildArtifacts Include="$(TargetDir)$(AssemblyName).deps.json" Condition="Exists('$(TargetDir)$(AssemblyName).deps.json')" />
+      <PumaBuildArtifacts Include="$(TargetDir)$(AssemblyName).runtimeconfig.json" Condition="Exists('$(TargetDir)$(AssemblyName).runtimeconfig.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PumaBuildArtifacts)" DestinationFolder="$(PumaInstallDirectory)\" SkipUnchangedFiles="true" />
+  </Target>
 
   <Target Name="PublishAndInstallPumaCompiler" DependsOnTargets="Publish">
     <MakeDir Directories="$(PumaInstallDirectory)" />
