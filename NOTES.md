@@ -2,6 +2,8 @@ General notes
 
 Recent updates
 
+- Copied the complete copyright and license header from `Program.cs` into the 21 C# files missing it, without changing functional code. Verified all 33 source files have leading copyright notices (excluding build and IDE directories). Solution build, all 463 unit tests, and whitespace review passed. No commits or pushes were made.
+
 - Updated both exact-output Hello World unit tests to pause with `Pause()` instead of `ReadLn()`, including their expected `PumaConsole::Pause()` C++ output. Added `Pause` to the existing scoped console-symbol binding and console-header dependency detection. Solution build passed; all 463 unit tests passed with no failures or skips. No commits or pushes were made.
 
 - Completed the two exact-output Hello World regressions without changing either unit test. `Codegen.cs` now binds qualified `PumaConsole.WriteLn` / `ReadLn` and console-imported calls through scoped external-symbol metadata, discovers console dependencies from resolved expression trees, maps `use PumaConsole` to `<PumaConsole/Console.hpp>`, and preserves canonical C++ names in default-argument fallback emission. Ordinary object-member calls, unrelated native imports, supplied metadata precedence, and scoped shadowing retain their existing paths. Final solution build and whitespace review passed; all 463 Visual Studio unit tests passed with no failures or skips. Pre-existing project/example changes were preserved; no commits or pushes were made.
