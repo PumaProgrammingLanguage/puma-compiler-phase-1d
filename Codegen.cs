@@ -2303,7 +2303,7 @@ namespace Puma
             var imports = ast.OfType<UseStatementAstNode>()
                 .Where(use => !use.IsFilePath && use.Target == "PumaConsole" && use.ResolvedImport == null)
                 .ToList();
-            foreach (var name in new[] { "WriteLn", "ReadLn" })
+            foreach (var name in new[] { "WriteLn", "ReadLn", "Pause" })
             {
                 var qualifiedName = $"PumaConsole.{name}";
                 var symbol = new ExternalSymbol(qualifiedName, ExternalSymbolKind.Function, CppName: $"PumaConsole::{name}");
@@ -2439,7 +2439,7 @@ namespace Puma
         {
             return expression != null
                 && (expression.ResolvedExternalSymbol is
-                    { Kind: ExternalSymbolKind.Function, CppName: "PumaConsole::WriteLn" or "PumaConsole::ReadLn" }
+                    { Kind: ExternalSymbolKind.Function, CppName: "PumaConsole::WriteLn" or "PumaConsole::ReadLn" or "PumaConsole::Pause" }
                     || RequiresConsoleHeader(expression.Left)
                     || RequiresConsoleHeader(expression.Right)
                     || expression.Arguments.Any(RequiresConsoleHeader));

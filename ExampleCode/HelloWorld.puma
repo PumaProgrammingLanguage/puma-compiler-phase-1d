@@ -1,3 +1,4 @@
 // Hello World program in Puma language
 PumaConsole.WriteLn("Hello, World!");
-PumaConsole.ReadLn(); // Wait for user input before closing the program
+// Wait for user input before closing the program
+PumaConsole.Pause();

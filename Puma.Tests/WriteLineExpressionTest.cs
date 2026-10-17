@@ -12,7 +12,8 @@ namespace test
             const string source =
 @"// Hello World program in Puma language
 PumaConsole.WriteLn(""Hello, World!"");
-PumaConsole.ReadLn(); // Wait for user input before closing the program
+// Wait for user input before closing the program
+PumaConsole.Pause();
 ";
             const string expected =
 @"#include <PumaConsole/Console.hpp>
@@ -21,7 +22,7 @@ PumaConsole.ReadLn(); // Wait for user input before closing the program
 int main()
 {
     PumaConsole::WriteLn(""Hello, World!"");
-    PumaConsole::ReadLn();
+    PumaConsole::Pause();
     return 0;
 }";
             var tokens = new Lexer().Tokenize(source);
@@ -41,7 +42,8 @@ use
 
 start
     WriteLn(""Hello, World!"");
-    ReadLn(); // Wait for user input before closing the program
+    // Wait for user input before closing the program
+    Pause();
 ";
             const string expected =
 @"#include <PumaConsole/Console.hpp>
@@ -50,7 +52,7 @@ start
 int main()
 {
     PumaConsole::WriteLn(""Hello, World!"");
-    PumaConsole::ReadLn();
+    PumaConsole::Pause();
     return 0;
 }";
             var tokens = new Lexer().Tokenize(source);
