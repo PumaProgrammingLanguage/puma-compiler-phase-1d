@@ -1,1 +1,0 @@
-C:/Users/dabur/source/repos/puma-compiler-phase-1d/bin/Release/net10.0/win-x64/puma.exe HelloWorld.puma
