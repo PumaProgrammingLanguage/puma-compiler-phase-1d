@@ -1,0 +1,4 @@
+﻿start
+	z = 5
+	s = "The value of z is 5"
+	WriteLn(s)

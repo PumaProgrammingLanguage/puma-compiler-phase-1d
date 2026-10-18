@@ -24,6 +24,35 @@ namespace test
     public class WriteLineExpressionTest
     {
         [TestMethod]
+        public void ProvidedExample_StringVariableWriteLn_EmitsExactCppOutput()
+        {
+            const string source =
+@"start
+    z = 5
+    s = ""The value of z is 5""
+    WriteLn(s)
+";
+            const string expected =
+@"#include <cstdint>
+#include <PumaType/String.hpp>
+#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{
+    auto z = (int64_t)5;
+    auto s = PumaType::String(""The value of z is 5"", sizeof(""The value of z is 5"") - 1);
+    PumaConsole::WriteLn(s);
+    return 0;
+}";
+            var tokens = new Lexer().Tokenize(source);
+            var ast = new Parser().Parse(tokens);
+            var generated = new Codegen().Generate(ast);
+
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), generated.Replace("\r\n", "\n").Trim());
+        }
+
+        [TestMethod]
         public void HelloWorldWithoutSections_EmitsExactCppOutput()
         {
             const string source =
@@ -99,6 +128,36 @@ int main()
             CollectionAssert.AreEqual(new[] { "PumaConsole", "PumaType" }, result.RequiredRuntimeLibraries.ToArray());
         }
 
+        [DataTestMethod]
+        [DataRow("s", "")]
+        [DataRow("message", ";")]
+        public void IdentifierArgument_EmitsExactOutputAndRetainsSourceSpan(string identifier, string terminator)
+        {
+            var source = $@"start
+    {identifier} = ""Hello""
+    WriteLn({identifier}){terminator}
+";
+            var expected = $@"#include <PumaType/String.hpp>
+#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{{
+    auto {identifier} = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
+    PumaConsole::WriteLn({identifier});
+    return 0;
+}}";
+            var ast = new Parser().Parse(new Lexer().Tokenize(source));
+            var argument = ast.OfType<WriteLineAstNode>().Single().ArgumentExpression;
+            Assert.IsNotNull(argument);
+            Assert.AreEqual(ExpressionKind.Identifier, argument.Kind);
+            Assert.AreEqual(identifier, argument.Value);
+            Assert.AreEqual(new SourceSpan(3, 13, 3, 13 + identifier.Length), argument.SourceSpan);
+            var result = new Codegen().GenerateResult(ast);
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), result.SourceCode.Replace("\r\n", "\n").Trim());
+            CollectionAssert.AreEqual(new[] { "PumaConsole", "PumaType" }, result.RequiredRuntimeLibraries.ToArray());
+        }
+
         [TestMethod]
         public void ArgumentAstReplacement_UpdatesOutputWithoutStringRuntimeDependency()
         {
@@ -150,12 +209,15 @@ int main()
             Assert.AreEqual(expected, new Codegen().Generate(ast).Replace("\r\n", "\n").Trim());
         }
 
+        // Insertion point for identifier-argument parser regression coverage.
         [DataTestMethod]
         [DataRow("WriteLn \"x\")", "Expected '(' after WriteLn.")]
         [DataRow("WriteLn(1)", "Expected string literal in WriteLn(...)")]
         [DataRow("WriteLn()", "Expected string literal in WriteLn(...)")]
         [DataRow("WriteLn(\"x\"", "Expected ')' after WriteLn argument.")]
         [DataRow("WriteLn(\"x\", \"y\")", "Expected ')' after WriteLn argument.")]
+        [DataRow("WriteLn(s", "Expected ')' after WriteLn argument.")]
+        [DataRow("WriteLn(s, sizeof(s) - 1)", "Expected ')' after WriteLn argument.")]
         public void InvalidArgument_PreservesParserDiagnostic(string statement, string expected)
         {
             var source = $"start\n    {statement}\n";

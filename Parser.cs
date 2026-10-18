@@ -1200,7 +1200,7 @@ namespace Puma
                 return;
             }
 
-            // Recognize built-in WriteLn in start section: WriteLn("...") [EOL]
+            // Recognize built-in WriteLn in start section.
             if (token is LexerTokens t && t.Category == TokenCategory.Identifier && t.TokenText == "WriteLn"
                 && ReferenceEquals(GetStatementTarget(ast), ast))
             {
@@ -1329,19 +1329,20 @@ namespace Puma
 
         private void ParseWriteLineCall()
         {
-            // Expect '(' StringLiteral ')'
+            // Expect '(' followed by a string literal or identifier and ')'.
             var open = GetNextToken(_tokens);
             if (open == null || open.Value.Category != TokenCategory.Delimiter || open.Value.TokenText != "(")
             {
                 throw new InvalidOperationException("Expected '(' after WriteLn.");
             }
 
-            var textTok = GetNextToken(_tokens);
-            if (textTok == null || textTok.Value.Category != TokenCategory.StringLiteral)
+            var argumentToken = GetNextToken(_tokens);
+            if (argumentToken == null
+                || argumentToken.Value.Category is not (TokenCategory.StringLiteral or TokenCategory.Identifier))
             {
                 throw new InvalidOperationException("Expected string literal in WriteLn(...)");
             }
-            var argument = ParseExpression(new List<LexerTokens> { textTok.Value })!;
+            var argument = ParseExpression(new List<LexerTokens> { argumentToken.Value })!;
 
             var close = GetNextToken(_tokens);
             if (close == null || close.Value.Category != TokenCategory.Delimiter || close.Value.TokenText != ")")

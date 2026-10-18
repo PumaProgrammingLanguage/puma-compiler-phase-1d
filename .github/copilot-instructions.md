@@ -20,6 +20,7 @@
 - When presenting implementation options, proceed with the recommended option by default rather than repeatedly asking the user to choose, unless a genuine blocker or required approval prevents proceeding.
 
 ## Unit Testing
+- When adding compiler regression tests from user-provided examples, preserve both the supplied Puma input and expected C++ output as requested rather than correcting their semantics. For the StringVariableWriteLn regression, retain the original Puma input, including `WriteLn(s, sizeof(s) - 1)`, while correcting only the expected C++ to existing test conventions. Leave the test unrun pending user review.
 
 ## Specification Reference
 - The specification text file is located at `C:\Users\dabur\source\repos\Puma Programming Language Specification.txt`.

@@ -2,6 +2,8 @@ General notes
 
 Recent updates
 
+- Fixed built-in `WriteLn(s)` parsing in `Parser.cs` to accept a single identifier as well as a string literal through the existing expression AST. The user's reviewed `ProvidedExample_StringVariableWriteLn_EmitsExactCppOutput` now passes without changing its one-argument Puma input or expected C++. Added exact-output identifier/source-span/runtime-dependency coverage, semicolon handling, and negative cases for missing closing parentheses and unsupported extra arguments. Existing literal and numeric-argument diagnostics are preserved; no codegen or runtime changes were needed. Solution build passed; all 468 unit tests passed with no failures or skips. Preserved unrelated workspace changes; no commits or pushes were made.
+
 - Copied the complete copyright and license header from `Program.cs` into the 21 C# files missing it, without changing functional code. Verified all 33 source files have leading copyright notices (excluding build and IDE directories). Solution build, all 463 unit tests, and whitespace review passed. No commits or pushes were made.
 
 - Updated both exact-output Hello World unit tests to pause with `Pause()` instead of `ReadLn()`, including their expected `PumaConsole::Pause()` C++ output. Added `Pause` to the existing scoped console-symbol binding and console-header dependency detection. Solution build passed; all 463 unit tests passed with no failures or skips. No commits or pushes were made.

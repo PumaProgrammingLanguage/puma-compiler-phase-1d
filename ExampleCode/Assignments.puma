@@ -1,0 +1,7 @@
+﻿start
+	x = 5
+	y = 10.0
+	z = x flt + y
+	s = "The value of z is {z}" //fstr
+	//WriteLn(s)
+	//Pause()
