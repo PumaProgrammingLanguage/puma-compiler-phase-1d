@@ -30,7 +30,7 @@ namespace test
         [DataRow("0xFE", "(int64_t)0xFE", "#include <cstdint>\n\n")]
         [DataRow("(1) int16", "(int16_t) 1", "#include <cstdint>\n\n")]
         [DataRow("1 uint8 + 2 int16", "((uint8_t)1 + (int16_t)2)", "#include <cstdint>\n\n")]
-        [DataRow("str", "PumaType::String(\"\", sizeof(\"\") - 1)", "#include <PumaType/String.hpp>\n\n")]
+        [DataRow("str", "PumaType::String(\"\", (size_t)(sizeof(\"\") - 1))", "#include <PumaType/String.hpp>\n\n")]
         public void GlobalProperty_FormatsStructuredInitializer(string expression, string expectedInitializer, string headers)
         {
             var source = $"properties\n    value = {expression}\n";

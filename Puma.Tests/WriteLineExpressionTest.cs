@@ -41,7 +41,7 @@ namespace test
 int main()
 {
     auto z = (int64_t)5;
-    auto s = PumaType::String(""The value of z is 5"", sizeof(""The value of z is 5"") - 1);
+    auto s = PumaType::String(""The value of z is 5"", (size_t)(sizeof(""The value of z is 5"") - 1));
     PumaConsole::WriteLn(s);
     return 0;
 }";
@@ -143,7 +143,7 @@ int main()
 // start
 int main()
 {{
-    auto {identifier} = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
+    auto {identifier} = PumaType::String(""Hello"", (size_t)(sizeof(""Hello"") - 1));
     PumaConsole::WriteLn({identifier});
     return 0;
 }}";

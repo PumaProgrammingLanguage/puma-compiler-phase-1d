@@ -73,7 +73,7 @@ struct Numbers
 struct Values
 {
     auto enabled = false;
-    auto label = PumaType::String(""x=y"", sizeof(""x=y"") - 1);
+    auto label = PumaType::String(""x=y"", (size_t)(sizeof(""x=y"") - 1));
     auto marker = PumaType::Character(reinterpret_cast<const uint8_t*>(""\x41""));
 };";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
@@ -94,7 +94,7 @@ struct Values
 // records
 struct Value
 {
-    auto item = PumaType::String(""updated"", sizeof(""updated"") - 1);
+    auto item = PumaType::String(""updated"", (size_t)(sizeof(""updated"") - 1));
 };";
             var ast = new Parser().Parse(new Lexer().Tokenize(source));
             var replacement = new Parser().Parse(new Lexer().Tokenize(replacementSource));

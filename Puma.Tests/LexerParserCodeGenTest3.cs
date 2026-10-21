@@ -2243,8 +2243,8 @@ struct MyRecord [[gnu::packed]]
     auto a = false;
     auto b = true;
     auto c = false;
-    auto d = PumaType::String("""", sizeof("""") - 1);
-    auto e = PumaType::String("""", sizeof("""") - 1);
+    auto d = PumaType::String("""", (size_t)(sizeof("""") - 1));
+    auto e = PumaType::String("""", (size_t)(sizeof("""") - 1));
 };
 ";
 

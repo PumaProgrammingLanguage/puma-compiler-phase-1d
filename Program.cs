@@ -118,6 +118,7 @@ namespace Puma
                 var clangArguments = new List<string>
                 {
                     cppSourceFileName,
+                    "-std=c++20",
                     "--target=x86_64-pc-windows-msvc",
                     "-fms-runtime-lib=dll"
                 };

@@ -24,8 +24,8 @@ namespace test
     public class InitializerExpressionTest
     {
         [DataTestMethod]
-        [DataRow("\"hi\"", "PumaType::String(\"hi\", sizeof(\"hi\") - 1)")]
-        [DataRow("\"\"", "PumaType::String(\"\", sizeof(\"\") - 1)")]
+        [DataRow("\"hi\"", "PumaType::String(\"hi\", (size_t)(sizeof(\"hi\") - 1))")]
+        [DataRow("\"\"", "PumaType::String(\"\", (size_t)(sizeof(\"\") - 1))")]
         [DataRow("Length(\"hello\")", "Length(\"hello\")")]
         [DataRow("Pick(\"a\", Inner(\"b\"))", "Pick(\"a\", Inner(\"b\"))")]
         [DataRow("\"yes\" if flag else \"no\"", "(flag ? \"yes\" : \"no\")")]
@@ -40,7 +40,7 @@ namespace test
 
         [DataTestMethod]
         [DataRow("\"original\"", "Length(\"replacement\")", "Length(\"replacement\")")]
-        [DataRow("Length(\"original\")", "\"replacement\"", "PumaType::String(\"replacement\", sizeof(\"replacement\") - 1)")]
+        [DataRow("Length(\"original\")", "\"replacement\"", "PumaType::String(\"replacement\", (size_t)(sizeof(\"replacement\") - 1))")]
         public void InitializerAstReplacement_ChangesLiteralConstruction(string original, string replacement, string initializer)
         {
             var source = $"functions\n    F()\n        value = {original}\n";
@@ -79,7 +79,7 @@ namespace test
 
         [DataTestMethod]
         [DataRow("bool", "false", "#include <stdbool>\n\n")]
-        [DataRow("str", "PumaType::String(\"\", sizeof(\"\") - 1)", "#include <PumaType/String.hpp>\n\n")]
+        [DataRow("str", "PumaType::String(\"\", (size_t)(sizeof(\"\") - 1))", "#include <PumaType/String.hpp>\n\n")]
         public void BareTypeInitializer_PreservesAstSelectedDefault(string expression, string initializer, string headers)
         {
             var source = $"start\n    value = {expression}\n";

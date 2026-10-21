@@ -202,7 +202,7 @@ int main()
 // start
 int main()
 {
-    auto value = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
+    auto value = PumaType::String(""Hello"", (size_t)(sizeof(""Hello"") - 1));
     return 0;
 }
 ";
@@ -308,6 +308,61 @@ int main()
                     Assert.AreEqual("Puma build error: Unable to locate the installed Puma runtime. Set PUMA_STDLIB_ROOT to the directory containing include and lib\\x64\\Release, or install them beside the compiler executable.", standardError.Trim());
                     Assert.IsFalse(File.Exists(executablePath));
                 }
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public void CliStringVariable_CompilesAndRunsWithDefaultCppStandard()
+        {
+            const string source = "start\n    z = 5\n    s = \"The value of z is 5\"\n    WriteLn(s)\n";
+            const string expected =
+@"#include <cstdint>
+#include <PumaType/String.hpp>
+#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{
+    auto z = (int64_t)5;
+    auto s = PumaType::String(""The value of z is 5"", (size_t)(sizeof(""The value of z is 5"") - 1));
+    PumaConsole::WriteLn(s);
+    return 0;
+}";
+            var runtime = Puma.Program.FindInstalledPumaRuntime();
+            Assert.IsNotNull(runtime, "Set PUMA_STDLIB_ROOT to the installed standard-library root.");
+            var directory = Path.Combine(Path.GetTempPath(), $"PumaStringCliTests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var sourcePath = Path.Combine(directory, "main.puma");
+                var executablePath = Path.Combine(directory, "main.exe");
+                File.WriteAllText(sourcePath, source);
+                var startInfo = CreatePumaProcess(sourcePath, "-o", executablePath);
+                startInfo.Environment["PUMA_STDLIB_ROOT"] = Path.GetDirectoryName(runtime.IncludeDirectory)!;
+                using var process = Process.Start(startInfo);
+                Assert.IsNotNull(process);
+                var output = process.StandardOutput.ReadToEndAsync();
+                var error = process.StandardError.ReadToEndAsync();
+                process.WaitForExit();
+                output.GetAwaiter().GetResult();
+                var standardError = error.GetAwaiter().GetResult();
+                Assert.AreEqual(Normalize(expected).Trim(), Normalize(File.ReadAllText(Path.ChangeExtension(sourcePath, ".cpp"))).Trim());
+                Assert.AreEqual(0, process.ExitCode, standardError);
+                using var executable = Process.Start(new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false
+                });
+                Assert.IsNotNull(executable);
+                var standardOutput = executable.StandardOutput.ReadToEnd();
+                executable.WaitForExit();
+                Assert.AreEqual(0, executable.ExitCode);
+                Assert.AreEqual("The value of z is 5" + Environment.NewLine, standardOutput);
             }
             finally
             {
@@ -507,12 +562,17 @@ int main()
                 Environment.SetEnvironmentVariable("PUMA_CLANGXX", compilerPath);
                 Environment.SetEnvironmentVariable("PUMA_CLANG_ARGUMENTS_FILE", capturePath);
 
-                using var process = Process.Start(CreatePumaProcess(sourcePath, "-DNAME=Puma Test"));
+                using var process = Process.Start(CreatePumaProcess(sourcePath, "-std=c++17", "-DNAME=Puma Test"));
                 Assert.IsNotNull(process);
                 process.WaitForExit();
 
                 Assert.AreEqual(0, process.ExitCode);
-                StringAssert.Contains(File.ReadAllText(capturePath), "\"-DNAME=Puma Test\"");
+                var arguments = File.ReadAllText(capturePath);
+                StringAssert.Contains(arguments, "\"-DNAME=Puma Test\"");
+                StringAssert.Contains(arguments, "-std=c++20");
+                StringAssert.Contains(arguments, "-std=c++17");
+                Assert.IsTrue(arguments.IndexOf("-std=c++20", StringComparison.Ordinal)
+                    < arguments.IndexOf("-std=c++17", StringComparison.Ordinal));
             }
             finally
             {
@@ -877,7 +937,7 @@ PumaType::Character Pick(PumaType::Character a, PumaType::Character b)
 // functions
 void Hello(void)
 {
-    auto s = PumaType::String(""Hello, World!"", sizeof(""Hello, World!"") - 1);
+    auto s = PumaType::String(""Hello, World!"", (size_t)(sizeof(""Hello, World!"") - 1));
     PrintLn(s);
 }
 
@@ -1478,7 +1538,7 @@ int main()
 {
     if (1 == 1)
     {
-        message = PumaType::String(""Hello"", sizeof(""Hello"") - 1);
+        message = PumaType::String(""Hello"", (size_t)(sizeof(""Hello"") - 1));
     }
     return 0;
 }

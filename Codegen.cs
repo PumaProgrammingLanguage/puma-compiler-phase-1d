@@ -916,7 +916,7 @@ namespace Puma
 
         private static string ToPumaStringLiteral(string literal)
         {
-            return $"PumaType::String({literal}, sizeof({literal}) - 1)";
+            return $"PumaType::String({literal}, (size_t)(sizeof({literal}) - 1))";
         }
 
         private static string ToPumaCharacterLiteral(string literal)
@@ -1715,7 +1715,7 @@ namespace Puma
             var type = MapType(parameter.Type) ?? "int64_t";
             return type switch
             {
-                "PumaType::String" => "PumaType::String(\"\", sizeof(\"\") - 1)",
+                "PumaType::String" => ToPumaStringLiteral("\"\""),
                 "bool_t" => "false",
                 _ => "0"
             };

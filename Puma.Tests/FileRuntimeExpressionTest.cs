@@ -34,8 +34,8 @@ namespace test
         };
 
         [DataTestMethod]
-        [DataRow("\"hello file\"", "PumaType::String(\"hello file\", sizeof(\"hello file\") - 1)", "hello file", false)]
-        [DataRow("\"café\"", "PumaType::String(\"café\", sizeof(\"café\") - 1)", "café", false)]
+        [DataRow("\"hello file\"", "PumaType::String(\"hello file\", (size_t)(sizeof(\"hello file\") - 1))", "hello file", false)]
+        [DataRow("\"café\"", "PumaType::String(\"café\", (size_t)(sizeof(\"café\") - 1))", "café", false)]
         [DataRow("'A'", "PumaType::Character(reinterpret_cast<const uint8_t*>(\"\\x41\"))", "A", true)]
         public void TextWriteAndRead_EmitExactOutputAndExecuteRoundTrip(string literal, string initializer, string text, bool character)
         {
@@ -81,7 +81,7 @@ namespace test
         public void TextOpenAndClose_EmitExactOutputAndExecuteAgainstRuntime()
         {
             const string source = "use\n    PumaFile.Text\nfunctions\n    Save(path str)\n        file = PumaFile.Text()\n        file.Open(path, PumaFile.Text.OpenMode.WRITE_NEW)\n        text = \"hello file\"\n        file.WriteLn(text)\n        file.Close()\n";
-            const string expected = "#include <PumaType/String.hpp>\n#include <PumaFile/Text.hpp>\n\n// functions\nvoid Save(PumaType::String path)\n{\n    auto file = PumaFile::Text();\n    file.Open(path, PumaFile::Text::OpenMode::WRITE_NEW);\n    auto text = PumaType::String(\"hello file\", sizeof(\"hello file\") - 1);\n    file.WriteLn(text);\n    file.Close();\n}";
+            const string expected = "#include <PumaType/String.hpp>\n#include <PumaFile/Text.hpp>\n\n// functions\nvoid Save(PumaType::String path)\n{\n    auto file = PumaFile::Text();\n    file.Open(path, PumaFile::Text::OpenMode::WRITE_NEW);\n    auto text = PumaType::String(\"hello file\", (size_t)(sizeof(\"hello file\") - 1));\n    file.WriteLn(text);\n    file.Close();\n}";
             var result = Generate(source);
             Assert.AreEqual(expected, Normalize(result.SourceCode));
             CollectionAssert.AreEqual(new[] { "PumaFile", "PumaType" }, result.RequiredRuntimeLibraries.ToArray());
