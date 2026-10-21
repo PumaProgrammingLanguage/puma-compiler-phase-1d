@@ -2,6 +2,8 @@ General notes
 
 Recent updates
 
+- Verified the requested `z = 5` / string-variable `WriteLn(s)` regression already exists as `ProvidedExample_StringVariableWriteLn_EmitsExactCppOutput` in `Puma.Tests/WriteLineExpressionTest.cs`, with the supplied Puma input and expected C++ output. Visual Studio discovers the test; no duplicate test or compiler changes were needed. Left the test unrun pending user review.
+
 - Fixed built-in `WriteLn(s)` parsing in `Parser.cs` to accept a single identifier as well as a string literal through the existing expression AST. The user's reviewed `ProvidedExample_StringVariableWriteLn_EmitsExactCppOutput` now passes without changing its one-argument Puma input or expected C++. Added exact-output identifier/source-span/runtime-dependency coverage, semicolon handling, and negative cases for missing closing parentheses and unsupported extra arguments. Existing literal and numeric-argument diagnostics are preserved; no codegen or runtime changes were needed. Solution build passed; all 468 unit tests passed with no failures or skips. Preserved unrelated workspace changes; no commits or pushes were made.
 
 - Copied the complete copyright and license header from `Program.cs` into the 21 C# files missing it, without changing functional code. Verified all 33 source files have leading copyright notices (excluding build and IDE directories). Solution build, all 463 unit tests, and whitespace review passed. No commits or pushes were made.
