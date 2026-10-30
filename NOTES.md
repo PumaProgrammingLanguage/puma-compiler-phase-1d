@@ -2,6 +2,10 @@ General notes
 
 Recent updates
 
+- Fixed unqualified `Pause()` code generation without requiring `use PumaConsole`: `Codegen.cs` now registers the default console symbol through the existing scoped binding path, preserving local declaration shadowing and supplied external metadata precedence. The supplied float-conversion/string-variable regression passes with its original Puma input and expected C++ unchanged. Added exact-output coverage for standalone Pause and local/external precedence, including runtime dependencies. Solution build passed; all 473 unit tests passed with no failures or skips. No commits or pushes were made.
+
+- Added `ProvidedExample_FloatConversionStringVariableWriteLnAndPause_EmitsExactCppOutput` in `Puma.Tests/WriteLineExpressionTest.cs`, preserving the supplied Puma input and expected C++ output, including `x flt + y`, literal `{z}` string content, `Pause()`, and the blank line before `return 0;`. Left the test unrun pending user review; no compiler changes were made.
+
 - Completed the String-variable constructor regression fix and verified both exact-output tests match the user's reviewed C++ output, including `(size_t)(sizeof("The value of z is 5") - 1)`. `Codegen.cs` consistently emits explicit size_t literal lengths and reuses the formatter for empty-string default arguments. `Program.cs` now defaults Clang to C++20: the actual constructor failure came from pre-C++17 temporary copy initialization, not the length argument. Added a CLI exact-output/compile/run regression and verified explicit language-standard overrides remain after the default. Solution build passed; all 469 unit tests passed, including the native String example printing `The value of z is 5`. No runtime changes, commits, or pushes were made.
 
 - Verified the requested `z = 5` / string-variable `WriteLn(s)` regression already exists as `ProvidedExample_StringVariableWriteLn_EmitsExactCppOutput` in `Puma.Tests/WriteLineExpressionTest.cs`, with the supplied Puma input and expected C++ output. Visual Studio discovers the test; no duplicate test or compiler changes were needed. Left the test unrun pending user review.

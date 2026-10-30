@@ -24,6 +24,42 @@ namespace test
     public class WriteLineExpressionTest
     {
         [TestMethod]
+        public void ProvidedExample_FloatConversionStringVariableWriteLnAndPause_EmitsExactCppOutput()
+        {
+            const string source =
+@"start
+    x = 5
+    y = 10.0
+    z = x flt + y
+    s = ""The value of z is {z}""
+    WriteLn(s)
+    Pause()
+";
+            const string expected =
+@"#include <cstdint>
+#include <PumaType/String.hpp>
+#include <PumaConsole/Console.hpp>
+
+// start
+int main()
+{
+    auto x = (int64_t)5;
+    auto y = (double)10.0;
+    auto z = (double) x + y;
+    auto s = PumaType::String(""The value of z is {z}"", (size_t)(sizeof(""The value of z is {z}"") - 1));
+    PumaConsole::WriteLn(s);
+    PumaConsole::Pause();
+
+    return 0;
+}";
+            var tokens = new Lexer().Tokenize(source);
+            var ast = new Parser().Parse(tokens);
+            var generated = new Codegen().Generate(ast);
+
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), generated.Replace("\r\n", "\n").Trim());
+        }
+
+        [TestMethod]
         public void ProvidedExample_StringVariableWriteLn_EmitsExactCppOutput()
         {
             const string source =

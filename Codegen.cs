@@ -2308,7 +2308,7 @@ namespace Puma
                 var qualifiedName = $"PumaConsole.{name}";
                 var symbol = new ExternalSymbol(qualifiedName, ExternalSymbolKind.Function, CppName: $"PumaConsole::{name}");
                 symbols.TryAdd(qualifiedName, symbol);
-                if (imports.Count > 0)
+                if (name == "Pause" || imports.Count > 0)
                 {
                     symbols.TryAdd(name, symbol with { Name = name });
                     foreach (var import in imports.Where(use => use.Alias != null))

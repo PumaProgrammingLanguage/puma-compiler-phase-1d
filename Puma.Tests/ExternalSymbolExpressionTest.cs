@@ -27,6 +27,40 @@ namespace test
         private const string OwnedFunctionCpp = "auto value = Fetch();\n\n// start\nint main()\n{\n    delete value;\n    return 0;\n}";
         private const string ConstructorCpp = "auto value = new Fetch();\n\n// start\nint main()\n{\n    delete value;\n    return 0;\n}";
 
+        [TestMethod]
+        public void UnqualifiedPause_UsesConsoleWithoutImport()
+        {
+            const string source = "start\n    Pause()\n";
+            const string expected = "#include <PumaConsole/Console.hpp>\n\n// start\nint main()\n{\n    PumaConsole::Pause();\n    return 0;\n}";
+            var result = new Codegen().GenerateResult(Parse(source));
+
+            Assert.AreEqual(expected, Normalize(result.SourceCode));
+            CollectionAssert.AreEqual(new[] { "PumaConsole", "PumaType" }, result.RequiredRuntimeLibraries.ToArray());
+        }
+
+        [TestMethod]
+        public void LocalPauseFunction_OverridesDefaultConsoleSymbol()
+        {
+            const string source = "start\n    Pause()\nfunctions\n    Pause() double\n        return 1.25\n";
+            const string expected = "// functions\ndouble Pause(void)\n{\n    return 1.25;\n}\n\n// start\nint main()\n{\n    Pause();\n    return 0;\n}";
+            var result = new Codegen().GenerateResult(Parse(source));
+
+            Assert.AreEqual(expected, Normalize(result.SourceCode));
+            Assert.AreEqual(0, result.RequiredRuntimeLibraries.Count);
+        }
+
+        [TestMethod]
+        public void ExternalPauseMetadata_OverridesDefaultConsoleSymbol()
+        {
+            const string source = "start\n    Pause()\n";
+            const string expected = "// start\nint main()\n{\n    Custom::Pause();\n    return 0;\n}";
+            var symbol = new ExternalSymbol("Pause", ExternalSymbolKind.Function, CppName: "Custom::Pause");
+            var result = new Codegen().GenerateResult(Parse(source), new[] { symbol });
+
+            Assert.AreEqual(expected, Normalize(result.SourceCode));
+            Assert.AreEqual(0, result.RequiredRuntimeLibraries.Count);
+        }
+
         [DataTestMethod]
         [DataRow((int)ExternalSymbolKind.Function, false, FunctionCpp)]
         [DataRow((int)ExternalSymbolKind.Function, true, OwnedFunctionCpp)]
