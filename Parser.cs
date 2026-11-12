@@ -1342,9 +1342,15 @@ namespace Puma
             {
                 throw new InvalidOperationException("Expected string literal in WriteLn(...)");
             }
-            var argument = ParseExpression(new List<LexerTokens> { argumentToken.Value })!;
-
+            var argumentTokens = new List<LexerTokens> { argumentToken.Value };
             var close = GetNextToken(_tokens);
+            if (argumentToken.Value.Category == TokenCategory.StringLiteral
+                && close is { TokenText: "str" or "vstr" })
+            {
+                argumentTokens.Add(close.Value);
+                close = GetNextToken(_tokens);
+            }
+            var argument = ParseExpression(argumentTokens)!;
             if (close == null || close.Value.Category != TokenCategory.Delimiter || close.Value.TokenText != ")")
             {
                 throw new InvalidOperationException("Expected ')' after WriteLn argument.");
@@ -1963,7 +1969,10 @@ namespace Puma
                     if (MatchDelimiter("["))
                     {
                         var indexExpr = ParseExpression();
-                        MatchDelimiter("]");
+                        if (!MatchDelimiter("]"))
+                        {
+                            throw CreateParserException("Expected ']' after index expression.", _tokens[_index - 1]);
+                        }
                         expr = new ExpressionNode { Kind = ExpressionKind.Index, Left = expr, Right = indexExpr };
                         continue;
                     }
@@ -1982,7 +1991,10 @@ namespace Puma
                                 }
                             } while (MatchPunctuation(","));
 
-                            MatchDelimiter(")");
+                            if (!MatchDelimiter(")"))
+                            {
+                                throw CreateParserException("Expected ')' after call arguments.", _tokens[_index - 1]);
+                            }
                         }
 
                         expr = call;
@@ -2000,7 +2012,10 @@ namespace Puma
                 if (MatchDelimiter("("))
                 {
                     var expr = ParseExpression();
-                    MatchDelimiter(")");
+                    if (!MatchDelimiter(")"))
+                    {
+                        throw CreateParserException("Expected ')' after expression.", _tokens[_index - 1]);
+                    }
                     return expr;
                 }
 
@@ -2015,6 +2030,16 @@ namespace Puma
                     token.StartColumn,
                     token.StartLine,
                     token.StartColumn + token.TokenText.Length);
+                if (token.Category == TokenCategory.Unknown && token.TokenText.StartsWith('"'))
+                {
+                    throw CreateParserException("Invalid or unterminated string literal.", token);
+                }
+                if (token.Category == TokenCategory.StringLiteral)
+                {
+                    var verbatim = MatchKeyword("vstr");
+                    if (!verbatim) MatchKeyword("str");
+                    return ParseString(token, sourceSpan, verbatim);
+                }
                 if (token.Category is TokenCategory.Identifier or TokenCategory.Keyword)
                 {
                     return new ExpressionNode { Kind = ExpressionKind.Identifier, Value = token.TokenText, SourceSpan = sourceSpan };
@@ -2048,6 +2073,106 @@ namespace Puma
                 }
 
                 return new ExpressionNode { Kind = ExpressionKind.Literal, Value = token.TokenText, SourceSpan = sourceSpan };
+            }
+
+            private static ExpressionNode ParseString(LexerTokens token, SourceSpan sourceSpan, bool verbatim)
+            {
+                var content = token.TokenText[1..^1];
+                if (verbatim)
+                {
+                    return new ExpressionNode
+                    {
+                        Kind = ExpressionKind.Literal,
+                        Value = "\"" + content.Replace("\\", "\\\\").Replace("\"", "\\\"")
+                            .Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t") + "\"",
+                        SourceSpan = sourceSpan
+                    };
+                }
+
+                var result = new ExpressionNode { Kind = ExpressionKind.InterpolatedString, SourceSpan = sourceSpan };
+                var text = new System.Text.StringBuilder();
+                for (var i = 0; i < content.Length; i++)
+                {
+                    var ch = content[i];
+                    if (ch == '\\')
+                    {
+                        text.Append(ch);
+                        if (++i < content.Length) text.Append(content[i]);
+                        continue;
+                    }
+                    if (ch is '{' or '}')
+                    {
+                        if (i + 1 < content.Length && content[i + 1] == ch)
+                        {
+                            text.Append(ch);
+                            i++;
+                            continue;
+                        }
+                        if (ch == '}') throw CreateParserException("Unmatched '}' in string interpolation.", token);
+
+                        result.Arguments.Add(new ExpressionNode { Kind = ExpressionKind.Literal, Value = "\"" + text + "\"" });
+                        text.Clear();
+                        var start = ++i;
+                        var depth = 1;
+                        char quote = '\0';
+                        for (; i < content.Length; i++)
+                        {
+                            var current = content[i];
+                            if (quote != '\0')
+                            {
+                                if (current == '\\') i++;
+                                else if (current == quote) quote = '\0';
+                            }
+                            else if (current is '\'' or '"') quote = current;
+                            else if (current == '{') depth++;
+                            else if (current == '}' && --depth == 0) break;
+                        }
+                        if (i == content.Length) throw CreateParserException("Unclosed string interpolation.", token);
+                        var expressionTokens = new Lexer().Tokenize(content[start..i]).Where(t => !IsIgnorable(t)).ToList();
+                        foreach (var index in Enumerable.Range(0, expressionTokens.Count))
+                        {
+                            var embeddedToken = expressionTokens[index];
+                            embeddedToken.StartLine = token.StartLine;
+                            embeddedToken.StartColumn += token.StartColumn + start;
+                            expressionTokens[index] = embeddedToken;
+                        }
+                        try
+                        {
+                            if (expressionTokens.Any(t => t.Category == TokenCategory.Unknown || t.TokenText == ":"))
+                                throw new InvalidOperationException("Invalid expression or unsupported format specifier.");
+                            var embedded = Parser.ParseExpression(expressionTokens);
+                            if (!IsCompleteInterpolationExpression(embedded))
+                                throw new InvalidOperationException("Expected a complete expression.");
+                            result.Arguments.Add(new ExpressionNode { Kind = ExpressionKind.StringConversion, Left = embedded, SourceSpan = embedded!.SourceSpan });
+                        }
+                        catch (InvalidOperationException error)
+                        {
+                            throw CreateParserException($"Invalid string interpolation: {error.Message}", token);
+                        }
+                        continue;
+                    }
+                    text.Append(ch);
+                }
+                if (result.Arguments.Count == 0)
+                {
+                    return new ExpressionNode { Kind = ExpressionKind.Literal, Value = "\"" + text + "\"", SourceSpan = sourceSpan };
+                }
+                if (text.Length > 0) result.Arguments.Add(new ExpressionNode { Kind = ExpressionKind.Literal, Value = "\"" + text + "\"" });
+                return result;
+            }
+
+            private static bool IsCompleteInterpolationExpression(ExpressionNode? expression)
+            {
+                if (expression == null) return false;
+                if (expression.Kind == ExpressionKind.Literal
+                    && (string.IsNullOrEmpty(expression.Value) || !(char.IsDigit(expression.Value[0]) || expression.Value[0] is '\'' or '"'))) return false;
+                if (expression.Kind is ExpressionKind.Binary or ExpressionKind.Index or ExpressionKind.Conditional
+                    && (expression.Left == null || expression.Right == null)) return false;
+                if (expression.Kind is ExpressionKind.Unary or ExpressionKind.Cast or ExpressionKind.Call or ExpressionKind.MemberAccess
+                    && expression.Left == null) return false;
+                return (expression.Left == null || IsCompleteInterpolationExpression(expression.Left))
+                    && (expression.Right == null || IsCompleteInterpolationExpression(expression.Right))
+                    && expression.Arguments.All(IsCompleteInterpolationExpression);
             }
 
             private bool MatchOperator(string op)

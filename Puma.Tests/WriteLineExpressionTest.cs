@@ -24,7 +24,7 @@ namespace test
     public class WriteLineExpressionTest
     {
         [TestMethod]
-        public void ProvidedExample_FloatConversionStringVariableWriteLnAndPause_EmitsExactCppOutput()
+        public void ProvidedExample_DefaultStringInterpolation_EmitsExactCppOutput()
         {
             const string source =
 @"start
@@ -37,6 +37,7 @@ namespace test
 ";
             const string expected =
 @"#include <cstdint>
+#include <string>
 #include <PumaType/String.hpp>
 #include <PumaConsole/Console.hpp>
 
@@ -46,7 +47,8 @@ int main()
     auto x = (int64_t)5;
     auto y = (double)10.0;
     auto z = (double) x + y;
-    auto s = PumaType::String(""The value of z is {z}"", (size_t)(sizeof(""The value of z is {z}"") - 1));
+    auto s = PumaType::String(""The value of z is "", (size_t)(sizeof(""The value of z is "") - 1));
+    s += PumaType::String(std::to_string(z).c_str(), (size_t)std::to_string(z).size());
     PumaConsole::WriteLn(s);
     PumaConsole::Pause();
 

@@ -53,11 +53,17 @@ namespace Puma
             var ownedMembers = ast.OfType<TypeDeclarationAstNode>()
                 .SelectMany(type => type.TypeProperties.Concat(type.TypeFunctions)).ToHashSet();
             var topLevelNodes = ast.Where(node => !ownedMembers.Contains(node)).ToList();
+            BindInterpolationTypes(topLevelNodes, new Dictionary<string, string>(StringComparer.Ordinal));
             var globalShadows = topLevelNodes.OfType<PropertyDeclarationAstNode>().Select(property => property.PropertyName)
                 .Concat(topLevelNodes.OfType<TypeDeclarationAstNode>().Select(type => type.DeclarationName))
                 .Concat(topLevelNodes.OfType<FunctionDeclarationAstNode>().Select(function => function.FunctionDeclarationName))
                 .Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name!).ToHashSet(StringComparer.Ordinal);
             BindScopedExternalSymbols(topLevelNodes, externalSymbolTable, globalShadows);
+            if (allNodes.SelectMany(GetExpressionRoots).Any(expression => ContainsExpressionKind(expression, ExpressionKind.InterpolatedString)))
+            {
+                includes.Add("<string>");
+                includes.Add("<PumaType/String.hpp>");
+            }
             if (allNodes.Any(node => node.Kind == NodeKind.WriteLine)
                 || allNodes.SelectMany(GetExpressionRoots).Any(RequiresConsoleHeader))
             {
@@ -294,6 +300,7 @@ namespace Puma
             {
                 "<cstdint>" => 10,
                 "<stdbool>" => 20,
+                "<string>" => 21,
                 "<PumaType/Character.hpp>" => 30,
                 "<PumaType/StringIterator.hpp>" => 31,
                 "<PumaType/String.hpp>" => 32,
@@ -1268,6 +1275,12 @@ namespace Puma
                         || ContainsCharacterLiteral(rightExpression)
                         || rightExpression is { Kind: ExpressionKind.Call, Left.ResolvedExternalSymbol.Kind: ExternalSymbolKind.ValueType }))
                 {
+                    if (rightExpression?.Kind == ExpressionKind.InterpolatedString)
+                    {
+                        EmitInterpolatedStringDeclaration(left, rightExpression, sb, indent);
+                        declared.Add(left);
+                        continue;
+                    }
                     var value = rightExpression?.Kind == ExpressionKind.Literal
                         ? FormatInitializer(rightExpression)
                         : GenerateExpression(rightExpression);
@@ -1515,6 +1528,12 @@ namespace Puma
                                 }
                             }
 
+                            if (GetAssignmentOperator(node) == "="
+                                && GetAssignmentRightExpression(node)?.Kind == ExpressionKind.InterpolatedString)
+                            {
+                                sb.AppendLine($"{indent}[](auto& target, auto value) {{ target = value; value.SetBorrower(); target.SetOwner(); }}({leftExpression}, {rightExpression});");
+                                break;
+                            }
                             sb.AppendLine($"{indent}{leftExpression} {GetAssignmentOperator(node)} {rightExpression};");
                             break;
                         }
@@ -1662,6 +1681,8 @@ namespace Puma
                     ? "null"
                     : node.ResolvedExternalSymbol?.CppName ?? node.Value ?? string.Empty,
                 ExpressionKind.Literal when ContainsCharacterLiteral(node) => ToPumaCharacterLiteral(node.Value!),
+                ExpressionKind.InterpolatedString => "(" + string.Join(" + ", node.Arguments.Select(GenerateStringPart)) + ")",
+                ExpressionKind.StringConversion => GenerateStringConversion(node),
                 ExpressionKind.Literal => !string.IsNullOrWhiteSpace(node.DeclaredType)
                     ? $"({MapType(node.DeclaredType) ?? node.DeclaredType}){node.Value}"
                     : node.Value ?? string.Empty,
@@ -1684,6 +1705,104 @@ namespace Puma
             "and" => "&&",
             "or" => "||",
             _ => value
+        };
+
+        private static string GenerateStringPart(ExpressionNode part) => part.Kind == ExpressionKind.Literal
+            ? ToPumaStringLiteral(part.Value!)
+            : GenerateExpression(part);
+
+        private static string GenerateStringConversion(ExpressionNode conversion)
+        {
+            var value = conversion.Left!;
+            if (value.Kind == ExpressionKind.Literal && ContainsStringLiteral(value)) return ToPumaStringLiteral(value.Value!);
+            var expression = GenerateExpression(value);
+            if (conversion.DeclaredType is not (null or "str" or "char")
+                && value.Kind is ExpressionKind.Identifier or ExpressionKind.Literal)
+            {
+                return $"PumaType::String(std::to_string({expression}).c_str(), (size_t)std::to_string({expression}).size())";
+            }
+
+            return "[](const auto& value) { "
+                + "if constexpr (requires { value.ToUTF8(); value.Size(); }) { return PumaType::String(value.ToUTF8(), (size_t)value.Size()); } "
+                + "else if constexpr (requires { value.GetCharSize(); }) { return PumaType::String(value); } "
+                + "else { const auto text = std::to_string(value); return PumaType::String(text.data(), (size_t)text.size()); } "
+                + $"}}({expression})";
+        }
+
+        private static void EmitInterpolatedStringDeclaration(string name, ExpressionNode expression, StringBuilder sb, string indent)
+        {
+            sb.AppendLine($"{indent}auto {name} = {GenerateStringPart(expression.Arguments[0])};");
+            foreach (var part in expression.Arguments.Skip(1))
+            {
+                sb.AppendLine($"{indent}{name} += {GenerateStringPart(part)};");
+            }
+        }
+
+        private static bool ContainsExpressionKind(ExpressionNode? expression, ExpressionKind kind) => expression != null
+            && (expression.Kind == kind || ContainsExpressionKind(expression.Left, kind)
+                || ContainsExpressionKind(expression.Right, kind) || expression.Arguments.Any(argument => ContainsExpressionKind(argument, kind)));
+
+        private static void BindInterpolationTypes(IEnumerable<Node> nodes, Dictionary<string, string> inheritedTypes)
+        {
+            var types = new Dictionary<string, string>(inheritedTypes, StringComparer.Ordinal);
+            foreach (var property in nodes.OfType<PropertyDeclarationAstNode>())
+            {
+                if (property.PropertyName is { } name && (GetPropertyType(property) ?? InferInterpolationType(property.PropertyValueExpression, types)) is { } type)
+                    types[name] = type;
+            }
+            foreach (var node in nodes)
+            {
+                if (node is TypeDeclarationAstNode owner)
+                {
+                    BindInterpolationTypes(owner.TypeProperties.Concat(owner.TypeFunctions), types);
+                    continue;
+                }
+                if (node is FunctionDeclarationAstNode function)
+                {
+                    var parameters = new Dictionary<string, string>(types, StringComparer.Ordinal);
+                    foreach (var parameter in function.FunctionParameterList) parameters[parameter.Name] = parameter.Type;
+                    foreach (var root in GetExpressionRoots(function)) BindInterpolationExpression(root, parameters);
+                    BindInterpolationTypes(function.FunctionBody, parameters);
+                    continue;
+                }
+                if (node is SectionAstNode section)
+                {
+                    types = new Dictionary<string, string>(inheritedTypes, StringComparer.Ordinal);
+                    foreach (var parameter in section.SectionParameterList) types[parameter.Name] = parameter.Type;
+                }
+                foreach (var root in GetExpressionRoots(node)) BindInterpolationExpression(root, types);
+                if (node is AssignmentStatementAstNode assignment && GetSimpleIdentifier(assignment.AssignmentLeftExpression) is { } local)
+                {
+                    var type = InferInterpolationType(assignment.AssignmentRightExpression, types);
+                    if (type != null) types[local] = type;
+                    else types.Remove(local);
+                }
+                BindInterpolationTypes(GetStatementBody(node), types);
+                if (node is IfStatementAstNode) BindInterpolationTypes(GetIfElseBody(node), types);
+            }
+        }
+
+        private static void BindInterpolationExpression(ExpressionNode? expression, Dictionary<string, string> types)
+        {
+            if (expression == null) return;
+            if (expression.Kind == ExpressionKind.StringConversion) expression.DeclaredType = InferInterpolationType(expression.Left, types);
+            BindInterpolationExpression(expression.Left, types);
+            BindInterpolationExpression(expression.Right, types);
+            foreach (var argument in expression.Arguments) BindInterpolationExpression(argument, types);
+        }
+
+        private static string? InferInterpolationType(ExpressionNode? expression, Dictionary<string, string> types) => expression?.Kind switch
+        {
+            ExpressionKind.InterpolatedString => "str",
+            ExpressionKind.Literal when ContainsStringLiteral(expression) => "str",
+            ExpressionKind.Literal when ContainsCharacterLiteral(expression) => "char",
+            ExpressionKind.Literal => expression.DeclaredType ?? "flt",
+            ExpressionKind.Identifier => types.GetValueOrDefault(expression.Value ?? string.Empty),
+            ExpressionKind.Cast => expression.Value,
+            ExpressionKind.Unary => InferInterpolationType(expression.Left, types),
+            ExpressionKind.Binary when InferInterpolationType(expression.Left, types) is { } left
+                && InferInterpolationType(expression.Right, types) is { } right => left == "str" || right == "str" ? "str" : "flt",
+            _ => null
         };
 
         private static string FormatParameter(Node.ParameterInfo parameter)
@@ -2117,6 +2236,14 @@ namespace Puma
             if (globalNames.Contains(leftName) || localNames.Contains(leftName))
             {
                 return false;
+            }
+
+            if (GetAssignmentRightExpression(statement) is { Kind: ExpressionKind.InterpolatedString } interpolation)
+            {
+                EmitInterpolatedStringDeclaration(leftName, interpolation, sb, indent);
+                localNames.Add(leftName);
+                usedExpressionFallback = true;
+                return true;
             }
 
             var expressionFallback = false;

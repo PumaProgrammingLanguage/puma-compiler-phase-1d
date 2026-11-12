@@ -128,11 +128,8 @@ namespace Puma
             var currentTokenType = TokenCategory.Unknown;
             var currentToken = "";
             var atLineStart = true;
-            var escapeString = false;
             var escapeChar = false;
-            var invalidStringEscape = false;
             var invalidCharEscape = false;
-            var stringHexRemaining = 0;
             var charHexRemaining = 0;
             var indentStack = new Stack<int>();
             indentStack.Push(0);
@@ -218,7 +215,7 @@ namespace Puma
 
 
                     case TokenCategory.StringLiteral:
-                        TokenizeStringLiteral(tokens, ref currentTokenType, ref currentToken, currentChar, ref escapeString, ref invalidStringEscape, ref stringHexRemaining);
+                        TokenizeStringLiteral(tokens, source, ref i, ref currentTokenType, ref currentToken);
                         break;
 
                     case TokenCategory.CharLiteral:
@@ -558,70 +555,84 @@ namespace Puma
             }
         }
 
-        private static void TokenizeStringLiteral(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar, ref bool escapeString, ref bool invalidStringEscape, ref int stringHexRemaining)
+        private static void TokenizeStringLiteral(List<LexerTokens> tokens, string source, ref int index, ref TokenCategory currentTokenType, ref string currentToken)
         {
-            if (stringHexRemaining > 0)
+            var start = index - 1;
+            var rawEnd = source.IndexOf('"', index);
+            var suffix = rawEnd + 1;
+            while (suffix < source.Length && source[suffix] is ' ' or '\t') suffix++;
+            var verbatim = rawEnd >= 0 && source.AsSpan(suffix).StartsWith("vstr", StringComparison.Ordinal)
+                && (suffix + 4 == source.Length || !IsIdentifierPartChar(source[suffix + 4]));
+            if (verbatim)
             {
-                currentToken += currentChar;
-                if (!char.IsAsciiHexDigit(currentChar))
-                {
-                    invalidStringEscape = true;
-                }
-                stringHexRemaining--;
-                return;
-            }
-
-            if (stringHexRemaining < 0)
-            {
-                if (char.IsAsciiHexDigit(currentChar))
-                {
-                    currentToken += currentChar;
-                    return;
-                }
-
-                stringHexRemaining = 0;
-            }
-
-            if (escapeString)
-            {
-                currentToken += currentChar;
-                if (currentChar is 'x' or 'u' or 'U')
-                {
-                    stringHexRemaining = currentChar == 'x' ? -1 : currentChar == 'u' ? 4 : 8;
-                    escapeString = false;
-                    return;
-                }
-                if (!IsValidEscapeChar(currentChar))
-                {
-                    invalidStringEscape = true;
-                }
-                escapeString = false;
-                return;
-            }
-
-            if (currentChar == '\\')
-            {
-                currentToken += currentChar;
-                escapeString = true;
-                return;
-            }
-
-            if (currentChar == '\"')
-            {
-                // found end of the string
-                currentToken += currentChar;
-                var category = invalidStringEscape ? TokenCategory.Unknown : currentTokenType;
-                tokens.Add(new LexerTokens() { TokenText = currentToken, Category = category });
-                currentToken = string.Empty;
-                currentTokenType = TokenCategory.Unknown;
-                escapeString = false;
-                invalidStringEscape = false;
+                index = rawEnd;
             }
             else
             {
-                // string continues
-                currentToken += currentChar;
+                var invalid = false;
+                var interpolationDepth = 0;
+                for (; index < source.Length; index++)
+                {
+                    var ch = source[index];
+                    if (ch is '\r' or '\n') break;
+                    if (ch == '\\')
+                    {
+                        index++;
+                        if (index >= source.Length || !IsValidEscapeChar(source[index]))
+                        {
+                            invalid = true;
+                            continue;
+                        }
+                        var count = source[index] == 'u' ? 4 : source[index] == 'U' ? 8 : 0;
+                        if (source[index] == 'x')
+                        {
+                            var first = index + 1;
+                            while (index + 1 < source.Length && char.IsAsciiHexDigit(source[index + 1])) index++;
+                            invalid |= index < first;
+                        }
+                        for (var digit = 0; digit < count; digit++)
+                        {
+                            if (index + 1 >= source.Length || !char.IsAsciiHexDigit(source[index + 1]))
+                            {
+                                invalid = true;
+                                break;
+                            }
+                            index++;
+                        }
+                        continue;
+                    }
+                    if (ch == '{')
+                    {
+                        if (interpolationDepth == 0 && index + 1 < source.Length && source[index + 1] == '{') index++;
+                        else interpolationDepth++;
+                    }
+                    else if (ch == '}') interpolationDepth = Math.Max(0, interpolationDepth - 1);
+                    else if (interpolationDepth > 0 && ch is '"' or '\'')
+                    {
+                        var quotedEnd = index + 1;
+                        while (quotedEnd < source.Length && source[quotedEnd] is not ('\r' or '\n'))
+                        {
+                            if (source[quotedEnd] == '\\') quotedEnd += 2;
+                            else if (source[quotedEnd] == ch) break;
+                            else quotedEnd++;
+                        }
+                        if (quotedEnd < source.Length && source[quotedEnd] == ch)
+                        {
+                            index = quotedEnd;
+                            continue;
+                        }
+                        if (ch == '"') break;
+                    }
+                    else if (ch == '"') break;
+                }
+                if (invalid) currentTokenType = TokenCategory.Unknown;
             }
+            var closed = index < source.Length && source[index] == '"';
+            var end = closed ? index + 1 : Math.Min(index, source.Length);
+            tokens.Add(new LexerTokens { TokenText = source[start..end], Category = closed ? currentTokenType : TokenCategory.Unknown });
+            if (!closed) index--;
+            currentToken = string.Empty;
+            currentTokenType = TokenCategory.Unknown;
         }
 
         private void TokenizeComment(List<LexerTokens> tokens, ref TokenCategory currentTokenType, ref string currentToken, char currentChar)
