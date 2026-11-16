@@ -48,7 +48,8 @@ int main()
     auto y = (double)10.0;
     auto z = (double) x + y;
     auto s = PumaType::String(""The value of z is "", (size_t)(sizeof(""The value of z is "") - 1));
-    s += PumaType::String(std::to_string(z).c_str(), (size_t)std::to_string(z).size());
+    auto puma_tmp_str_0 = std::to_string(z);
+    s += PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size());
     PumaConsole::WriteLn(s);
     PumaConsole::Pause();
 

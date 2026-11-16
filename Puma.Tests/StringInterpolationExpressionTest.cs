@@ -24,7 +24,8 @@ namespace test
     [TestClass]
     public class StringInterpolationExpressionTest
     {
-        private const string ExpectedValueConversion = "[](const auto& value) { if constexpr (requires { value.ToUTF8(); value.Size(); }) { return PumaType::String(value.ToUTF8(), (size_t)value.Size()); } else if constexpr (requires { value.GetCharSize(); }) { return PumaType::String(value); } else { const auto text = std::to_string(value); return PumaType::String(text.data(), (size_t)text.size()); } }";
+        private const string ExpectedValueConversion = "[](const auto& value) { if constexpr (requires { value.ToUTF8(); value.Size(); }) { return PumaType::String(value.ToUTF8(), (size_t)value.Size()); } else if constexpr (requires { value.GetCharSize(); }) { return PumaType::String(value); } else { const auto puma_tmp_str_0 = std::to_string(value); return PumaType::String(puma_tmp_str_0.data(), (size_t)puma_tmp_str_0.size()); } }";
+        private const string ExpectedNumericConversion = "[](const auto& value) { const auto puma_tmp_str_0 = std::to_string(value); return PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size()); }";
 
         [DataTestMethod]
         [DataRow("\"c:\\directory\\file.ext {missing}\" vstr", "\"c:\\\\directory\\\\file.ext {missing}\"")]
@@ -45,19 +46,19 @@ namespace test
         public void MultiplePlaceholders_EmitExactCppOutput()
         {
             const string source = "start\n    x = 5\n    s = \"{x} + {x} = ten\"\n";
-            const string expected = "#include <cstdint>\n#include <string>\n#include <PumaType/String.hpp>\n\n// start\nint main()\n{\n    auto x = (int64_t)5;\n    auto s = PumaType::String(\"\", (size_t)(sizeof(\"\") - 1));\n    s += PumaType::String(std::to_string(x).c_str(), (size_t)std::to_string(x).size());\n    s += PumaType::String(\" + \", (size_t)(sizeof(\" + \") - 1));\n    s += PumaType::String(std::to_string(x).c_str(), (size_t)std::to_string(x).size());\n    s += PumaType::String(\" = ten\", (size_t)(sizeof(\" = ten\") - 1));\n\n    return 0;\n}";
+            const string expected = "#include <cstdint>\n#include <string>\n#include <PumaType/String.hpp>\n\n// start\nint main()\n{\n    auto x = (int64_t)5;\n    auto s = PumaType::String(\"\", (size_t)(sizeof(\"\") - 1));\n    auto puma_tmp_str_0 = std::to_string(x);\n    s += PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size());\n    s += PumaType::String(\" + \", (size_t)(sizeof(\" + \") - 1));\n    auto puma_tmp_str_1 = std::to_string(x);\n    s += PumaType::String(puma_tmp_str_1.c_str(), (size_t)puma_tmp_str_1.size());\n    s += PumaType::String(\" = ten\", (size_t)(sizeof(\" = ten\") - 1));\n\n    return 0;\n}";
             Assert.AreEqual(expected, new Codegen().Generate(new Parser().Parse(new Lexer().Tokenize(source))).Replace("\r\n", "\n").Trim());
         }
 
         [DataTestMethod]
-        [DataRow("\"{5}\"", "", "PumaType::String(std::to_string(5).c_str(), (size_t)std::to_string(5).size())")]
-        [DataRow("\"value {5}\" str", "value ", "PumaType::String(std::to_string(5).c_str(), (size_t)std::to_string(5).size())")]
-        [DataRow("\"text {\"literal\"}\"", "text ", "PumaType::String(\"literal\", (size_t)(sizeof(\"literal\") - 1))")]
-        [DataRow("\"text {\"c:\\directory\" vstr}\"", "text ", "PumaType::String(\"c:\\\\directory\", (size_t)(sizeof(\"c:\\\\directory\") - 1))")]
-        public void InterpolatedLiteralParts_EmitExactCppOutput(string literal, string prefix, string converted)
+        [DataRow("\"{5}\"", "", "    auto puma_tmp_str_0 = std::to_string(5);\n", "PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size())")]
+        [DataRow("\"value {5}\" str", "value ", "    auto puma_tmp_str_0 = std::to_string(5);\n", "PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size())")]
+        [DataRow("\"text {\"literal\"}\"", "text ", "", "PumaType::String(\"literal\", (size_t)(sizeof(\"literal\") - 1))")]
+        [DataRow("\"text {\"c:\\directory\" vstr}\"", "text ", "", "PumaType::String(\"c:\\\\directory\", (size_t)(sizeof(\"c:\\\\directory\") - 1))")]
+        public void InterpolatedLiteralParts_EmitExactCppOutput(string literal, string prefix, string temporary, string converted)
         {
             var source = $"start\n    s = {literal}\n";
-            var expected = $"#include <string>\n#include <PumaType/String.hpp>\n\n// start\nint main()\n{{\n    auto s = PumaType::String(\"{prefix}\", (size_t)(sizeof(\"{prefix}\") - 1));\n    s += {converted};\n\n    return 0;\n}}";
+            var expected = $"#include <string>\n#include <PumaType/String.hpp>\n\n// start\nint main()\n{{\n    auto s = PumaType::String(\"{prefix}\", (size_t)(sizeof(\"{prefix}\") - 1));\n{temporary}    s += {converted};\n\n    return 0;\n}}";
             Assert.AreEqual(expected, new Codegen().Generate(new Parser().Parse(new Lexer().Tokenize(source))).Replace("\r\n", "\n").Trim());
         }
 
@@ -96,7 +97,7 @@ namespace test
         public void InterpolatedReturn_EmitsExactCppAndExecutesAgainstRuntime()
         {
             const string source = "functions\n    Render(n int) str\n        return \"A long interpolation prefix: {n} :suffix\"\n";
-            const string expected = "#include <cstdint>\n#include <string>\n#include <PumaType/String.hpp>\n\n// functions\nPumaType::String Render(int64_t n)\n{\n    return PumaType::String(\"A long interpolation prefix: \", (size_t)(sizeof(\"A long interpolation prefix: \") - 1)) + PumaType::String(std::to_string(n).c_str(), (size_t)std::to_string(n).size()) + PumaType::String(\" :suffix\", (size_t)(sizeof(\" :suffix\") - 1));\n}";
+            const string expected = "#include <cstdint>\n#include <string>\n#include <PumaType/String.hpp>\n\n// functions\nPumaType::String Render(int64_t n)\n{\n    return PumaType::String(\"A long interpolation prefix: \", (size_t)(sizeof(\"A long interpolation prefix: \") - 1)) + " + ExpectedNumericConversion + "(n) + PumaType::String(\" :suffix\", (size_t)(sizeof(\" :suffix\") - 1));\n}";
             var generated = new Codegen().GenerateResult(new Parser().Parse(new Lexer().Tokenize(source)));
             Assert.AreEqual(expected, generated.SourceCode.Replace("\r\n", "\n").Trim());
             CollectionAssert.AreEqual(new[] { "PumaType" }, generated.RequiredRuntimeLibraries.ToArray());
@@ -134,7 +135,7 @@ namespace test
         public void InterpolatedReassignment_PreservesLongStringOwnership()
         {
             const string source = "functions\n    Render(n int) str\n        s = \"initial long string {n}\"\n        s = \"replacement long string {n}\"\n        return s\n";
-            const string expected = "#include <cstdint>\n#include <string>\n#include <PumaType/String.hpp>\n\n// functions\nPumaType::String Render(int64_t n)\n{\n    auto s = PumaType::String(\"initial long string \", (size_t)(sizeof(\"initial long string \") - 1));\n    s += PumaType::String(std::to_string(n).c_str(), (size_t)std::to_string(n).size());\n    [](auto& target, auto value) { target = value; value.SetBorrower(); target.SetOwner(); }(s, (PumaType::String(\"replacement long string \", (size_t)(sizeof(\"replacement long string \") - 1)) + PumaType::String(std::to_string(n).c_str(), (size_t)std::to_string(n).size())));\n    return s;\n}";
+            const string expected = "#include <cstdint>\n#include <string>\n#include <PumaType/String.hpp>\n\n// functions\nPumaType::String Render(int64_t n)\n{\n    auto s = PumaType::String(\"initial long string \", (size_t)(sizeof(\"initial long string \") - 1));\n    auto puma_tmp_str_0 = std::to_string(n);\n    s += PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size());\n    [](auto& target, auto value) { target = value; value.SetBorrower(); target.SetOwner(); }(s, (PumaType::String(\"replacement long string \", (size_t)(sizeof(\"replacement long string \") - 1)) + " + ExpectedNumericConversion + "(n)));\n    return s;\n}";
             var generated = new Codegen().Generate(new Parser().Parse(new Lexer().Tokenize(source)));
             Assert.AreEqual(expected, generated.Replace("\r\n", "\n").Trim());
             CompileAndRun(generated + "\n#include <cstring>\nint main() { auto result = Render(15); const char expected[] = \"replacement long string 15\"; return result.IsOwner() && result.Size() == sizeof(expected) - 1 && std::memcmp(result.ToUTF8(), expected, sizeof(expected) - 1) == 0 ? 0 : 1; }\n");
@@ -144,10 +145,99 @@ namespace test
         public void GlobalInterpolation_EmitsExactCppAndExecutesAgainstRuntime()
         {
             const string source = "properties\n    message = \"value {5}\"\n";
-            const string expected = "#include <string>\n#include <PumaType/String.hpp>\n\n// properties\nauto message = (PumaType::String(\"value \", (size_t)(sizeof(\"value \") - 1)) + PumaType::String(std::to_string(5).c_str(), (size_t)std::to_string(5).size()));";
+            const string expected = "#include <string>\n#include <PumaType/String.hpp>\n\n// properties\nauto message = (PumaType::String(\"value \", (size_t)(sizeof(\"value \") - 1)) + " + ExpectedNumericConversion + "(5));";
             var generated = new Codegen().Generate(new Parser().Parse(new Lexer().Tokenize(source)));
             Assert.AreEqual(expected, generated.Replace("\r\n", "\n").Trim());
             CompileAndRun(generated + "\n#include <cstring>\nint main() { return message.Size() == 7 && std::memcmp(message.ToUTF8(), \"value 5\", 7) == 0 ? 0 : 1; }\n");
+        }
+
+        [TestMethod]
+        public void NumericTemporaries_AvoidExistingAndLaterDeclarations()
+        {
+            const string source = "start\n    x = 5\n    xStr = 7\n    puma_tmp_str_0 = 8\n    s = \"{x} {x}\"\n    puma_tmp_str_1 = 9\n    t = \"{x}\"\n";
+            const string expected =
+@"#include <cstdint>
+#include <string>
+#include <PumaType/String.hpp>
+
+// start
+int main()
+{
+    auto x = (int64_t)5;
+    auto xStr = (int64_t)7;
+    auto puma_tmp_str_0 = (int64_t)8;
+    auto s = PumaType::String("""", (size_t)(sizeof("""") - 1));
+    auto puma_tmp_str_2 = std::to_string(x);
+    s += PumaType::String(puma_tmp_str_2.c_str(), (size_t)puma_tmp_str_2.size());
+    s += PumaType::String("" "", (size_t)(sizeof("" "") - 1));
+    auto puma_tmp_str_3 = std::to_string(x);
+    s += PumaType::String(puma_tmp_str_3.c_str(), (size_t)puma_tmp_str_3.size());
+    auto puma_tmp_str_1 = (int64_t)9;
+    auto t = PumaType::String("""", (size_t)(sizeof("""") - 1));
+    auto puma_tmp_str_4 = std::to_string(x);
+    t += PumaType::String(puma_tmp_str_4.c_str(), (size_t)puma_tmp_str_4.size());
+
+    return 0;
+}";
+            var ast = new Parser().Parse(new Lexer().Tokenize(source));
+            var codegen = new Codegen();
+            var generated = codegen.Generate(ast);
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), generated.Replace("\r\n", "\n").Trim());
+            Assert.AreEqual(generated, codegen.Generate(ast));
+            Assert.AreEqual(generated, codegen.Generate(new Parser().Parse(new Lexer().Tokenize(source))));
+            CompileAndRun(generated);
+        }
+
+        [TestMethod]
+        public void NumericTemporary_AvoidsParameterNameAndPreservesRuntimeValue()
+        {
+            const string source = "functions\n    Render(n int, puma_tmp_str_0 int) str\n        s = \"value {n}\"\n        return s\n";
+            const string expected =
+@"#include <cstdint>
+#include <string>
+#include <PumaType/String.hpp>
+
+// functions
+PumaType::String Render(int64_t n, int64_t puma_tmp_str_0)
+{
+    auto s = PumaType::String(""value "", (size_t)(sizeof(""value "") - 1));
+    auto puma_tmp_str_1 = std::to_string(n);
+    s += PumaType::String(puma_tmp_str_1.c_str(), (size_t)puma_tmp_str_1.size());
+    return s;
+}";
+            var generated = new Codegen().Generate(new Parser().Parse(new Lexer().Tokenize(source)));
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), generated.Replace("\r\n", "\n").Trim());
+            CompileAndRun(generated + "\n#include <cstring>\nint main() { auto result = Render(15, 99); const char expected[] = \"value 15\"; return result.Size() == sizeof(expected) - 1 && std::memcmp(result.ToUTF8(), expected, sizeof(expected) - 1) == 0 ? 0 : 1; }\n");
+        }
+
+        [TestMethod]
+        public void NumericTemporaryNames_RestartForEachFunction()
+        {
+            const string source = "functions\n    Render(n int) str\n        s = \"value {n}\"\n        return s\n    Other(n int) str\n        s = \"value {n}\"\n        return s\n";
+            const string expected =
+@"#include <cstdint>
+#include <string>
+#include <PumaType/String.hpp>
+
+// functions
+PumaType::String Render(int64_t n)
+{
+    auto s = PumaType::String(""value "", (size_t)(sizeof(""value "") - 1));
+    auto puma_tmp_str_0 = std::to_string(n);
+    s += PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size());
+    return s;
+}
+
+PumaType::String Other(int64_t n)
+{
+    auto s = PumaType::String(""value "", (size_t)(sizeof(""value "") - 1));
+    auto puma_tmp_str_0 = std::to_string(n);
+    s += PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size());
+    return s;
+}";
+            var generated = new Codegen().Generate(new Parser().Parse(new Lexer().Tokenize(source)));
+            Assert.AreEqual(expected.Replace("\r\n", "\n"), generated.Replace("\r\n", "\n").Trim());
+            CompileAndRun(generated + "\n#include <cstring>\nint main() { auto first = Render(15); auto second = Other(20); return first.Size() == 8 && second.Size() == 8 && std::memcmp(first.ToUTF8(), \"value 15\", 8) == 0 && std::memcmp(second.ToUTF8(), \"value 20\", 8) == 0 ? 0 : 1; }\n");
         }
 
         private static void CompileAndRun(string generated)

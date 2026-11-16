@@ -993,7 +993,7 @@ namespace Puma
                 sb.AppendLine("{");
                 if (string.Equals(GetFunctionDeclarationReturnType(node), "char", StringComparison.OrdinalIgnoreCase))
                 {
-                    EmitStatementsWithLocalDeclarations(functionBody, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
+                    EmitStatementsWithLocalDeclarations(functionBody, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal), ast);
                 }
                 else
                 {
@@ -1050,7 +1050,7 @@ namespace Puma
                     .Select(GetPropertyName)
                     .Where(n => !string.IsNullOrWhiteSpace(n))
                     .ToHashSet(StringComparer.Ordinal);
-                EmitStatementsWithLocalDeclarations(statements, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal));
+                EmitStatementsWithLocalDeclarations(statements, sb, "    ", new HashSet<string?>(globalNames, StringComparer.Ordinal), ast);
             }
             else
             {
@@ -1094,6 +1094,7 @@ namespace Puma
             var numericPropertyReassignmentMode = UsesTypedPropertyReassignmentMode(ast);
             var globalNames = globalPropertyNames;
             var localNames = new HashSet<string>(StringComparer.Ordinal);
+            var temporaryNames = GetInterpolationReservedNames(ast);
             var bufferedStatements = new List<Node>();
             var emittedExpressionBasedLocalDeclaration = false;
             var emittedPropertyTypedAssignment = false;
@@ -1113,7 +1114,7 @@ namespace Puma
             {
                 TrackOwnershipTransfer(statement, heapAllocatedGlobalProperties, globalNames, propertiesAssignedToNone, transferredOwnershipLocals, functionsReturningConstructedObject, ownedLocalsToDelete, ast);
 
-                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, "    ", out var usedExpressionFallback, out var usedPropertyTypedAssignment))
+                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, temporaryNames, sb, "    ", out var usedExpressionFallback, out var usedPropertyTypedAssignment))
                 {
                     emittedExpressionBasedLocalDeclaration |= usedExpressionFallback;
                     emittedPropertyTypedAssignment |= usedPropertyTypedAssignment;
@@ -1198,7 +1199,7 @@ namespace Puma
                     sb.AppendLine("public:");
                     sb.AppendLine($"    {name}()");
                     sb.AppendLine("    {");
-                    EmitStatementsWithLocalDeclarations(initializeStatements, sb, "        ", new HashSet<string?>(StringComparer.Ordinal));
+                    EmitStatementsWithLocalDeclarations(initializeStatements, sb, "        ", new HashSet<string?>(StringComparer.Ordinal), ast);
                     sb.AppendLine("    }");
                 }
                 EmitTypeProperties(node, sb, "    ", ast);
@@ -1223,7 +1224,7 @@ namespace Puma
                     sb.AppendLine("public:");
                     sb.AppendLine($"    {name}()");
                     sb.AppendLine("    {");
-                    EmitTraitInitializeStatements(initializeStatements, sb, "        ");
+                    EmitTraitInitializeStatements(initializeStatements, sb, "        ", ast);
                     sb.AppendLine("    }");
                 }
                 EmitTypeProperties(node, sb, "    ", ast);
@@ -1233,14 +1234,15 @@ namespace Puma
             }
         }
 
-        private static void EmitStatementsWithLocalDeclarations(List<Node> statements, StringBuilder sb, string indent, HashSet<string?> globalNames)
+        private static void EmitStatementsWithLocalDeclarations(List<Node> statements, StringBuilder sb, string indent, HashSet<string?> globalNames, List<Node> ast)
         {
             var localNames = new HashSet<string>(StringComparer.Ordinal);
+            var temporaryNames = GetInterpolationReservedNames(ast);
             var bufferedStatements = new List<Node>();
 
             foreach (var statement in statements)
             {
-                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent))
+                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, temporaryNames, sb, indent))
                 {
                     if (bufferedStatements.Count > 0)
                     {
@@ -1262,6 +1264,7 @@ namespace Puma
         private static void EmitStatementsWithStringLocalDeclarations(List<Node> statements, StringBuilder sb, string indent, List<Node>? ast)
         {
             var declared = new HashSet<string>(StringComparer.Ordinal);
+            var temporaryNames = GetInterpolationReservedNames(ast ?? statements);
             foreach (var statement in statements)
             {
                 var left = GetSimpleIdentifier(GetAssignmentLeftExpression(statement));
@@ -1277,7 +1280,7 @@ namespace Puma
                 {
                     if (rightExpression?.Kind == ExpressionKind.InterpolatedString)
                     {
-                        EmitInterpolatedStringDeclaration(left, rightExpression, sb, indent);
+                        EmitInterpolatedStringDeclaration(left, rightExpression, sb, indent, temporaryNames);
                         declared.Add(left);
                         continue;
                     }
@@ -1321,14 +1324,15 @@ namespace Puma
             return $"{functionName}({string.Join(", ", arguments)})";
         }
 
-        private static void EmitTraitInitializeStatements(List<Node> statements, StringBuilder sb, string indent)
+        private static void EmitTraitInitializeStatements(List<Node> statements, StringBuilder sb, string indent, List<Node> ast)
         {
             var localNames = new HashSet<string>(StringComparer.Ordinal);
             var globalNames = new HashSet<string?>(StringComparer.Ordinal);
+            var temporaryNames = GetInterpolationReservedNames(ast);
 
             foreach (var statement in statements)
             {
-                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent))
+                if (TryEmitMainLocalDeclaration(statement, globalNames, localNames, temporaryNames, sb, indent))
                 {
                     continue;
                 }
@@ -1716,25 +1720,79 @@ namespace Puma
             var value = conversion.Left!;
             if (value.Kind == ExpressionKind.Literal && ContainsStringLiteral(value)) return ToPumaStringLiteral(value.Value!);
             var expression = GenerateExpression(value);
-            if (conversion.DeclaredType is not (null or "str" or "char")
-                && value.Kind is ExpressionKind.Identifier or ExpressionKind.Literal)
+            if (IsSimpleNumericStringConversion(conversion))
             {
-                return $"PumaType::String(std::to_string({expression}).c_str(), (size_t)std::to_string({expression}).size())";
+                return "[](const auto& value) { const auto puma_tmp_str_0 = std::to_string(value); "
+                    + "return PumaType::String(puma_tmp_str_0.c_str(), (size_t)puma_tmp_str_0.size()); }"
+                    + $"({expression})";
             }
 
             return "[](const auto& value) { "
                 + "if constexpr (requires { value.ToUTF8(); value.Size(); }) { return PumaType::String(value.ToUTF8(), (size_t)value.Size()); } "
                 + "else if constexpr (requires { value.GetCharSize(); }) { return PumaType::String(value); } "
-                + "else { const auto text = std::to_string(value); return PumaType::String(text.data(), (size_t)text.size()); } "
+                + "else { const auto puma_tmp_str_0 = std::to_string(value); return PumaType::String(puma_tmp_str_0.data(), (size_t)puma_tmp_str_0.size()); } "
                 + $"}}({expression})";
         }
 
-        private static void EmitInterpolatedStringDeclaration(string name, ExpressionNode expression, StringBuilder sb, string indent)
+        private static bool IsSimpleNumericStringConversion(ExpressionNode expression) => expression.Kind == ExpressionKind.StringConversion
+            && expression.DeclaredType is not (null or "str" or "char")
+            && expression.Left?.Kind is ExpressionKind.Identifier or ExpressionKind.Literal;
+
+        private static HashSet<string> GetInterpolationReservedNames(IEnumerable<Node> nodes)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var node in EnumerateAllNodes(nodes))
+            {
+                foreach (var parameter in GetParameters(node)) names.Add(parameter.Name);
+                var name = node switch
+                {
+                    PropertyDeclarationAstNode property => property.PropertyName,
+                    FunctionDeclarationAstNode function => function.FunctionDeclarationName,
+                    TypeDeclarationAstNode type => type.DeclarationName,
+                    ForStatementAstNode loop => loop.ForVariable,
+                    ForAllStatementAstNode loop => loop.ForVariable,
+                    _ => null
+                };
+                if (name != null) names.Add(name);
+                if (node is TypeDeclarationAstNode owner)
+                {
+                    foreach (var property in owner.TypeProperties) names.Add(GetPropertyName(property)!);
+                }
+                foreach (var root in GetExpressionRoots(node)) ReserveExpressionNames(root);
+            }
+            return names;
+
+            void ReserveExpressionNames(ExpressionNode? expression)
+            {
+                if (expression == null) return;
+                if (expression.Kind == ExpressionKind.Identifier)
+                {
+                    if (expression.Value != null) names.Add(expression.Value);
+                    if (expression.ResolvedExternalSymbol?.CppName is { } cppName) names.Add(cppName);
+                }
+                ReserveExpressionNames(expression.Left);
+                ReserveExpressionNames(expression.Right);
+                foreach (var argument in expression.Arguments) ReserveExpressionNames(argument);
+            }
+        }
+
+        private static void EmitInterpolatedStringDeclaration(string name, ExpressionNode expression, StringBuilder sb, string indent, HashSet<string> temporaryNames)
         {
             sb.AppendLine($"{indent}auto {name} = {GenerateStringPart(expression.Arguments[0])};");
             foreach (var part in expression.Arguments.Skip(1))
             {
-                sb.AppendLine($"{indent}{name} += {GenerateStringPart(part)};");
+                if (IsSimpleNumericStringConversion(part))
+                {
+                    var value = part.Left!;
+                    var temporaryName = "puma_tmp_str_0";
+                    for (var suffix = 1; !temporaryNames.Add(temporaryName); suffix++) temporaryName = "puma_tmp_str_" + suffix;
+                    sb.AppendLine($"{indent}auto {temporaryName} = std::to_string({GenerateExpression(value)});");
+                    sb.AppendLine($"{indent}{name} += PumaType::String({temporaryName}.c_str(), (size_t){temporaryName}.size());");
+                }
+                else
+                {
+                    sb.AppendLine($"{indent}{name} += {GenerateStringPart(part)};");
+                }
             }
         }
 
@@ -2212,12 +2270,12 @@ namespace Puma
             return statements;
         }
 
-        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent)
+        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, HashSet<string> temporaryNames, StringBuilder sb, string indent)
         {
-            return TryEmitMainLocalDeclaration(statement, globalNames, localNames, sb, indent, out _, out _);
+            return TryEmitMainLocalDeclaration(statement, globalNames, localNames, temporaryNames, sb, indent, out _, out _);
         }
 
-        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, StringBuilder sb, string indent, out bool usedExpressionFallback, out bool usedPropertyTypedAssignment)
+        private static bool TryEmitMainLocalDeclaration(Node statement, HashSet<string?> globalNames, HashSet<string> localNames, HashSet<string> temporaryNames, StringBuilder sb, string indent, out bool usedExpressionFallback, out bool usedPropertyTypedAssignment)
         {
             usedExpressionFallback = false;
             usedPropertyTypedAssignment = false;
@@ -2240,7 +2298,7 @@ namespace Puma
 
             if (GetAssignmentRightExpression(statement) is { Kind: ExpressionKind.InterpolatedString } interpolation)
             {
-                EmitInterpolatedStringDeclaration(leftName, interpolation, sb, indent);
+                EmitInterpolatedStringDeclaration(leftName, interpolation, sb, indent, temporaryNames);
                 localNames.Add(leftName);
                 usedExpressionFallback = true;
                 return true;

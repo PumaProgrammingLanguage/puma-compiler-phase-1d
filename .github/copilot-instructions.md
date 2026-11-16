@@ -9,6 +9,9 @@
 - Use `PUMA_STDLIB_ROOT` as the configured root for Puma standard libraries (lib and include). Install the compiler executable and required .NET files into `PUMA_STDLIB_ROOT` only when publishing, not during normal builds.
 - Puma standard-library String and Character `ToUTF8()` return non-NUL-terminated UTF-8 byte pointers. Always use `Size()` for byte length; do not assume NUL termination or use `strlen`/C-string APIs on these pointers.
 
+## Naming Conventions
+- Name compiler-generated string-conversion temporaries `puma_tmp_str_<number>`, using deterministic numbering per independent emission scope and collision checks against user declarations/parameters. Preserve user-written identifiers and avoid C++ reserved double-underscore names.
+
 ## Task Management
 - Break large tasks into smaller tasks that can be completed in one session, then continue iteratively. 
 - Prioritize parser/lexer work first; do codegen unit tests last.
@@ -21,6 +24,7 @@
 
 ## Unit Testing
 - When adding compiler regression tests from user-provided examples, preserve both the supplied Puma input and expected C++ output as requested rather than correcting their semantics. For the StringVariableWriteLn regression, retain the original Puma input, including `WriteLn(s)`, and expect `auto s = PumaType::String("The value of z is 5", (size_t)(sizeof("The value of z is 5") - 1));` in the C++ output. Leave the test unrun pending user review.
+- Use the namespaced `PumaType::String` C++ API in unit-test expectations, not `PumaTypeString`.
 
 ## Specification Reference
 - The specification text file is located at `C:\Users\dabur\source\repos\Puma Programming Language Specification.txt`.
